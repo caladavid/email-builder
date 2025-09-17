@@ -21,7 +21,7 @@ onMounted(() => {
   window.addEventListener('message', (event) => {
     // El origen del mensaje DEBE COINCIDIR con la URL del padre.
     // Si tu app padre está en http://localhost:3000, ese es el origen correcto.
-    if (event.origin !== 'http://localhost:3000') {
+    if (event.origin !== 'http://localhost:3000' && event.origin !== 'http://email-builder.multinetlabs.com/') {
       /* console.warn('Mensaje ignorado, origen no seguro:', event.origin); */
       return;
     }

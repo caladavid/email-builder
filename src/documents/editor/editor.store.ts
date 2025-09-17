@@ -63,7 +63,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   if (typeof window !== 'undefined') {
     window.addEventListener('message', (event) => {
       // Verificar origen por seguridad
-      if (event.origin !== 'http://localhost:3000') return // Tu app principal
+      if (event.origin !== 'http://localhost:3000' && event.origin !== 'http://email-builder.multinetlabs.com/') return // Tu app principal
 
       const data = event.data as TReceivedMessage; // Casteo de tipo
 
