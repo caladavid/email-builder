@@ -1,0 +1,31 @@
+/* Reset específico para contenido markdown en bloques de texto */  
+.email-text-block .markdown-content p {  
+  margin: 0 !important;  
+  padding: 0 !important;  
+}  
+  
+.email-text-block .markdown-content h1,  
+.email-text-block .markdown-content h2,  
+.email-text-block .markdown-content h3,  
+.email-text-block .markdown-content h4,  
+.email-text-block .markdown-content h5,  
+.email-text-block .markdown-content h6 {  
+  margin: 0 !important;  
+  padding: 0 !important;  
+}  
+  
+.email-text-block .markdown-content ul,  
+.email-text-block .markdown-content ol {  
+  margin: 0 !important;  
+  padding-left: 20px !important;  
+}  
+  
+.email-text-block .markdown-content blockquote {  
+  margin: 0 !important;  
+  padding: 0 !important;  
+}  
+  
+.email-text-block .markdown-content a {  
+  color: inherit;  
+  text-decoration: underline;  
+}

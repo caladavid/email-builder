@@ -1,0 +1,13 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+@layer utilities {
+  .revert-browser-styles * {
+    all: revert;
+  }
+}
+
+:root {
+  --ui-primary: #ff9900;
+  /* --ui-bg: #0033a0; */
+}
