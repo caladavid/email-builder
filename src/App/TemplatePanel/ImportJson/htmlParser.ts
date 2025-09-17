@@ -403,9 +403,32 @@ export class HTMLToBlockParser {
 
                 if (!inlineTags.has(tag)) return;
 
-                if (tag === "br") {               // salto de línea real
+                if (tag === "br") {
                     append("\n");
                     return;
+                }
+
+                // Procesar enlaces dentro de elementos strong/b  
+                if ((tag === "strong" || tag === "b") && el.querySelector("a")) {
+                    const link = el.querySelector("a");
+                    if (link) {
+                        const href = link.getAttribute("href") || "";
+                        const linkText = link.textContent?.trim() || "";
+                        if (href && linkText) {
+                            append(`**[${linkText}](${href})**`);
+                            return;
+                        }
+                    }
+                }
+
+                // Procesar enlaces simples  
+                if (tag === "a") {
+                    const href = el.getAttribute("href") || "";
+                    const linkText = el.textContent?.trim() || "";
+                    if (href && linkText) {
+                        append(`[${linkText}](${href})`);
+                        return;
+                    }
                 }
 
                 const childStyles = this.extractStyles(el, inheritedStyles);
@@ -417,40 +440,18 @@ export class HTMLToBlockParser {
 
                     const fmt: any = { start, end: start + childRes.text.length };
 
-                    // === BOLD detection (strong/b o font-weight alto) ===
+                    // Bold detection  
                     const fw = String(childStyles.fontWeight ?? "").toLowerCase();
                     const isBoldTag = tag === "strong" || tag === "b";
                     const isBoldStyle = fw === "bold" || (!isNaN(parseInt(fw)) && parseInt(fw) >= 600);
                     if (isBoldTag || isBoldStyle) fmt.bold = true;
-
-                    // === Enlaces: Añadir enlace al formato ===
-                    if (tag === "a") fmt.link = el.getAttribute("href") || "";
 
                     formats.push(fmt);
                 }
             }
         });
 
-        // Limpieza de espacios antes de saltos de línea
         text = text.replace(/[ \t]+\n/g, "\n").trimEnd();
-
-        // Nueva lógica: convertir los enlaces dentro de negrita a formato Markdown
-        text = text.replace(
-            /(\*\*|__)(.*?)\1/g,  // Busca **Texto** o __Texto__
-            (match, p1, p2) => {
-                // Aquí tenemos el caso de **Texto**, por lo que procesamos si contiene un enlace dentro
-                if (p2.includes('href')) {
-                    const linkMatch = p2.match(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/); // Verificar si hay un enlace en el texto
-                    if (linkMatch) {
-                        const linkText = linkMatch[1];
-                        const linkUrl = linkMatch[2];
-                        return `**[${linkText}](${linkUrl})**`; // Convertir a formato Markdown
-                    }
-                }
-                return match; // Si no hay enlaces, dejar el texto en negrita tal cual
-            }
-        );
-
         return { text: text.trim(), formats };
     }
 
@@ -765,15 +766,23 @@ export class HTMLToBlockParser {
     private createTextBlock(text: string, formats: any[], styles: any): string | null {
         if (!text) return null;
         const id = uuidv4();
+
+        // Detectar si el texto contiene enlaces markdown  
+        const hasMarkdownLinks = /\[([^\]]+)\]\(([^)]+)\)/.test(text);
+
         this.blocks[id] = {
             type: "Text",
             data: {
                 style: {
                     ...styles,
-                    textAlign: this.normalizeTextAlign(styles?.textAlign),  // ← aquí
+                    textAlign: this.normalizeTextAlign(styles?.textAlign),
                     padding: { top: 16, bottom: 16, left: 24, right: 24 }
                 },
-                props: { text, formats, markdown: false }
+                props: {
+                    text,
+                    formats,
+                    markdown: hasMarkdownLinks // Activar markdown si hay enlaces  
+                }
             }
         };
         return id;

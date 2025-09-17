@@ -32,10 +32,8 @@ const emit = defineEmits<{
 
 function handleClick(item: typeof BUTTONS[number]) {
   const block = item.block()
-  
-  setTimeout(() => {
-    emit('select', block);
-  }, 0);
+  emit('select', block);
+  open.value = false;
 }
 
 /** Watch */
