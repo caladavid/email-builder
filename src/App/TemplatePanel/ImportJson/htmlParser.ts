@@ -74,7 +74,7 @@ export class HTMLToBlockParser {
         });
         if (!htmlFile) throw new Error("No se encontró archivo HTML en el ZIP");
 
-        const htmlContent = await htmlFile.async("string");
+        const htmlContent = await (htmlFile as JSZipObject).async("string");
         return this.parseHtmlToBlocks(htmlContent);
     }
 

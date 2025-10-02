@@ -34,7 +34,8 @@ const props = defineProps<EditorChildrenIdsProps>()
 
 /** Functions */
 
-const generateId = () => `block-${Date.now()}`
+let idCounter = 0;
+const generateId = () => `block-${Date.now()}-${++idCounter}`
 
 function handleInsertBlock(block: TEditorBlock, index: number) {
   const blockId = generateId()
