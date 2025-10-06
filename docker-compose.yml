@@ -1,0 +1,11 @@
+version: '3.9'
+
+services:
+  email-builder:
+    build:
+      context: .        # Ruta donde está tu Dockerfile
+      dockerfile: Dockerfile
+    container_name: email-builder-container  # Nombre fijo del contenedor
+    ports:
+      - "8080:80"       # Exponer puerto 80 del contenedor en el puerto 8080 de tu máquina
+    restart: unless-stopped  # Opcional: reinicia automáticamente si el contenedor falla
