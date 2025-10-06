@@ -1,6 +1,6 @@
 <template>
-  <BaseSidebarPanel title="Button block">
-    <UFormField label="Text">
+  <BaseSidebarPanel title="Bloque del botón">
+    <UFormField label="Texto">
       <RichTextEditor      
         label=""      
         :rows="3"      
@@ -14,30 +14,30 @@
       <UInput :model-value="url" @update:model-value="handleUpdateData({ ...data, props: { ...data.props, url: $event as string } })" class="w-full" />
     </UFormField>
     <RadioGroupInput
-      label="Width"
+      label="Ancho"
       :model-value="fullWidth ? 'FULL_WIDTH' : 'AUTO'"
       :items="[{ label: 'Full', value: 'FULL_WIDTH' }, { label: 'Auto', value: 'AUTO' }]"
       @update:model-value="handleUpdateData({ ...data, props: { ...data.props, fullWidth: $event === 'FULL_WIDTH' } })"
     />
     <RadioGroupInput
-      label="Size"
+      label="Tamaño"
       :model-value="size"
       :items="[{ label: 'Xs', value: 'x-small' }, { label: 'Sm', value: 'small' }, { label: 'Md', value: 'medium' }, { label: 'Lg', value: 'large' }]"
       @update:model-value="handleUpdateData({ ...data, props: { ...data.props, size: $event } })"
     />
     <RadioGroupInput
-      label="Style"
+      label="Estilo"
       :model-value="buttonStyle"
       :items="[{ label: 'Rectangle', value: 'rectangle' }, { label: 'Rounded', value: 'rounded' }, { label: 'Pill', value: 'pill' }]"
       @update:model-value="handleUpdateData({ ...data, props: { ...data.props, buttonStyle: $event } })"
     />
     <ColorInput
-      label="Text color"
+      label="Color del texto"
       :default-value="buttonTextColor"
       @change="handleUpdateData({ ...data, props: { ...data.props, buttonTextColor: $event } })"
     />
     <ColorInput
-      label="Button color"
+      label="Color del botón"
       :default-value="buttonBackgroundColor"
       @change="handleUpdateData({ ...data, props: { ...data.props, buttonBackgroundColor: $event } })"
     />

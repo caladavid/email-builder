@@ -1,5 +1,5 @@
 <template>
-  <BaseSidebarPanel title="Html block">
+  <BaseSidebarPanel title="Bloque de Html">
     <UFormField label="Content">
       <UTextarea
         :rows="5"

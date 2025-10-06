@@ -12,7 +12,7 @@ export const BUTTONS: TButtonProps[] = [
     block: () => ({
       type: 'Heading',
       data: {
-        props: { text: 'Hello friend' },
+        props: { text: 'Encabezado' },
         style: {
           padding: { top: 16, bottom: 16, left: 24, right: 24 },
         },
@@ -25,7 +25,7 @@ export const BUTTONS: TButtonProps[] = [
     block: () => ({
       type: 'Text',
       data: {
-        props: { text: 'My new text block' },
+        props: { text: 'Mi nuevo bloque de texto' },
         style: {
           padding: { top: 16, bottom: 16, left: 24, right: 24 },
           fontWeight: 'normal',
@@ -41,8 +41,8 @@ export const BUTTONS: TButtonProps[] = [
       type: 'Button',
       data: {
         props: {
-          text: 'Button',
-          url: 'https://www.usewaypoint.com',
+          text: 'Botón',
+          url: 'https://www.celcomlatam.com/',
         },
         style: { padding: { top: 16, bottom: 16, left: 24, right: 24 } },
       },
@@ -56,7 +56,7 @@ export const BUTTONS: TButtonProps[] = [
       data: {
         props: {
           url: 'https://assets.usewaypoint.com/sample-image.jpg',
-          alt: 'Sample product',
+          alt: 'Producto de Ejemplo',
           contentAlignment: 'middle',
           linkHref: null,
         },
@@ -105,7 +105,7 @@ export const BUTTONS: TButtonProps[] = [
     block: () => ({
       type: 'Html',
       data: {
-        props: { contents: '<strong>Hello world</strong>' },
+        props: { contents: '<strong>Hola mundo</strong>' },
         style: {
           fontSize: 16,
           textAlign: null,

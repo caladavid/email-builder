@@ -1,7 +1,7 @@
 <template>
-  <BaseSidebarPanel title="Columns block">
+  <BaseSidebarPanel title="Bloque de columnas">
     <RadioGroupInput
-      label="Number of columns"
+      label="Numeros de columnas"
       :model-value="data.props?.columnsCount === 2 ? '2' : '3'"
       :items="[{ label: '2', value: '2' }, { label: '3', value: '3' }]"
       @update:model-value="handleUpdateData({ ...data, props: { ...data.props, columnsCount: $event === '2' ? 2 : 3 } })"
@@ -12,7 +12,7 @@
       @update:model-value="handleUpdateData({ ...data, props: { ...data.props, fixedWidths: $event } })"
     />
     <SliderInput
-      label="Column gap"
+      label="Espacio entre columnas (gap)"
       icon-label="material-symbols:space-bar"
       units="px"
       :step="4"
@@ -22,7 +22,7 @@
       @change="handleUpdateData({ ...data, props: { ...data.props, columnsGap: $event } })"
     />
     <RadioGroupInput
-      label="Alignment"
+      label="Alineación"
       :model-value="data.props?.contentAlignment ?? 'middle'"
       :items="[
         { icon: 'material-symbols:vertical-align-top', value: 'top' },

@@ -1,7 +1,7 @@
 <template>
-  <BaseSidebarPanel title="Spacer block">
+  <BaseSidebarPanel title="Bloque espaciador">
     <SliderInput
-      label="Height"
+      label="Altura"
       icon-label="material-symbols:height"
       units="px"
       :step="4"

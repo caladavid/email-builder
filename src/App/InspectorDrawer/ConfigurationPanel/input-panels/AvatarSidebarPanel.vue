@@ -1,7 +1,7 @@
 <template>
-  <BaseSidebarPanel title="Avatar block">
+  <BaseSidebarPanel title="Bloque del Avatar">
     <SliderInput
-      label="Size"
+      label="Tamaño"
       icon-label="material-symbols:aspect-ratio"
       units="px"
       :step="3"
@@ -11,19 +11,19 @@
       @change="handleUpdateData({ ...data, props: { ...data.props, size: $event } })"
     />
     <RadioGroupInput
-      label="Shape"
+      label="Forma"
       :model-value="shape"
-      :items="[{ label: 'Circle', value: 'circle' }, { label: 'Square', value: 'square' }, { label: 'Rounded', value: 'rounded' }]"
+      :items="[{ label: 'Círculo', value: 'circle' }, { label: 'Cuadrado', value: 'square' }, { label: 'Redondeado', value: 'rounded' }]"
       @update:model-value="handleUpdateData({ ...data, props: { ...data.props, shape: $event } })"
     />
-    <UFormField label="Image URL">
+    <UFormField label="URL de la imagen">
       <UInput
         :model-value="imageUrl"
         @update:model-value="handleUpdateData({ ...data, props: { ...data.props, imageUrl: $event as string } })"
         class="w-full"
       />
     </UFormField>
-    <UFormField label="Alt text">
+    <UFormField label="Texto alternativo">
       <UInput
         :model-value="alt"
         @update:model-value="handleUpdateData({ ...data, props: { ...data.props, alt: $event as string } })"

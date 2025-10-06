@@ -29,7 +29,7 @@ const options = FONT_FAMILIES.map<Extract<SelectItem, object>>((f) => ({
   label: f.label,
   value: f.key,
 })).concat({
-  label: 'Match email settings',
+  label: 'Coincidir configuración del correo',
   value: 'inherit',
 })
 

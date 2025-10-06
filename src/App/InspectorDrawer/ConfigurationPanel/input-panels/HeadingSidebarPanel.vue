@@ -1,5 +1,5 @@
 <template>
-  <BaseSidebarPanel title="Heading block">
+  <BaseSidebarPanel title="Bloque de encabezado">
     <UFormField label="Content">
       <!-- <UTextarea
         :rows="3"
