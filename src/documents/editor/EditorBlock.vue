@@ -11,6 +11,7 @@ import { BuildBlockComponent } from '@flyhub/email-document-core';
 import { useInspectorDrawer } from './editor.store';
 import type { InjectionKey } from 'vue';
 import { computed, provide } from 'vue';
+import { watch } from 'vue';
 
 export const currentBlockIdSymbol = Symbol('currentBlockId') as InjectionKey<string>
 </script>
@@ -26,5 +27,13 @@ const inspectorDrawer = useInspectorDrawer()
 provide(currentBlockIdSymbol, props.id)
 
 const block = computed(() => inspectorDrawer.document[props.id])
+
+watch(() => inspectorDrawer.document, (newDoc) => {  
+  console.log('📄 Documento cambió en TemplatePanel:', {  
+    root: newDoc.root,  
+    bloques: Object.keys(newDoc).length  
+  });  
+}, { deep: true });  
+
 </script>
 

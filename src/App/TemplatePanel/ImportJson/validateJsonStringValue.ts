@@ -12,6 +12,7 @@ export default function validateTextAreaValue(value: string): TResult {
   }
 
   const parseResult = EditorConfigurationSchema.safeParse(jsonObject);
+  console.log(parseResult);
 
   if (!parseResult.success) {
     return { error: 'Invalid JSON schema' };

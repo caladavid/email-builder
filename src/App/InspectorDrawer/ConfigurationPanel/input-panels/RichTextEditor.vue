@@ -16,23 +16,34 @@
         />
 
         <UPopover v-model:open="showVariablesDropdown">
-          <UButton
-            icon="material-symbols:code"
-            variant="ghost"
-            size="sm"
-            class="absolute right-2 top-2"
-          />
+          <UTooltip 
+            text="Insertar variable" 
+            arrow 
+            :delay-duration="0" 
+            :content="{ side: 'top', align: 'center' }"
+          >
+            <UButton
+              icon="material-symbols:variable-insert"
+              variant="ghost"
+              size="sm"
+              class="absolute right-2 -top-6"
+            />
+          </UTooltip>
+          
           
           <template #content>
-            <div class="p-2 space-y-1 max-w-xs">
+            <div class="max-h-64 overflow-y-auto p-2">
               <div 
                 v-for="(item, index) in variableItems" 
                 :key="index" 
                 @click="insertVariable(item.key)" 
-                class="flex items-center gap-2 p-2 hover:bg-green-400 cursor-pointer rounded"
+                class="flex items-center gap-2 p-2 hover:bg-[var(--ui-primary)] hover:text-[var(--ui-text)] cursor-pointer rounded"
               >
                 <span>{{ item.value }}</span>
               </div>
+              <div v-if="Object.keys(variableItems).length === 0" class="px-3 py-2 text-gray-500">  
+                No hay variables disponibles  
+              </div>  
             </div>
           </template>
         </UPopover>

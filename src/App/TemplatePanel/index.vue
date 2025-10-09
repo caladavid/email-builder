@@ -1,5 +1,16 @@
 <template>
   <UTabs :items="tabs" variant="link" class="h-full" :ui="{ content: 'h-full bg-gray-100' }">
+   
+    <template #list-leading >  
+      <UButton  
+        :icon="inspectorDrawer.samplesDrawerOpen ? 'material-symbols:first-page' : 'material-symbols:menu'"  
+        variant="ghost"  
+        color="neutral"  
+        @click="inspectorDrawer.samplesDrawerOpen = !inspectorDrawer.samplesDrawerOpen"  
+        class="cursor-pointer w-10 justify-center"  
+      />  
+    </template> 
+
     <template #list-trailing class="bg-red-300">
       <div class="flex w-full justify-end gap-x-2">
         <DownloadJson />
@@ -67,6 +78,7 @@ import { Reader } from '@flyhub/email-builder'
 import { useInspectorDrawer } from '../../documents/editor/editor.store'
 import VariablesModal from '../VariablesModal/index.vue'
 import { createProcessedDocument } from '../../utils/documentProcessor'
+
 
 // FIXME: implement
 // import ShareButton from './ShareButton.vue'

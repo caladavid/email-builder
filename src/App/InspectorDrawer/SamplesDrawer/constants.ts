@@ -1,0 +1,1 @@
+export const SAMPLES_DRAWER_WIDTH = 240;

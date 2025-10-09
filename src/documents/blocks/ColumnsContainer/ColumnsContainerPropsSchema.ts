@@ -10,11 +10,7 @@ const ColumnsContainerPropsSchema = z.object({
   props: z
     .object({
       ...BasePropsShape,
-      columns: z.tuple([
-        z.object({ childrenIds: z.array(z.string()) }),
-        z.object({ childrenIds: z.array(z.string()) }),
-        z.object({ childrenIds: z.array(z.string()) }),
-      ]),
+      columns: z.array(z.object({ childrenIds: z.array(z.string()) })).min(1),
     })
     .optional()
     .nullable(),
@@ -22,11 +18,7 @@ const ColumnsContainerPropsSchema = z.object({
 
 export type ColumnsContainerProps = Omit<BaseColumnsContainerProps, 'props'> & {
   props?: Extract<BaseColumnsContainerProps['props'], object> & {
-    columns: [
-      { childrenIds: string[] },
-      { childrenIds: string[] },
-      { childrenIds: string[] }
-    ];
+    columns: Array<{ childrenIds: string[] }>;
   }
   | null;
 }

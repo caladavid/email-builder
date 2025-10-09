@@ -66,7 +66,7 @@
         </div>  
   
         <!-- Preview de variables -->  
-        <div v-if="Object.keys(inspectorDrawer.globalVariables).length > 0" class="mt-6">  
+        <!-- <div v-if="Object.keys(inspectorDrawer.globalVariables).length > 0" class="mt-6">  
           <h4 class="text-sm font-medium mb-2">Vista previa</h4>  
           <div class="p-3 bg-gray-50 rounded-md text-sm max-h-32 overflow-y-auto">  
             <div v-for="(value, key) in inspectorDrawer.globalVariables" :key="key" class="flex justify-between">  
@@ -74,7 +74,7 @@
               <span>→ {{ value }}</span>  
             </div>  
           </div>  
-        </div>  
+        </div>  --> 
   
         <!-- Instrucciones de uso -->  
         <div class="mt-6 p-3 bg-blue-50 rounded-md">  

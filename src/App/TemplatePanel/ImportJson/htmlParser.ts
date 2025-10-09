@@ -1,6 +1,6 @@
 import JSZip, { type JSZipObject } from "jszip";
 import { v4 as uuidv4 } from "uuid";
-import type { TEditorConfiguration } from "../../../documents/editor/core";
+import { EditorConfigurationSchema, type TEditorConfiguration } from "../../../documents/editor/core";
 
 /* =========================================================
    CSSParser (simple)
@@ -1009,7 +1009,21 @@ export class HTMLToBlockParser {
     /* ---------------- Build final configuration ---------------- */
     private buildConfiguration(): TEditorConfiguration {
         const rootId = "root";
-        return {
+        /* return {
+            [rootId]: {
+                type: "EmailLayout",
+                data: {
+                    backdropColor: "#F8F8F8",
+                    canvasColor: "#FFFFFF",
+                    textColor: "#242424",
+                    fontFamily: "MODERN_SANS",
+                    childrenIds: this.childrenIds
+                }
+            },
+            ...this.blocks
+        }; */
+
+        const config = {
             [rootId]: {
                 type: "EmailLayout",
                 data: {
@@ -1022,5 +1036,17 @@ export class HTMLToBlockParser {
             },
             ...this.blocks
         };
+
+        // Agregar validación antes de retornar  
+        console.log('📋 Configuración generada:', JSON.stringify(config, null, 2));
+
+        // Validar contra el schema  
+        const validation = EditorConfigurationSchema.safeParse(config);
+        if (!validation.success) {
+            console.error('❌ Error de validación:', validation.error);
+            console.error('Detalles:', validation.error.issues);
+        }
+
+        return config;
     }
 }

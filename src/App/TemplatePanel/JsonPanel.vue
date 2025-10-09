@@ -20,6 +20,8 @@ const processedDocument = computed(() => {
   return JSON.stringify(processed, null, 2);  
 });
 
+console.log(processedDocument.value);
+
 watch(() => inspectorDrawer.document, async (document) => {
   const json = JSON.stringify(document, null, '  ')
 

@@ -32,6 +32,15 @@
       />
     </UFormField>
 
+    <UFormField label="Subir imagen">
+      <UInput 
+        type="file"
+        icon="material-symbols:imagesmode"
+        placeholder="Subir imagen"
+        @change="onFileChange"
+      />
+    </UFormField>
+
     <div class="flex gap-2">
       <TextDimensionInput
         label="Ancho (Width)"
@@ -61,6 +70,7 @@
       :model-value="data.style"
       @update:model-value="handleUpdateData({ ...data, style: $event })"
     />
+    
   </BaseSidebarPanel>
 </template>
 
@@ -73,11 +83,13 @@ import type { ImageProps } from '@flyhub/email-block-image';
 import { ImagePropsSchema } from '@flyhub/email-block-image';
 import { ref } from 'vue';
 
+const file = ref<File | null>(null);
+
 type ImageSidebarPanelProps = {
   data: ImageProps
 }
 
-defineProps<ImageSidebarPanelProps>()
+const props = defineProps<ImageSidebarPanelProps>()
 
 const emit = defineEmits<{
   (e: 'update:data', args: ImageProps): void
@@ -98,5 +110,26 @@ function handleUpdateData(data: unknown) {
   } else {
     errors.value = res.error;
   }
+}
+
+function onFileChange(event: Event){
+  const target = event.target as HTMLInputElement;
+  const files = target.files
+  if (files && files.length > 0) {
+    file.value = files[0];
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64Url = e.target?.result as string;
+
+
+      handleUpdateData({
+        ...props.data,
+        props: { ...props.data.props, url: base64Url}
+      });
+    };
+
+    reader.readAsDataURL(files[0]);
+  };
 }
 </script>

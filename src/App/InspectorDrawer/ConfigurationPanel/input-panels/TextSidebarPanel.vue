@@ -17,6 +17,16 @@
       />  
     </UFormField>
 
+<!--     <div class="mt-3">
+      <UButton
+        size="sm"
+        icon="material-symbols:variable-insert"
+        @click=""
+      >
+        Colocar Variables
+      </UButton>
+    </div> -->
+
     <BooleanInput
       label="Formato Markdown"
       :model-value="Boolean(data.props?.markdown)"
@@ -26,7 +36,7 @@
     <div class="mt-3">
       <UButton
         size="sm"
-        icon="material-symbols:link"
+        icon="material-symbols:add-link"
         @click="toggleLinkPanel"
       >
         Agregar Link
@@ -85,7 +95,6 @@ import { TextPropsSchema } from '@flyhub/email-block-text';
 import { computed, ref, watch } from 'vue';
 import { useInspectorDrawer } from '../../../../documents/editor/editor.store';
 import RichTextEditor from '../input-panels/RichTextEditor.vue';
-import RichTextLink from './RichTextLink.vue';
 
 type TextSidebarPanelProps = {
   data: TextProps
@@ -107,24 +116,7 @@ const inspectorDrawer = useInspectorDrawer();
 
 /** Computed */ 
 
-/* const processedText = computed(() => {
-  const text = props.data.props?.text ?? "";
-  return proccessText(text, variables.value);
-});
-
-const previewText = (() => {
-  const text = props.data.props?.text ?? "";
-  return proccessText(text, variables.value);
-});
- */
-
 /** Functions */
-
-/* function proccessText(text: string, vars: Record<string, string>): string {
-  return text.replace(/\{\{(\w+)\}\}/g, (match, varName) => {
-    return vars[varName] || match
-  });
-}; */
 
 // v-model del editor rich text (HTML)
 const rtValue = computed<string>({
@@ -185,26 +177,6 @@ function updateVariablesInStore() {
   }
 } 
 
-/* function importVariables(jsonString: string) {
-  try {
-    const data = JSON.parse(jsonString)
-    if (data.variables && typeof data.variables === "object"){
-      variables.value = {
-        ...variables.value,
-        ...data.variables
-      }
-      updateVariablesInStore()
-
-      // Aquí podrías mostrar un toast de éxito  
-      console.log('Variables imported successfully')  
-    } else {
-      throw new Error('Invalid variables format')  
-    }
-  } catch (error) {
-    console.error('Invalid variables JSON:', error)  
-  }
-} */
-
   
 // Refs para la funcionalidad de enlaces  
 const selectedText = ref('')  
@@ -249,9 +221,5 @@ watch(() => (props.data.props as any)?.variables, (newVariables) => {
     variables.value = { ...newVariables }  
   }  
 }, { immediate: true }) 
-
-
-
-
 
 </script>

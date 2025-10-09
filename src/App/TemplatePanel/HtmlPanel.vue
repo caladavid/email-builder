@@ -27,7 +27,7 @@ const processedDocument = computed(() => {
   code.value = html
 }, { immediate: true }) */
 watch(() => [inspectorDrawer.document, inspectorDrawer.globalVariables], async () => {  
-  const html = await renderToStaticMarkup(processedDocument.value, { rootBlockId: 'root' })  
+  const html = await renderToStaticMarkup(processedDocument.value, { rootBlockId: 'root' })
   code.value = html  
 }, { immediate: true, deep: true }) 
 </script>
