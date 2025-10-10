@@ -36,6 +36,7 @@
       <UInput 
         type="file"
         icon="material-symbols:imagesmode"
+        accept="image/*"
         placeholder="Subir imagen"
         @change="onFileChange"
       />
@@ -82,6 +83,7 @@ import TextDimensionInput from './helpers/inputs/TextDimensionInput.vue';
 import type { ImageProps } from '@flyhub/email-block-image';
 import { ImagePropsSchema } from '@flyhub/email-block-image';
 import { ref } from 'vue';
+import { z } from 'zod';
 
 const file = ref<File | null>(null);
 
@@ -97,7 +99,7 @@ const emit = defineEmits<{
 
 /** Refs */
 
-const errors = ref<Zod.ZodError | null>(null)
+const errors = ref<z.ZodError | null>(null)
 
 /** Functions */
 

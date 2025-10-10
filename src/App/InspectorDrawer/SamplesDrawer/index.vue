@@ -17,7 +17,7 @@
         </h1>  
   
         <div class="flex flex-col items-start space-y-1">  
-          <SidebarButton href="#">Nuevo</SidebarButton>  
+          <SidebarButton href="#">Nueva plantilla</SidebarButton>  
           <SidebarButton href="#sample/welcome">Email de bienvenida</SidebarButton>  
           <SidebarButton href="#sample/one-time-password">Contraseña de un solo uso (OTP)</SidebarButton>  
           <SidebarButton href="#sample/reset-password">Restablecer contraseña</SidebarButton>  

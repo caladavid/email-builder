@@ -30,6 +30,16 @@
         class="w-full"
       />
     </UFormField>
+
+    <UFormField label="Subir imagen">
+      <UInput 
+        type="file"
+        icon="material-symbols:imagesmode"
+        accept="image/*" 
+        placeholder="Subir imagen"
+        @change="onFileChange"
+      />
+    </UFormField>
     <MultiStylePropertyPanel
       :names="['textAlign', 'padding']"
       :model-value="data.style"
@@ -46,6 +56,9 @@ import RadioGroupInput from './helpers/inputs/RadioGroupInput.vue';
 import type { AvatarProps } from '@flyhub/email-block-avatar';
 import { AvatarPropsDefaults, AvatarPropsSchema } from '@flyhub/email-block-avatar';
 import { ref, computed } from 'vue';
+import { z } from 'zod';
+
+const file = ref<File | null>(null);
 
 type AvatarSidebarPanelProps = {
   data: AvatarProps;
@@ -56,9 +69,10 @@ const emit = defineEmits<{
   (e: 'update:data', args: AvatarProps): void
 }>()
 
+
 /** Refs */
 
-const errors = ref<Zod.ZodError | null>(null)
+const errors = ref<z.ZodError | null>(null)
 
 /** Computed */
 
@@ -78,5 +92,26 @@ function handleUpdateData(data: AvatarProps) {
   } else {
     errors.value = res.error;
   }
+}
+
+function onFileChange(event: Event) {
+  const target = event.target as HTMLInputElement;
+  const files = target.files
+  if (files && files.length > 0) {
+    file.value = files[0];
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64Url = e.target?.result as string;
+
+
+      handleUpdateData({
+        ...props.data,
+        props: { ...props.data.props, imageUrl: base64Url}
+      });
+    };
+
+    reader.readAsDataURL(files[0]);
+  };
 }
 </script>
