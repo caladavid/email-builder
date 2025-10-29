@@ -16,7 +16,7 @@
         <DownloadJson />
         <ImportJson />
 
-        <VariablesModal />
+        <!-- <VariablesModal /> -->
 
         <UButtonGroup>
           <UTooltip text="Vista de escritorio">
@@ -96,14 +96,14 @@ const tabs = [
     icon: 'material-symbols:preview-outline',
     slot: 'preview' as const
   },
-  {
+  /* {
     icon: 'material-symbols:code',
     slot: 'html' as const
   },
   {
     icon: 'material-symbols:data-object',
     slot: 'json' as const
-  }
+  } */
 ]
 
 /** Computed */

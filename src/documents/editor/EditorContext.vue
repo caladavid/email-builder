@@ -54,12 +54,15 @@
     const samplesDrawerOpen = ref<boolean>(true); // NUEVO - true como en Zustand  
     const INSPECTOR_DRAWER_WIDTH = 335;  
     const receivedVariables = ref<{ [key: string]: any } | null>(null);  
-    const globalVariables = ref<TValue['globalVariables']>(loadVariablesFromStorage());  
+    /* const globalVariables = ref<TValue['globalVariables']>(loadVariablesFromStorage()); */  
+    const globalVariables = ref<TValue['globalVariables']>({});  
     
     function initializeGlobalVariables(variables: Record<string, string>) {  
-        const merged = { ...loadVariablesFromStorage(), ...variables };  
+        /* const merged = { ...loadVariablesFromStorage(), ...variables };  
         globalVariables.value = merged;  
-        saveVariablesToStorage(merged);  
+        saveVariablesToStorage(merged);   */
+        globalVariables.value = variables  
+        saveVariablesToStorage(variables) 
     }  
     
     if (typeof window !== 'undefined') {  

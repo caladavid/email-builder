@@ -58,12 +58,15 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   const receivedVariables = ref<{ [key: string]: any } | null>(null); // Variable para guardar los datos
   const samplesDrawerOpen = ref<boolean>(false);
 
-  const globalVariables = ref<TValue['globalVariables']>(loadVariablesFromStorage());
+  /* const globalVariables = ref<TValue['globalVariables']>(loadVariablesFromStorage()); */
+  const globalVariables = ref<TValue['globalVariables']>({}); 
 
   function initializeGlobalVariables(variables: Record<string, string>) {
-    const merged = { ...loadVariablesFromStorage(), ...variables }
+    /* const merged = { ...loadVariablesFromStorage(), ...variables }
     globalVariables.value = merged
-    saveVariablesToStorage(merged)
+    saveVariablesToStorage(merged) */
+    globalVariables.value = variables  
+    saveVariablesToStorage(variables)
   }
 
   // Escuchar mensajes de la aplicación padre

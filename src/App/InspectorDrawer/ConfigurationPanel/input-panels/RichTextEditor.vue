@@ -166,7 +166,7 @@ async function updateDropdownPosition() {
     top: `${rect.top + lines * lineHeight + 30}px`,
     left: `${rect.left + 10}px`,
   };
-  console.log("Posición del dropdown actualizada:", dropdownPosition.value);
+  /* console.log("Posición del dropdown actualizada:", dropdownPosition.value); */
 }
 
 function insertVariable(variableKey: string) {
@@ -178,20 +178,20 @@ function insertVariable(variableKey: string) {
 
   const newValue =
     currentValue.substring(0, start) +
-    `[[[${variableKey}]]]` +
+    `{${variableKey}}` +
     currentValue.substring(end);
 
   emit("update:model-value", newValue);
 
   nextTick(() => {
-    const newCursorPos = start + `[[[${variableKey}]]]`.length;
+    const newCursorPos = start + `{${variableKey}}`.length;
     if (savedTextareaElement) {
       savedTextareaElement.focus();
       savedTextareaElement.setSelectionRange(newCursorPos, newCursorPos);
     } else {
     console.error("savedTextareaElement is null");
   }
-    console.log("insertVariable: Cursor posicionado correctamente.");
+    /* console.log("insertVariable: Cursor posicionado correctamente."); */
   });
 
   showVariablesDropdown.value = false;

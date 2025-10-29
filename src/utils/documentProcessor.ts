@@ -29,7 +29,7 @@ export const createProcessedDocument = (document: TEditorConfiguration, globalVa
 };
 
 export function processDocumentVariables(text: string, variables: Record<string, string>): string {
-    return text.replace(/\[\[\[(\w+)\]\]\]/g, (match, varName) => {
+    return text.replace(/\{(\w+)\}/g, (match, varName) => {
         return variables[varName] || match;
     });
 }
