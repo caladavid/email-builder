@@ -1,7 +1,7 @@
 export const ALLOWED_ORIGINS = [
     "http://localhost:5173",
     'http://localhost:3000',
-    "http://email-builder.celcomlatam.com/"
+    "http://email-builder.celcomlatam.com"
 
 ] as const;
 

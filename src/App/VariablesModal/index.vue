@@ -129,7 +129,7 @@ const variablesList = computed(() => {
   
 // Función para formatear nombres de variables  
 function formatVariableName(key: string): string {  
-  return `{{${key}}}`  
+  return `[[[${key}]]]`  
 }  
   
 // Gestión de Variables  

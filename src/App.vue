@@ -4,6 +4,8 @@
     <pre >{{ JSON.stringify(editorStore.receivedVariables, null, 2) }}</pre>
   </div> -->
 
+  <div id="preview"></div>
+
   <UApp>
     <Editor />
   </UApp>
@@ -26,10 +28,7 @@ onMounted(() => {
       console.warn('Mensaje ignorado, origen no seguro:', event.origin);
       return;
     } */
-   if (!isOriginAllowed(event.origin)){
-    return;
-   }
-    
+   
     const data = event.data;
 
     if (!data.type || !['updateVariables', 'addVariable', 'requestHtml', 'loadTemplate', "requestJson", "requestHtmlAndJson"].includes(data.type)) {    

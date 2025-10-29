@@ -109,7 +109,7 @@ function handleKeydown(event: KeyboardEvent) {
     if (savedTextareaElement) {
       const textarea = savedTextareaElement;
       cursorPosition.value = textarea.selectionStart || 0; // Save the cursor position
-      console.log("handleKeydown: Cursor position saved:", cursorPosition.value);
+      /* console.log("handleKeydown: Cursor position saved:", cursorPosition.value); */
     }
     showVariablesDropdown.value = true;
   }
@@ -178,13 +178,13 @@ function insertVariable(variableKey: string) {
 
   const newValue =
     currentValue.substring(0, start) +
-    `{{${variableKey}}}` +
+    `[[[${variableKey}]]]` +
     currentValue.substring(end);
 
   emit("update:model-value", newValue);
 
   nextTick(() => {
-    const newCursorPos = start + `{{${variableKey}}}`.length;
+    const newCursorPos = start + `[[[${variableKey}]]]`.length;
     if (savedTextareaElement) {
       savedTextareaElement.focus();
       savedTextareaElement.setSelectionRange(newCursorPos, newCursorPos);
