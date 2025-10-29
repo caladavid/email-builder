@@ -28,7 +28,11 @@ onMounted(() => {
       console.warn('Mensaje ignorado, origen no seguro:', event.origin);
       return;
     } */
-   
+   if (!isOriginAllowed(event.origin)){
+    console.warn('Mensaje ignorado, origen no seguro:', event.origin);
+    return;
+   }
+    
     const data = event.data;
 
     if (!data.type || !['updateVariables', 'addVariable', 'requestHtml', 'loadTemplate', "requestJson", "requestHtmlAndJson"].includes(data.type)) {    
