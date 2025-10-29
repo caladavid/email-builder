@@ -128,6 +128,10 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     document.value = newDocument
     selectedSidebarTab.value = 'styles'
     selectedBlockId.value = null
+
+     // Limpiar variables globales  
+    globalVariables.value = {}  
+    saveVariablesToStorage({})
   }
 
   // Agregar función para recibir variables individuales  

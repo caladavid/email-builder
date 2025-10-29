@@ -13,7 +13,7 @@
 
     <template #list-trailing class="bg-red-300">
       <div class="flex w-full justify-end gap-x-2">
-        <DownloadJson />
+        <!-- <DownloadJson /> -->
         <ImportJson />
 
         <!-- <VariablesModal /> -->

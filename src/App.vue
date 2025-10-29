@@ -16,6 +16,7 @@ import { ref, onMounted } from 'vue';
 import Editor from './App/index.vue'
 import { useInspectorDrawer } from './documents/editor/editor.store';
 import { isOriginAllowed } from './utils/allowedOrigins';
+import getConfiguration from './getConfiguration';
 
 const editorStore = useInspectorDrawer();
 
@@ -28,14 +29,15 @@ onMounted(() => {
       console.warn('Mensaje ignorado, origen no seguro:', event.origin);
       return;
     } */
+
    if (!isOriginAllowed(event.origin)){
     console.warn('Mensaje ignorado, origen no seguro:', event.origin);
     return;
    }
-    
+
     const data = event.data;
 
-    if (!data.type || !['updateVariables', 'addVariable', 'requestHtml', 'loadTemplate', "requestJson", "requestHtmlAndJson"].includes(data.type)) {    
+    if (!data.type || !['updateVariables', 'addVariable', 'requestHtml', 'loadTemplate', "requestJson", "requestHtmlAndJson", "clearTemplate"].includes(data.type)) {    
       return;  
     } 
 
@@ -59,6 +61,9 @@ onMounted(() => {
         break; 
       case 'requestHtmlAndJson':  
         await editorStore.exportHtmlAndJsonToParent();  
+        break; 
+      case 'clearTemplate':  
+        editorStore.resetDocument(getConfiguration(''));  
         break; 
       default:  
         console.log('Mensaje no reconocido:', data); 
