@@ -151,18 +151,29 @@
     }  
     
     function addVariableFromParent(key: string, value: string) {  
-        const cleanValue = value.replace(/^{+|}+$/g, '');
+        const cleanKey = key.replace(/[{}]/g, '');  
+        const cleanValue = value.replace(/[{}]/g, '');
+
         const newVariables = {  
         ...globalVariables.value,  
-        [key]: cleanValue,  
+        [cleanKey]: cleanValue,  
         };  
         setGlobalVariables(newVariables);  
     }  
     
     function receiveVariablesFromParent(variables: Record<string, string>) {  
+        // Limpiar TODAS las llaves de keys y values  
+        const cleanedVariables: Record<string, string> = {};  
+        
+        for (const [key, value] of Object.entries(variables)) {  
+        const cleanKey = key.replace(/[{}]/g, '');  
+        const cleanValue = value.replace(/[{}]/g, '');  
+        cleanedVariables[cleanKey] = cleanValue;  
+        } 
+
         const mergedVariables = {  
         ...globalVariables.value,  
-        ...variables,  
+        ...cleanedVariables,  
         };  
         setGlobalVariables(mergedVariables);  
     }  
