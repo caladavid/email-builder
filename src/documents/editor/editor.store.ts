@@ -136,9 +136,12 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
 
   // Agregar función para recibir variables individuales  
   function addVariableFromParent(key: string, value: string) {
+    // Limpiar llaves de los valores si existen  
+    const cleanValue = value.replace(/^{|}$/g, '');  
+
     const newVariables = {
       ...globalVariables.value,
-      [key]: value
+      [key]: cleanValue
     }
     setGlobalVariables(newVariables)
   }
