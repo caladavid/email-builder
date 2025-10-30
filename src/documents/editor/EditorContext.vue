@@ -151,7 +151,7 @@
     }  
     
     function addVariableFromParent(key: string, value: string) {  
-        const cleanValue = value.replace(/^{|}$/g, ''); 
+        const cleanValue = value.replace(/^{+|}+$/g, '');
         const newVariables = {  
         ...globalVariables.value,  
         [key]: cleanValue,  
