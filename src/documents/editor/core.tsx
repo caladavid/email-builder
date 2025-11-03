@@ -45,6 +45,7 @@ export const EDITOR_DICTIONARY = buildBlockConfigurationDictionary({
     schema: ButtonPropsSchema,
     Component: (data) => {
       const inspectorDrawer = useInspectorDrawer()
+      // Con processedProps, se muestran los valores de la key, ejm: {hello} = hola
       const processedProps = {
         ...data,
         props: {
@@ -53,8 +54,9 @@ export const EDITOR_DICTIONARY = buildBlockConfigurationDictionary({
         }
       };
       return (
+        // Cambiar ...data por ...processedProps, para obtener su value
         <EditorBlockWrapper>
-          <Button {...processedProps} />
+          <Button {...data} />
         </EditorBlockWrapper>
       );
     },
@@ -87,6 +89,7 @@ export const EDITOR_DICTIONARY = buildBlockConfigurationDictionary({
     schema: HeadingPropsSchema,
     Component: (data) => {
       const inspectorDrawer = useInspectorDrawer()
+      // Con processedProps, se muestran los valores de la key, ejm: {hello} = hola
       const processedProps = {
         ...data,
         props: {
@@ -94,9 +97,10 @@ export const EDITOR_DICTIONARY = buildBlockConfigurationDictionary({
           text: processDocumentVariables(data.props?.text ?? '', inspectorDrawer.globalVariables)
         }
       };
+      // Cambiar ...data por ...processedProps, para obtener su value
       return (
         <EditorBlockWrapper>
-          <Heading {...processedProps} />
+          <Heading {...data} />
         </EditorBlockWrapper>
       );
     },
@@ -119,6 +123,7 @@ export const EDITOR_DICTIONARY = buildBlockConfigurationDictionary({
           url: data.props?.url ?? 'https://placehold.co/600x400@2x/F8F8F8/CCC?text=Your%20image',
         },
       };
+      // Cambiar ...data por ...processedProps, para obtener su value
       return (
         <EditorBlockWrapper>
           <Image {...props} />
@@ -130,6 +135,7 @@ export const EDITOR_DICTIONARY = buildBlockConfigurationDictionary({
     schema: TextPropsSchema,
     Component: (data) => {
       const inspectorDrawer = useInspectorDrawer()
+      // Con processedProps, se muestran los valores de la key, ejm: {hello} = hola
       const processedProps = {
         ...data,
         props: {
@@ -137,9 +143,10 @@ export const EDITOR_DICTIONARY = buildBlockConfigurationDictionary({
           text: processDocumentVariables(data.props?.text ?? '', inspectorDrawer.globalVariables)
         }
       };
+      // Cambiar ...data por ...processedProps, para obtener su value
       return (
         <EditorBlockWrapper>
-          <Text {...processedProps} />
+          <Text {...data} />
         </EditorBlockWrapper>
       );
     },
