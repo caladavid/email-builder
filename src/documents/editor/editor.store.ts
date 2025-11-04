@@ -212,13 +212,15 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     const { renderToStaticMarkup } = await import("@flyhub/email-builder");
     const { createProcessedDocument } = await import("../../utils/documentProcessor");
 
-    const proccessedDocument = createProcessedDocument(
+    /* const proccessedDocument = createProcessedDocument(
       document.value,
       globalVariables.value
-    )
+    ) */
 
-    const html = await renderToStaticMarkup(proccessedDocument, { rootBlockId: 'root' })
-    const jsonContent = JSON.stringify(proccessedDocument, null, 2);
+    /* const html = await renderToStaticMarkup(proccessedDocument, { rootBlockId: 'root' }) */
+    /* const jsonContent = JSON.stringify(proccessedDocument, null, 2); */
+    const html = await renderToStaticMarkup(document.value, { rootBlockId: 'root' }) 
+    const jsonContent = JSON.stringify(document.value, null, 2);
 
     sendToParent({
       type: 'htmlAndJsonResponse',
