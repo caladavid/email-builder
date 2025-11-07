@@ -10,4 +10,10 @@
 :root {
   --ui-primary: #ff9900;
   /* --ui-bg: #0033a0; */
+  
 }
+
+.dark {
+  --ui-primary: #ff9900; 
+}
+

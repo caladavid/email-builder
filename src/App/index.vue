@@ -9,14 +9,16 @@ import { SAMPLES_DRAWER_WIDTH } from './InspectorDrawer/SamplesDrawer/constants'
 const inspectorDrawer = useInspectorDrawer()
 
 // Inicializar variables desde el componente padre  
-/* onMounted(() => {  
-  inspectorDrawer.initializeGlobalVariables({  
+onMounted(() => {  
+  // Forzar el modo dark de tailwind
+  document.body.classList.add('dark');
+  /* inspectorDrawer.initializeGlobalVariables({  
     userName: 'John Doe',  
     companyName: 'Acme Corp',  
     currentDate: new Date().toLocaleDateString(),  
     // Agrega aquí tus variables personalizadas  
-  })  
-})   */
+  }) */  
+})  
 </script>
 
 <template>
