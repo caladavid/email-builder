@@ -17,7 +17,7 @@ onMounted(() => {
     companyName: 'Acme Corp',  
     currentDate: new Date().toLocaleDateString(),  
     // Agrega aquí tus variables personalizadas  
-  }) */  
+  })  */ 
 })  
 </script>
 

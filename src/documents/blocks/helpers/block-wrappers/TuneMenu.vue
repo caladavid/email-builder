@@ -3,6 +3,7 @@
     <div style="display: flex; gap: 8px; flex-direction: column;">
       <UButton class="tune-menu-button" icon="material-symbols:arrow-upward" size="xl" @click="handleMoveClick('up')" />
       <UButton class="tune-menu-button" icon="material-symbols:arrow-downward" size="xl" @click="handleMoveClick('down')" />
+      <UButton class="tune-menu-button" icon="material-symbols:content-copy" size="xl" @click="handleDuplicateClick" />  
       <UButton class="tune-menu-button" icon="material-symbols:delete-outline" size="xl" @click="handleDeleteClick" />
     </div>
   </div>
@@ -11,7 +12,7 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
 import type { ColumnsContainerProps } from '../../ColumnsContainer/ColumnsContainerPropsSchema';
-import type { TEditorBlock } from '../../../editor/core';
+import type { TEditorBlock, TEditorConfiguration } from '../../../editor/core';
 import { useInspectorDrawer } from '../../../editor/editor.store';
 
 const sx: HTMLAttributes['style'] = {
@@ -28,6 +29,8 @@ const sx: HTMLAttributes['style'] = {
 const props = defineProps<{ blockId: string }>()
 
 const inspectorDrawer = useInspectorDrawer()
+let idCounter = 0;  
+const generateId = () => `block-${Date.now()}-${++idCounter}`; 
 
 function handleDeleteClick() {
   const filterChildrenIds = (childrenIds: string[] | null | undefined) => {
@@ -164,6 +167,105 @@ function handleMoveClick(direction: 'up' | 'down') {
 
   inspectorDrawer.document = nDocument  
   inspectorDrawer.setSelectedBlockId(props.blockId)
+}
+
+function deepCloneBlock(blockId: string, document: TEditorConfiguration): { newId: string, newBlocks: Record<string, TEditorBlock> } {  
+  const block = document[blockId];  
+  const newId = generateId();  
+  const newBlocks: Record<string, TEditorBlock> = {};  
+    
+  // Clonar el bloque actual  
+  const clonedBlock = JSON.parse(JSON.stringify(block));  
+  newBlocks[newId] = clonedBlock;  
+    
+  // Si tiene hijos, clonarlos recursivamente  
+  if (block.type === 'Container' && block.data.props?.childrenIds) {  
+    const newChildrenIds: string[] = [];  
+    for (const childId of block.data.props.childrenIds) {  
+      const { newId: newChildId, newBlocks: childBlocks } = deepCloneBlock(childId, document);  
+      newChildrenIds.push(newChildId);  
+      Object.assign(newBlocks, childBlocks);  
+    }  
+    newBlocks[newId].data.props.childrenIds = newChildrenIds;  
+  }  
+    
+  if (block.type === 'ColumnsContainer' && block.data.props?.columns) {  
+    const newColumns = block.data.props.columns.map(col => {  
+      const newChildrenIds: string[] = [];  
+      for (const childId of col.childrenIds) {  
+        const { newId: newChildId, newBlocks: childBlocks } = deepCloneBlock(childId, document);  
+        newChildrenIds.push(newChildId);  
+        Object.assign(newBlocks, childBlocks);  
+      }  
+      return { childrenIds: newChildrenIds };  
+    });  
+    newBlocks[newId].data.props.columns = newColumns;  
+  }  
+    
+  return { newId, newBlocks };  
+}  
+  
+function handleDuplicateClick() {  
+  const currentDocument = inspectorDrawer.document;  
+  const { newId, newBlocks } = deepCloneBlock(props.blockId, currentDocument);  
+    
+  // Encontrar el contenedor padre e insertar después del bloque actual  
+  const newDocument = { ...currentDocument, ...newBlocks };  
+    
+  for (const [blockId, block] of Object.entries(newDocument)) {  
+    if (block.type === 'EmailLayout' && block.data.childrenIds) {  
+      const index = block.data.childrenIds.indexOf(props.blockId);  
+      if (index !== -1) {  
+        const newChildrenIds = [...block.data.childrenIds];  
+        newChildrenIds.splice(index + 1, 0, newId);  
+        newDocument[blockId] = {  
+          ...block,  
+          data: { ...block.data, childrenIds: newChildrenIds }  
+        };  
+        inspectorDrawer.setDocument(newDocument);  
+        return;  
+      }  
+    }  
+      
+    if (block.type === 'Container' && block.data.props?.childrenIds) {  
+      const index = block.data.props.childrenIds.indexOf(props.blockId);  
+      if (index !== -1) {  
+        const newChildrenIds = [...block.data.props.childrenIds];  
+        newChildrenIds.splice(index + 1, 0, newId);  
+        newDocument[blockId] = {  
+          ...block,  
+          data: {  
+            ...block.data,  
+            props: { ...block.data.props, childrenIds: newChildrenIds }  
+          }  
+        };  
+        inspectorDrawer.setDocument(newDocument);  
+        return;  
+      }  
+    }  
+      
+    if (block.type === 'ColumnsContainer' && block.data.props?.columns) {  
+      for (let colIndex = 0; colIndex < block.data.props.columns.length; colIndex++) {  
+        const column = block.data.props.columns[colIndex];  
+        const index = column.childrenIds.indexOf(props.blockId);  
+        if (index !== -1) {  
+          const newColumns = [...block.data.props.columns];  
+          const newChildrenIds = [...column.childrenIds];  
+          newChildrenIds.splice(index + 1, 0, newId);  
+          newColumns[colIndex] = { childrenIds: newChildrenIds };  
+          newDocument[blockId] = {  
+            ...block,  
+            data: {  
+              ...block.data,  
+              props: { ...block.data.props, columns: newColumns }  
+            }  
+          };  
+          inspectorDrawer.setDocument(newDocument);  
+          return;  
+        }  
+      }  
+    }  
+  }  
 }
 </script>
 

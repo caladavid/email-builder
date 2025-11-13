@@ -945,9 +945,6 @@ export class HTMLToBlockParser {
         if (tag === "em" || tag === "i") final.fontStyle = "italic";
         if (tag === "a") final.textDecoration = "underline";
 
-        if (!final.color) final.color = "#242424";
-        if (!final.backgroundColor) final.backgroundColor = "#FFFFFF";
-
         return final;
     }
 

@@ -122,7 +122,7 @@ function handleKeydown(event: KeyboardEvent) {
 function updateCursorPosition() {
   if (savedTextareaElement) {
     cursorPosition.value = savedTextareaElement.selectionStart || 0;
-    console.log("updateCursorPosition: Cursor position updated:", cursorPosition.value);
+    /* console.log("updateCursorPosition: Cursor position updated:", cursorPosition.value); */
   }
 }
 
@@ -136,7 +136,7 @@ function handleTextSelection() {
     const selection = props.modelValue.substring(start, end);  
     selectedText.value = selection;  
     emit('text-selected', selection);  
-    console.log('Texto seleccionado:', selection);  
+    /* console.log('Texto seleccionado:', selection);  */ 
   }  
 }  
 
@@ -152,7 +152,7 @@ function getCurrentSelection(): string {
 // Actualizamos la posición del dropdown
 async function updateDropdownPosition() {
   await nextTick(); // Esperamos a que el DOM se actualice
-  console.log("Actualizando posición del dropdown");
+  /* console.log("Actualizando posición del dropdown"); */
 
   if (!savedTextareaElement) return;
 

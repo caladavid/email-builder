@@ -23,6 +23,7 @@ import { ref } from 'vue';
 import { useInspectorDrawer } from './editor.store';
 import RichTextLinkPropsSchema from '../blocks/RichTextLink/RichTextLinkPropsSchema';
 import RichTextLinkEditor from '../blocks/RichTextLink/RichTextLinkEditor.vue';
+import InlineTextEditor from '../blocks/InlineTextEditor/InlineTextEditor.vue';
 
 /* const globalVariables = ref<Record<string, string>>({
   // Variables de ejemplo  
@@ -45,6 +46,7 @@ export const EDITOR_DICTIONARY = buildBlockConfigurationDictionary({
     schema: ButtonPropsSchema,
     Component: (data) => {
       const inspectorDrawer = useInspectorDrawer()
+      
       // Con processedProps, se muestran los valores de la key, ejm: {hello} = hola
       const processedProps = {
         ...data,
@@ -146,7 +148,11 @@ export const EDITOR_DICTIONARY = buildBlockConfigurationDictionary({
       // Cambiar ...data por ...processedProps, para obtener su value
       return (
         <EditorBlockWrapper>
-          <Text {...data} />
+          {/* <Text {...data} /> */}
+           <InlineTextEditor     
+            text={data.props?.text || ""}    
+            style={data.style ?? undefined}     
+          />
         </EditorBlockWrapper>
       );
     },

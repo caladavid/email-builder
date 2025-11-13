@@ -20,6 +20,14 @@
           </template>
         </UPopover>
 
+        <!-- Campo de texto para código hexadecimal -->  
+        <UInput  
+          :model-value="value ?? ''"  
+          placeholder="#RRGGBB"  
+          class="w-32"  
+          @update:model-value="handleTextInput"  
+        />  
+
         <!-- reset button -->
         <UButton
           v-if="nullable && typeof value === 'string' && value.length > 0"
@@ -59,9 +67,20 @@ const value = ref(props.defaultValue)
 
 /** Functions */
 
+function isValidHexColor(color: string): boolean {  
+  return /^#[0-9A-Fa-f]{6}$/.test(color) || /^#[0-9A-Fa-f]{3}$/.test(color);  
+} 
+
 function handleChange(newValue: string | null) {
   value.value = newValue;
   emit('change', newValue as typeof props.nullable extends true ? string | null : string);
 }
+
+function handleTextInput(newValue: string) {  
+  const trimmed = newValue.trim();  
+  if (isValidHexColor(trimmed)) {  
+    handleChange(trimmed);  
+  }  
+}  
 
 </script>
