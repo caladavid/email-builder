@@ -28,12 +28,12 @@ provide(currentBlockIdSymbol, props.id)
 
 const block = computed(() => inspectorDrawer.document[props.id])
 
-watch(() => inspectorDrawer.document, (newDoc) => {  
+/* watch(() => inspectorDrawer.document, (newDoc) => {  
   console.log('📄 Documento cambió en TemplatePanel:', {  
     root: newDoc.root,  
     bloques: Object.keys(newDoc).length  
   });  
-}, { deep: true });  
+}, { deep: true });   */
 
 </script>
 

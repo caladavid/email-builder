@@ -10,10 +10,18 @@
       <RichTextEditor    
         label=""    
         :rows="3"    
+        :model-value="data.props?.text ?? HeadingPropsDefaults.text" 
+        @update:model-value="handleTextUpdate"  
+        @update:formats="handleFormatsUpdate"   
+        placeholder="Texto del botón. Usa Ctrl+Space para insertar variables"    
+      />  
+<!--       <RichTextEditor    
+        label=""    
+        :rows="3"    
         :model-value="data.props?.text ?? HeadingPropsDefaults.text"    
         @update:model-value="handleUpdateData({ ...data, props: { ...data.props, text: $event as string } })"    
         placeholder="Texto del botón. Usa Ctrl+Space para insertar variables"    
-      />  
+      />  --> 
     </UFormField>
     <RadioGroupInput
       label="Level"
@@ -42,7 +50,7 @@ type HeadingSidebarPanelProps = {
   data: HeadingProps
 }
 
-defineProps<HeadingSidebarPanelProps>()
+const props = defineProps<HeadingSidebarPanelProps>()
 
 const emit = defineEmits<{
   (e: 'update:data', args: HeadingProps): void
@@ -54,6 +62,7 @@ const errors = ref<Zod.ZodError | null>(null)
 
 /** Functions */
 
+
 function handleUpdateData(data: unknown) {
   const res = HeadingPropsSchema.safeParse(data);
 
@@ -63,5 +72,31 @@ function handleUpdateData(data: unknown) {
   } else {
     errors.value = res.error;
   }
+}
+function handleTextUpdate(newText: string) {  
+   console.log('📝 handleTextUpdate called with:', newText); 
+  handleUpdateData({   
+    ...props.data,   
+    props: {   
+      ...props.data.props,   
+      text: newText   
+    }   
+  });  
+}  
+  
+function handleFormatsUpdate(newFormats: any[]) {  
+  console.log('🟢 Panel - handleFormatsUpdate:', {  
+    newFormats,  
+    formatsLength: newFormats.length,  
+    currentBlockId: props.data  
+  }); 
+
+  handleUpdateData({   
+    ...props.data,   
+    props: {   
+      ...props.data.props,   
+      formats: newFormats   
+    }   
+  });  
 }
 </script>

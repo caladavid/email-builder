@@ -10,11 +10,20 @@
       <RichTextEditor  
         label=""  
         :rows="5"  
+        :model-value="data.props?.text ?? ''" 
+        @update:model-value="handleTextUpdate"  
+        @update:formats="handleFormatsUpdate" 
+        @text-selected="selectedText = $event"
+        placeholder="Escribe tu texto aquí. Usa Ctrl+Space para insertar variables"  
+      />  
+<!--       <RichTextEditor  
+        label=""  
+        :rows="5"  
         :model-value="data.props?.text ?? ''"  
         @update:model-value="handleUpdateData({ ...data, props: { ...data.props, text: $event as string } })"  
         @text-selected="selectedText = $event"
         placeholder="Escribe tu texto aquí. Usa Ctrl+Space para insertar variables"  
-      />  
+      />   -->
     </UFormField>
 
 <!--     <div class="mt-3">
@@ -176,6 +185,29 @@ function updateVariablesInStore() {
     }
   }
 } 
+
+function handleTextUpdate(newText: string) {  
+   console.log('📝 handleTextUpdate called with:', newText);
+  handleUpdateData({   
+    ...props.data,   
+    props: {   
+      ...props.data.props,   
+      text: newText   
+    }   
+  });  
+}  
+  
+function handleFormatsUpdate(newFormats: any[]) {  
+console.log('🎨 handleFormatsUpdate called with:', newFormats);
+
+  handleUpdateData({   
+    ...props.data,   
+    props: {   
+      ...props.data.props,   
+      formats: newFormats   
+    }   
+  });  
+}
 
   
 // Refs para la funcionalidad de enlaces  

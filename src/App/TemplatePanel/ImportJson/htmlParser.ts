@@ -446,6 +446,12 @@ export class HTMLToBlockParser {
                     const isBoldStyle = fw === "bold" || (!isNaN(parseInt(fw)) && parseInt(fw) >= 600);
                     if (isBoldTag || isBoldStyle) fmt.bold = true;
 
+                    // ✅ AGREGAR: Italic detection  
+                    const fs = String(childStyles.fontStyle ?? "").toLowerCase();  
+                    const isItalicTag = tag === "em" || tag === "i";  
+                    const isItalicStyle = fs === "italic";  
+                    if (isItalicTag || isItalicStyle) fmt.italic = true;
+
                     formats.push(fmt);
                 }
             }

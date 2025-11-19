@@ -10,7 +10,7 @@
     @mouseleave="visible = false"
   >
     <BlocksMenu v-if="placeholder || visible || open" @select="$emit('select', $event)" @update:open="open = $event">
-      <component :is="buttonComponent" @click="handleButtonClick"/>
+      <component :is="buttonComponent" />
     </BlocksMenu>
   </div>
 </template>
@@ -67,8 +67,8 @@ function handleMouseMove(e: MouseEvent) {
 }
 
 /** Functions */
-function handleButtonClick() {
+/* function handleButtonClick() {
   console.log('Botón clickeado. Estado de visibilidad:', visible.value);
   console.log('Estado de menú abierto:', open.value);
-}
+} */
 </script>
