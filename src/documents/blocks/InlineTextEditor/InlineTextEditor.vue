@@ -1,14 +1,11 @@
 <template>     
-
   <InlineTextToolbar    
+    ref="toolbarRef" 
     v-show="showToolBar"
-    label=""    
-    :rows="3"    
-    :model-value="initialText"     
     :editable-element="editableDiv" 
-    @content-changed="handleInput"   
     @toolbar-action="handleToolbarAction"   
-  /> 
+    :variable-items="variableItems"
+  />  
 
   <div                     
     ref="editableDiv"                    
@@ -25,7 +22,7 @@
 </template>                    
                   
 <script setup lang="ts">  
-import { computed, inject, nextTick, onMounted, ref, watch } from 'vue';  
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue';  
 import { useInspectorDrawer } from '../../editor/editor.store';  
 import { currentBlockIdSymbol } from '../../editor/EditorBlock.vue';  
 import InlineTextToolbar from '../../../App/InspectorDrawer/ConfigurationPanel/input-panels/InlineTextToolbar.vue';  
@@ -71,6 +68,8 @@ const blockId = inject(currentBlockIdSymbol);
 const isInternalUpdate = ref(false);  
 const lastCursorPosition = ref(0);  
 const isActivelyEditing = ref(false); 
+const showVariablesDropdown = ref(false);
+const toolbarRef = ref();
   
 // ============================================  
 // COMPUTED  
@@ -84,9 +83,11 @@ const currentBlock = computed(() => {
 const blockProps = computed(() => {
   if (!blockId) return null;
   const block = editorStore.document[blockId];
+  const blockData = block.data as { props?: TextBlockProps; style?: any };
+
   return {
-    text: block?.data?.props?.text || '',
-    formats: block?.data?.props?.formats || []
+    text: blockData.props?.text || '',
+    formats: blockData.props?.formats || []
   };
 });
   
@@ -118,6 +119,16 @@ const computedStyles = computed(() => {
     backgroundColor: props.style?.backgroundColor || 'transparent'  
   };  
 });  
+
+const variableItems = computed(() => {
+  return Object.entries(editorStore.globalVariables || {}).map(
+    ([key, value]) => ({
+      key,
+      value,
+      label: `${value}`,
+    })
+  );
+});
   
 // ============================================  
 // CURSOR MANAGEMENT  
@@ -136,40 +147,66 @@ function saveCursorPosition() {
   lastCursorPosition.value = preCaretRange.toString().length;  
 }  
   
-function restoreCursorPosition() {  
-  if (!editableDiv.value) return;  
+function restoreCursorPosition() {
+  if (!editableDiv.value) return;
   
-  const selection = window.getSelection();  
-  if (!selection) return;  
+  const selection = window.getSelection();
+  if (!selection) return;
   
-  let charCount = 0;  
-  const targetPos = lastCursorPosition.value;  
+  /* console.log('🔄 restoreCursorPosition: restoring to position', lastCursorPosition.value); */
   
-  const findPosition = (node: Node): { node: Node; offset: number } | null => {  
-    if (node.nodeType === Node.TEXT_NODE) {  
-      const textLength = node.textContent?.length || 0;  
-      if (charCount + textLength >= targetPos) {  
-        return { node, offset: targetPos - charCount };  
-      }  
-      charCount += textLength;  
-    } else if (node.nodeType === Node.ELEMENT_NODE) {  
-      for (const child of Array.from(node.childNodes)) {  
-        const result = findPosition(child);  
-        if (result) return result;  
-      }  
-    }  
-    return null;  
-  };  
+  // Si la posición es 0, ir al inicio
+  if (lastCursorPosition.value === 0) {
+    const range = document.createRange();
+    range.setStart(editableDiv.value, 0);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    /* console.log('📍 Moved to start (position 0)'); */
+    return;
+  }
   
-  const position = findPosition(editableDiv.value);  
-  if (position) {  
-    const range = document.createRange();  
-    range.setStart(position.node, position.offset);  
-    range.collapse(true);  
-    selection.removeAllRanges();  
-    selection.addRange(range);  
-  }  
-}  
+  // Crear un walker para recorrer los nodos de texto
+  const treeWalker = document.createTreeWalker(
+    editableDiv.value,
+    NodeFilter.SHOW_TEXT,
+    null,
+    false
+  );
+  
+  let currentPosition = 0;
+  let currentNode = null;
+  
+  // Encontrar el nodo que contiene la posición
+  while (treeWalker.nextNode()) {
+    const node = treeWalker.currentNode;
+    const nodeLength = node.textContent?.length || 0;
+    
+    if (currentPosition + nodeLength >= lastCursorPosition.value) {
+      currentNode = node;
+      break;
+    }
+    currentPosition += nodeLength;
+  }
+  
+  if (currentNode) {
+    const offset = lastCursorPosition.value - currentPosition;
+    const range = document.createRange();
+    range.setStart(currentNode, Math.min(offset, currentNode.textContent?.length || 0));
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    /* console.log('✅ Position restored in text node'); */
+  } else {
+    // Si no se encuentra, ir al final
+    /* console.warn('⚠️ Position not found, moving to end'); */
+    const range = document.createRange();
+    range.selectNodeContents(editableDiv.value);
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+}
   
 // ============================================  
 // FORMAT PROCESSING  
@@ -238,84 +275,32 @@ function processInlineContent(element: HTMLElement): { text: string; formats: Te
   return { text: text.trim(), formats };  
 }  
   
-function textWithFormatsToHtml(text: string, formats: any[]): string {  
-  if (!formats || formats.length === 0) return text;  
-  
-  // Ordenar formatos por posición de inicio
-  const sortedFormats = [...formats].sort((a, b) => a.start - b.start);  
-    
-  let html = '';  
-  let lastPos = 0;  
-  const stack: string[] = [];  
-  const openTags: { pos: number; tags: string[] }[] = [];  
-  const closeTags: { pos: number; tags: string[] }[] = [];  
-  
-  // Planificar apertura y cierre de tags
-  sortedFormats.forEach(format => {  
-    const tags: string[] = [];  
-    if (format.bold) tags.push('b');  
-    if (format.italic) tags.push('i');  
-      
-    if (tags.length > 0) {  
-      openTags.push({ pos: format.start, tags });  
-      closeTags.push({ pos: format.end, tags: [...tags].reverse() });  
-    }  
-  });  
-  
-  // Ordenar por posición
-  openTags.sort((a, b) => a.pos - b.pos);  
-  closeTags.sort((a, b) => a.pos - b.pos);  
-  
-  let openIndex = 0;  
-  let closeIndex = 0;  
-  
-  for (let i = 0; i <= text.length; i++) {  
-    // Cerrar tags en esta posición
-    while (closeIndex < closeTags.length && closeTags[closeIndex].pos === i) {  
-      closeTags[closeIndex].tags.forEach(tag => {  
-        html += `</${tag}>`;  
-      });  
-      closeIndex++;  
-    }  
-      
-    // Abrir tags en esta posición
-    while (openIndex < openTags.length && openTags[openIndex].pos === i) {  
-      openTags[openIndex].tags.forEach(tag => {  
-        html += `<${tag}>`;  
-      });  
-      openIndex++;  
-    }  
-      
-    // Agregar carácter actual
-    if (i < text.length) {  
-      html += text[i];  
-    }  
-  }  
-    
-  return html;  
-}
-
-function htmlToTextAndFormats(htmlContent: string): { text: string; formats: any[] } {  
+function htmlToTextAndFormats(htmlContent: string): { text: string; formats: TextFormat[] } {  
   const tempDiv = document.createElement('div');  
   tempDiv.innerHTML = htmlContent;  
     
   let text = "";  
-  const formats: any[] = [];  
-  let pos = 0;  
+  const formats: TextFormat[] = [];  
+  let post = 0;
   
-  function processNode(node: Node, currentFormats: { bold?: boolean; italic?: boolean } = {}) {  
+  function processNode(
+    node: Node, 
+    currentFormats: { bold?: boolean; italic?: boolean } = {}, 
+    depth: number = 0
+  ) {  
     if (node.nodeType === Node.TEXT_NODE) {  
       const content = node.textContent || "";  
       if (content) {  
-        const start = pos;  
+        const start = text.length;  
+        post = start;  
         text += content;  
-        pos += content.length;  
+        const end = text.length;  
         
         // Solo crear formato si hay algún estilo activo
         if (currentFormats.bold || currentFormats.italic) {  
           formats.push({  
             start,  
-            end: pos,  
+            end,  
             ...(currentFormats.bold && { bold: true }),  
             ...(currentFormats.italic && { italic: true })  
           });  
@@ -327,58 +312,149 @@ function htmlToTextAndFormats(htmlContent: string): { text: string; formats: any
     if (node.nodeType === Node.ELEMENT_NODE) {  
       const el = node as HTMLElement;  
       const tag = el.tagName.toLowerCase();  
+
+      if (tag === "a") {  
+        const href = el.getAttribute("href") || "";  
+        const linkText = el.textContent?.trim() || "";  
+        if (href && linkText) {  
+          const markdownLink = `[${linkText}](${href})`;  
+          text += markdownLink;  
+          post += markdownLink.length;  
+          return; // No procesar hijos  
+        }  
+      } 
         
-      // Actualizar formatos según la etiqueta
+      // Crear una copia de los formatos actuales para no mutar el objeto padre
       const newFormats = { ...currentFormats };  
-      if (tag === "b" || tag === "strong") newFormats.bold = true;  
-      if (tag === "i" || tag === "em") newFormats.italic = true;  
+      
+      // Manejar etiquetas de formato
+      if (tag === "b" || tag === "strong") {
+        newFormats.bold = true;
+      } else if (tag === "i" || tag === "em") {
+        newFormats.italic = true;
+      }
+      // Ignorar otras etiquetas como div, span, etc. a menos que tengan estilos específicos
         
       // Procesar hijos recursivamente
       Array.from(el.childNodes).forEach(child => {  
-        processNode(child, newFormats);  
+        processNode(child, newFormats, depth + 1);  
       });  
     }  
   }  
     
+  // Procesar todos los nodos hijos del div temporal
   Array.from(tempDiv.childNodes).forEach(node => {  
     processNode(node);  
   });  
     
   return { text, formats };  
 }
-  
+
+function textWithFormatsToHtml(text: string, formats: TextFormat[]): string {  
+  if (!formats || formats.length === 0) return text;  
+  
+  const events: Array<{ position: number; type: 'start' | 'end'; format: Partial<TextFormat> }> = [];
+  formats.forEach(format => {
+    if (format.bold) {
+      events.push({ position: format.start, type: 'start', format: { bold: true } });
+      events.push({ position: format.end, type: 'end', format: { bold: true } });
+    }
+    if (format.italic) {
+      events.push({ position: format.start, type: 'start', format: { italic: true } });
+      events.push({ position: format.end, type: 'end', format: { italic: true } });
+    }
+  });
+  
+  events.sort((a, b) => {
+    if (a.position !== b.position) return a.position - b.position;
+    return a.type === 'end' ? -1 : 1; 
+  });
+  
+  let result = '';
+  let currentPosition = 0;
+  let boldCount = 0;
+  let italicCount = 0;
+  
+  events.forEach(event => {
+    if (event.position > currentPosition) {
+      result += text.substring(currentPosition, event.position);
+    }
+    currentPosition = event.position;
+    
+    if (event.type === 'start') {
+      if (event.format.bold) {
+        if (boldCount === 0) result += '<b>'; 
+        boldCount++;
+      }
+      if (event.format.italic) {
+        if (italicCount === 0) result += '<i>'; 
+        italicCount++;
+      }
+    } else { // event.type === 'end'
+      if (event.format.italic) {
+        italicCount--;
+        if (italicCount === 0) result += '</i>'; 
+      }
+      if (event.format.bold) {
+        boldCount--;
+        if (boldCount === 0) result += '</b>'; 
+      }
+    }
+  });
+  
+  if (currentPosition < text.length) {
+    result += text.substring(currentPosition);
+  }
+  
+  return result;
+}
 
 // ============================================================================  
 // FUNCIONES DE FORMATO (RESTAURADAS)  
 // ============================================================================  
-function applyBold() {  
-  if (!editableDiv.value) return;  
+
+function toggleBold() {    
+  if (!editableDiv.value) return;    
+      
+  isInternalUpdate.value = true;    
+      
+  document.execCommand('bold', false, undefined);    
+      
+  nextTick(() => {    
+    const htmlContent = editableDiv.value!.innerHTML;    
+    const { text, formats } = htmlToTextAndFormats(htmlContent);
+
+    /* console.log('🟢 InlineTextEditor - Bold aplicado, formatos:', formats); */
     
-  document.execCommand('bold', false);  
-  editableDiv.value.focus();  
+    updateBlockInStore(text, formats);
+        
+    setTimeout(() => {    
+      isInternalUpdate.value = false;    
+    }, 100);    
+  });    
+} 
+
+function toggleItalic() {    
+  if (!editableDiv.value) return;    
+      
+  isInternalUpdate.value = true;    
+      
+  document.execCommand('italic', false, undefined);    
+      
+  nextTick(() => {    
+    const htmlContent = editableDiv.value!.innerHTML;   
+    const { text, formats } = htmlToTextAndFormats(htmlContent); 
+
+    /* console.log('🟢 InlineTextEditor - Italic aplicado, formatos:', formats); */
     
-  // Trigger input event para actualizar el store  
-  nextTick(() => {  
-    if (editableDiv.value) {  
-      editableDiv.value.dispatchEvent(new Event('input'));  
-    }  
-  });  
+    updateBlockInStore(text, formats);
+        
+    setTimeout(() => {    
+      isInternalUpdate.value = false;    
+    }, 100);    
+  });    
 }  
-  
-function applyItalic() {  
-  if (!editableDiv.value) return;  
-    
-  document.execCommand('italic', false);  
-  editableDiv.value.focus();  
-    
-  // Trigger input event para actualizar el store  
-  nextTick(() => {  
-    if (editableDiv.value) {  
-      editableDiv.value.dispatchEvent(new Event('input'));  
-    }  
-  });  
-}  
-  
+
 // ============================================  
 // EVENT HANDLERS  
 // ============================================  
@@ -386,16 +462,24 @@ function applyItalic() {
 function handleInput() {
   if (!editableDiv.value || isInternalUpdate.value || !blockId) return;
 
+  /* console.log('🟢 InlineTextEditor - handleInput disparado'); */
+
   isInternalUpdate.value = true;
   saveCursorPosition();
 
-  const htmlContent = editableDiv.value.innerHTML;
-  const { text, formats } = htmlToTextAndFormats(htmlContent);
+  
+  /* const htmlContent = editableDiv.value.innerHTML;
+  console.log('📄 HTML Content:', htmlContent);
+  const { text, formats } = htmlToTextAndFormats(htmlContent); */
+  const { text, formats } = processInlineContent(editableDiv.value);
+  const hasMarkdownLinks = /\[([^\]]+)\]\(([^)]+)\)/.test(text); 
 
-  console.log('🟢 InlineTextEditor - Formatos detectados:', formats);
+/*   console.log('📝 Texto extraído:', text);
+  console.log('🎨 Formatos detectados:', formats);
+  console.log('🔍 Número de formatos:', formats.length); */
 
   // Actualizar store
-  const currentBlock = editorStore.document[blockId];
+  /* const currentBlock = editorStore.document[blockId];
   if (currentBlock?.type === 'Text') {
     editorStore.setDocument({
       [blockId]: {
@@ -410,7 +494,9 @@ function handleInput() {
         }
       }
     });
-  }
+  } */
+
+  updateBlockInStore(text, formats, hasMarkdownLinks);
 
   nextTick(() => {
     restoreCursorPosition();
@@ -418,9 +504,128 @@ function handleInput() {
   });
 }
 
+function insertVariable(variableKey: string) {
+  /* console.log('🔧 InlineTextEditor - insertVariable called with:', variableKey); */
+  
+  if (!editableDiv.value) return;
+
+  // 1. ENFOCAR primero - esto es crítico
+  editableDiv.value.focus();
+  
+  // 2. RESTAURAR posición ANTES de cualquier otra operación
+  /* console.log('🔄 Restoring cursor position before insertion...'); */
+  restoreCursorPosition();
+  
+  // 3. Obtener la selección DESPUÉS de restaurar
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) {
+    /* console.error('❌ No selection after restore, using fallback'); */
+    
+    // Fallback robusto: insertar en la posición guardada
+    const currentContent = editableDiv.value.innerHTML;
+    const variableText = `{${variableKey}}`;
+    
+    if (lastCursorPosition.value >= 0 && lastCursorPosition.value <= currentContent.length) {
+      // Insertar en la posición específica
+      const textContent = editableDiv.value.textContent || '';
+      const before = textContent.substring(0, lastCursorPosition.value);
+      const after = textContent.substring(lastCursorPosition.value);
+      editableDiv.value.textContent = before + variableText + after;
+    } else {
+      // Insertar al final
+      editableDiv.value.innerHTML += variableText;
+    }
+    
+    handleInput();
+    return;
+  }
+
+  const range = selection.getRangeAt(0);
+/*   console.log('🎯 Current range for insertion:', {
+    collapsed: range.collapsed,
+    startOffset: range.startOffset,
+    endOffset: range.endOffset,
+    startContainer: range.startContainer.nodeName,
+    commonAncestor: range.commonAncestorContainer.nodeName
+  }); */
+
+  // 4. VERIFICAR que la selección esté dentro del editor
+  if (!editableDiv.value.contains(range.commonAncestorContainer)) {
+    /* console.warn('⚠️ Selection outside editor, moving to end'); */
+    range.selectNodeContents(editableDiv.value);
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+
+  // 5. INTENTAR execCommand PRIMERO (más confiable para contenteditable)
+  const variableText = `{${variableKey}}`;
+  let success = false;
+  
+  try {
+    /* console.log('🔄 Attempting execCommand insert...'); */
+    success = document.execCommand('insertText', false, variableText);
+    console.log('✅ execCommand result:', success);
+  } catch (error) {
+    console.error('❌ execCommand failed:', error);
+    success = false;
+  }
+
+  if (success) {
+    // execCommand tuvo éxito, el input event se disparará automáticamente
+    console.log('🎉 Variable inserted successfully with execCommand');
+    return;
+  }
+
+  // 6. FALLBACK: Inserción manual
+  /* console.log('🔄 Falling back to manual insertion...'); */
+  try {
+    // Para contenteditable, necesitamos manejar la inserción cuidadosamente
+    if (range.collapsed) {
+      // Insertar en posición de cursor
+      const textNode = document.createTextNode(variableText);
+      range.insertNode(textNode);
+      
+      // Mover cursor después del texto insertado
+      range.setStartAfter(textNode);
+      range.collapse(true);
+    } else {
+      // Reemplazar selección
+      const textNode = document.createTextNode(variableText);
+      range.deleteContents();
+      range.insertNode(textNode);
+      range.selectNodeContents(textNode);
+      range.collapse(false);
+    }
+    
+    selection.removeAllRanges();
+    selection.addRange(range);
+    
+    /*console.log('✅ Manual insertion completed'); */
+    
+    // Disparar input event manualmente
+    const inputEvent = new Event('input', { bubbles: true });
+    editableDiv.value.dispatchEvent(inputEvent);
+    
+  } catch (error) {
+    /* console.error('❌ Manual insertion failed:', error); */
+    
+    // ÚLTIMO RECURSO: innerHTML
+    /* console.warn('🔄 Last resort: innerHTML append'); */
+    const currentHTML = editableDiv.value.innerHTML;
+    editableDiv.value.innerHTML = currentHTML + variableText;
+    handleInput();
+  }
+  
+  /* console.log('🎉 insertVariable completed'); */
+}
 
 function handleFocus() {  
-  isActivelyEditing.value = true;  
+  isActivelyEditing.value = true;
+  
+  if (editorStore.selectedBlockId !== blockId && blockId) {  
+    editorStore.setSelectedBlockId(blockId);  
+  }  
 }  
   
 function handleBlur() {  
@@ -435,88 +640,110 @@ function handleMouseDown(event: MouseEvent) {
   // Solo detener propagación si el bloque ya está seleccionado  
   // Esto permite que el primer click seleccione el bloque  
   // y el contenido sea editable inmediatamente después
-  if (editorStore.selectedBlockId === blockId) {  
+  /* if (editorStore.selectedBlockId === blockId) {  
     event.stopPropagation();  
-  }  
+    }  */ 
+   if (editorStore.selectedBlockId !== blockId && blockId) {  
+     editorStore.setSelectedBlockId(blockId);  
+    }
+    
+    event.stopPropagation();  
 }  
   
 function handleKeydown(event: KeyboardEvent) {  
   // Ctrl + B → negrita  
   if (event.ctrlKey && event.key.toLowerCase() === "b") {  
     event.preventDefault();  
-    handleToolbarAction('bold');  
+    toggleBold();  
     return;  
   }  
   
   // Ctrl + I → itálica  
   if (event.ctrlKey && event.key.toLowerCase() === "i") {  
     event.preventDefault();  
-    handleToolbarAction('italic');  
+    toggleItalic();  
     return;  
   }  
-}  
-  
-function handleToolbarAction(action: 'bold' | 'italic') {  
-  if (!editableDiv.value) return;  
 
-  isInternalUpdate.value = true;
-  
-  // Enfocar y restaurar selección  
-  editableDiv.value.focus(); 
-  saveCursorPosition(); 
-  /* restoreCursorPosition();   */
-  
-  // Aplicar formato  
-  document.execCommand(action, false, undefined);  
-  
-  nextTick(() => {  
-    if (editableDiv.value) {  
-      editableDiv.value.dispatchEvent(new Event('input')); // ✅ Dispara el handleInput corregido
-    }  
-  });
+  // Ctrl + spacio → variables 
+  if ((event.ctrlKey && event.code === "Space") || event.key === "@") {  
+    event.preventDefault();  
+    saveCursorPosition();
+    toolbarRef.value?.openVariablesDropdown?.(); 
+    return; 
+  } 
 }  
+
   
+function handleToolbarAction(action: 'bold' | 'italic' | string) {
+  /* console.log('🎛️ InlineTextEditor - handleToolbarAction:', action); */
+
+  if (action === 'bold') {
+    toggleBold();
+  } else if (action === 'italic') {
+    toggleItalic();
+  } else {
+    // Si es una variable
+    saveCursorPosition();
+    setTimeout(() => {
+      insertVariable(action);
+    }, 10);
+  }
+}
+
+// ============================================  
+// UTILITY FUNCTIONS
+// ============================================
+
+function updateBlockInStore(text: string, formats: TextFormat[], markdown?: boolean) {
+  if (!blockId) return;
+  
+  const currentBlock = editorStore.document[blockId];
+  if (currentBlock?.type === 'Text') {
+    editorStore.setDocument({
+      [blockId]: {
+        ...currentBlock,
+        data: {
+          ...currentBlock.data,
+          props: {
+            ...currentBlock.data.props,
+            text: text,
+            formats: formats,
+            markdown: markdown
+          } as any
+        }
+      }
+    });
+  }
+}
+
+
 // ============================================  
 // WATCHERS  
 // ============================================  
- 
-watch(() => {  
-  if (!blockId) return null;  
-  const block = editorStore.document[blockId];  
-  return {  
-    text: block?.data?.props?.text || '',  
-    formats: block?.data?.props?.formats || []  
-  };  
-}, (newData) => {  
-  if (!newData || isInternalUpdate.value || !editableDiv.value) return;  
+
+watch(blockProps, (newProps, oldProps) => {
+  if (!editableDiv.value || !newProps || isInternalUpdate.value || isActivelyEditing.value) return;
+
+  // Evitar actualizaciones innecesarias
+  const oldText = oldProps?.text || '';
+  const oldFormats = oldProps?.formats || [];
+  const newText = newProps.text;
+  const newFormats = newProps.formats || [];
   
-    
-  const { text, formats } = newData;  
-  const htmlContent = textWithFormatsToHtml(text, formats);  
-    
-  // Solo actualizar si el contenido HTML es diferente  
-  if (editableDiv.value.innerHTML !== htmlContent) {  
-    isInternalUpdate.value = true;  
-    saveCursorPosition();  
-      
-    editableDiv.value.innerHTML = htmlContent;  
-      
-    nextTick(() => {  
-      restoreCursorPosition();  
-      isInternalUpdate.value = false;  
-    });  
-  }  
-}, { deep: true, immediate: false });
+  if (oldText === newText && JSON.stringify(oldFormats) === JSON.stringify(newFormats)) {
+    return;
+  }
 
-watch(blockProps, (newProps) => {
-  if (!editableDiv.value || !newProps || isInternalUpdate.value) return;
+/*   console.log('🔄 InlineTextEditor - Sincronizando desde store');
+  console.log('📝 Texto:', newText);
+  console.log('🎨 Formatos:', newFormats); */
 
-  const { text, formats = [] } = newProps;
-  const htmlContent = textWithFormatsToHtml(text, formats);
-
-  console.log('🟢 InlineTextEditor - Sincronizando formatos:', formats);
+  const htmlContent = textWithFormatsToHtml(newText, newFormats);
   
   if (editableDiv.value.innerHTML !== htmlContent) {
+    /* console.log('✅ Actualizando contenido del editor'); */
+    
     const wasFocused = document.activeElement === editableDiv.value;
     if (wasFocused) saveCursorPosition();
     
@@ -533,19 +760,29 @@ watch(blockProps, (newProps) => {
 // ============================================  
   
 onMounted(() => {  
-  if (!editableDiv.value || !props.text || !blockId) return;  
+  if (!editableDiv.value || !blockId) return;  
   
   const block = currentBlock.value;  
   if (!block) return;  
   
-  const formats = (block.data?.props as TextBlockProps)?.formats || [];  
-  const htmlContent = textWithFormatsToHtml(props.text, formats);  
-  editableDiv.value.innerHTML = htmlContent;  
-});  
+  // ✅ USAR DATOS DEL STORE, NO DE PROPS
+  const blockData = block.data as { props?: TextBlockProps; style?: any };
 
-defineExpose({  
-  applyBold,  
-  applyItalic,  
+  const text = (blockData.props as TextBlockProps)?.text || '';
+  const formats = (blockData.props as TextBlockProps)?.formats || [];  
+  const htmlContent = textWithFormatsToHtml(text, formats);  
+  
+  /* console.log('🚀 InlineTextEditor - Montado con datos del store:', { text, formats }); */
+  
+  editableDiv.value.innerHTML = htmlContent;  
+});
+
+provide('editorFunctions', {
+  saveCursorPosition,
+  insertVariable
+});
+
+defineExpose({   
   handleInput  
 });  
 

@@ -1,12 +1,6 @@
 <template>
   <BaseSidebarPanel title="Bloque de texto">
     <UFormField label="Texto">
-      <!-- <UTextarea
-        :rows="5"
-        :model-value="processedText"
-        @update:model-value="handleUpdateData({ ...data, props: { ...data.props, text: $event as string } })"
-        class="w-full"
-      /> -->
       <RichTextEditor  
         label=""  
         :rows="5"  
@@ -16,14 +10,6 @@
         @text-selected="selectedText = $event"
         placeholder="Escribe tu texto aquí. Usa Ctrl+Space para insertar variables"  
       />  
-<!--       <RichTextEditor  
-        label=""  
-        :rows="5"  
-        :model-value="data.props?.text ?? ''"  
-        @update:model-value="handleUpdateData({ ...data, props: { ...data.props, text: $event as string } })"  
-        @text-selected="selectedText = $event"
-        placeholder="Escribe tu texto aquí. Usa Ctrl+Space para insertar variables"  
-      />   -->
     </UFormField>
 
 <!--     <div class="mt-3">

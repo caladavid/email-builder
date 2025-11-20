@@ -8,7 +8,6 @@
         @update:model-value="handleUpdateData({ ...data, props: { ...data.props, text: $event as string } })"      
         placeholder="Texto del botón. Usa Ctrl+Space para insertar variables"      
       />      
-      <!-- <UInput :model-value="text" @update:model-value="handleUpdateData({ ...data, props: { ...data.props, text: $event as string } })" class="w-full" /> -->
     </UFormField>
     <UFormField label="Url">
       <UInput :model-value="url" @update:model-value="handleUpdateData({ ...data, props: { ...data.props, url: $event as string } })" class="w-full" />

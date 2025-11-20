@@ -3,19 +3,6 @@
     <UFormField :label="label">
       <div class="relative">
 
-        <!-- <UTextarea
-          ref="textareaRef"
-          :rows="rows"
-          :model-value="modelValue"
-          @update:model-value="handleTextChange"
-          @keydown="handleKeydown"
-          @click="updateCursorPosition"
-          @mouseup="handleTextSelection"  
-          @keyup="handleTextSelection" 
-          class="w-full"
-          :placeholder="placeholder"
-        /> -->
-
         <div  
           ref="editableDiv"  
           contenteditable="true"  
@@ -118,6 +105,20 @@ type Props = {
   formats?: any[];
   placeholder?: string;  
 };  
+
+export interface TextBlockProps {
+  text: string;
+  formats?: TextFormat[];
+  markdown?: boolean;
+}
+
+interface TextFormat {
+  start: number;
+  end: number;
+  bold?: boolean;
+  italic?: boolean;
+}
+
   
 const props = defineProps<Props>();  
 const emit = defineEmits<{  
@@ -137,15 +138,9 @@ const editableDiv = ref<HTMLDivElement | null>(null);
 const isInternalUpdate = ref(false);  
 const isActivelyEditing = ref(false);  
   
-// Textarea refs (for future use)  
-const textareaRef = ref<any>(null);  
-let savedTextareaElement: HTMLTextAreaElement | null = null;  
-  
 // Shared refs  
 const showVariablesDropdown = ref(false);  
-const cursorPosition = ref(0);  
 const lastCursorPosition = ref(0);  
-const dropdownPosition = ref({ top: "0px", left: "0px" });  
 const selectedText = ref('');  
   
 // ============================================  
@@ -165,10 +160,12 @@ const blockProps = computed(() => {
   const blockId = inspectorDrawer.selectedBlockId;
   if (!blockId) return null;
   const block = inspectorDrawer.document[blockId];
+
+  const blockData = block.data as { props?: TextBlockProps; style?: any };
   
   return {
-    text: block?.data?.props?.text || '',
-    formats: block?.data?.props?.formats || []
+    text: blockData.props?.text || '',
+    formats: blockData.props?.formats || []
   };
 }); 
   
@@ -176,15 +173,6 @@ const blockProps = computed(() => {
 // LIFECYCLE HOOKS  
 // ============================================  
   
-// Textarea initialization (commented for future use)  
-/*   
-onMounted(() => {  
-  if (textareaRef.value) {  
-    savedTextareaElement = textareaRef.value?.$el.querySelector("textarea") || null;  
-    console.log("onMounted: Native textarea element saved.");  
-  }  
-});  
-*/  
   
 // Contenteditable initialization (currently active)  
 onMounted(() => {    
@@ -192,10 +180,12 @@ onMounted(() => {
 
   const blockId = inspectorDrawer.selectedBlockId;
   if (!blockId) return;
-
+  
   const selectedBlock = inspectorDrawer.document[blockId];
-  const text = selectedBlock?.data?.props?.text || '';
-  const formats = selectedBlock?.data?.props?.formats || [];
+  const blockData = selectedBlock.data as { props?: TextBlockProps; style?: any };
+
+  const text = blockData.props?.text || '';
+  const formats = blockData.props?.formats || [];
 
   const htmlContent = textWithFormatsToHtml(text, formats);
   editableDiv.value.innerHTML = htmlContent;
@@ -235,23 +225,7 @@ function handleKeydown(event: KeyboardEvent) {
 // ============================================  
 // EVENT HANDLERS - CONTENTEDITABLE (Active)  
 // ============================================  
-  
-/* function handleContentChange(event: Event) {    
-  if (!editableDiv.value) return;    
-    
-  isInternalUpdate.value = true;    
-    
-  const htmlContent = editableDiv.value.innerHTML;    
-  const { text, formats } = htmlToTextAndFormats(htmlContent);    
-    
-  // Emit plain text only  
-  emit("update:model-value", text);    
-    
-  setTimeout(() => {    
-    isInternalUpdate.value = false;    
-  }, 100);    
-}  */ 
-  
+
 function updateCursorPosition() {  
   // Contenteditable version (currently active)  
   // No specific action needed for contenteditable  
@@ -287,249 +261,34 @@ function getCurrentSelection(): string {
   // Contenteditable version (currently active)  
   const selection = window.getSelection();  
   return selection ? selection.toString() : '';  
-    
-  // Textarea version (commented)  
-  /*  
-  if (!savedTextareaElement) return '';    
-      
-  const start = savedTextareaElement.selectionStart || 0;    
-  const end = savedTextareaElement.selectionEnd || 0;    
-      
-  return start !== end ? props.modelValue.substring(start, end) : '';  
-  */  
 }  
-  
-// ============================================  
-// FORMAT FUNCTIONS - TEXTAREA (Commented)  
-// ============================================  
-  
-/*  
-function toggleBold() {  
-  // TEXTAREA VERSION - Manipulates HTML tags in plain text  
-  if (!savedTextareaElement) return;  
-    
-  const start = savedTextareaElement.selectionStart || 0;  
-  const end = savedTextareaElement.selectionEnd || 0;  
-    
-  if (start === end) return;  
-  
-  const fullText = props.modelValue;  
-  const selection = fullText.substring(start, end);  
-  const before = fullText.substring(0, start);  
-  const after = fullText.substring(end);  
-  
-  const BOLD_OPEN = "<b>";  
-  const BOLD_CLOSE = "</b>";  
-  const BOLD_OPEN_LENGTH = BOLD_OPEN.length;  
-  const BOLD_CLOSE_LENGTH = BOLD_CLOSE.length;  
-  
-  const findBoldOpenPosition = (): number => {  
-    for (let i = start; i >= 0; i--) {  
-      if (fullText.substring(i, i + BOLD_OPEN_LENGTH) === BOLD_OPEN) {  
-        return i;  
-      }  
-    }  
-    return -1;  
-  };  
-  
-  const findBoldClosePosition = (): number => {  
-    for (let i = end; i <= fullText.length - BOLD_CLOSE_LENGTH; i++) {  
-      if (fullText.substring(i, i + BOLD_CLOSE_LENGTH) === BOLD_CLOSE) {  
-        return i;  
-      }  
-    }  
-    return -1;  
-  };  
-  
-  const openTagPos = findBoldOpenPosition();  
-  const closeTagPos = findBoldClosePosition();  
-  
-  const isProperlyWrapped =   
-    openTagPos !== -1 &&   
-    closeTagPos !== -1 &&  
-    openTagPos <= start &&  
-    closeTagPos >= end &&  
-    !selection.includes(BOLD_OPEN) &&   
-    !selection.includes(BOLD_CLOSE);  
-  
-  let newText: string;  
-  let newStart: number;  
-  let newEnd: number;  
-  
-  if (isProperlyWrapped) {  
-    newText =   
-      fullText.substring(0, openTagPos) +   
-      selection +   
-      fullText.substring(closeTagPos + BOLD_CLOSE_LENGTH);  
-  
-    newStart = openTagPos;  
-    newEnd = newStart + selection.length;  
-  } else {  
-    newText =   
-      before +   
-      BOLD_OPEN +   
-      selection +   
-      BOLD_CLOSE +   
-      after;  
-  
-    newStart = start + BOLD_OPEN_LENGTH;  
-    newEnd = newStart + selection.length;  
-  }  
-  
-  emit("update:model-value", newText);  
-  
-  nextTick(() => {  
-    if (savedTextareaElement) {  
-      savedTextareaElement.setSelectionRange(newStart, newEnd);  
-      savedTextareaElement.focus();  
-    }  
-  });  
-}  
-  
-function toggleItalic() {  
-  // TEXTAREA VERSION - Manipulates HTML tags in plain text  
-  if (!savedTextareaElement) return;  
-    
-  const start = savedTextareaElement.selectionStart || 0;  
-  const end = savedTextareaElement.selectionEnd || 0;  
-    
-  if (start === end) return;  
-  
-  const fullText = props.modelValue;  
-  const selection = fullText.substring(start, end);  
-  const before = fullText.substring(0, start);  
-  const after = fullText.substring(end);  
-  
-  const ITALIC_OPEN = "<i>";  
-  const ITALIC_CLOSE = "</i>";  
-  const ITALIC_OPEN_LENGTH = ITALIC_OPEN.length;  
-  const ITALIC_CLOSE_LENGTH = ITALIC_CLOSE.length;  
-  
-const findItalicClosePosition = (): number => {  
-    for (let i = end; i < fullText.length; i++) {  
-      if (fullText.substring(i, i + ITALIC_CLOSE_LENGTH) === ITALIC_CLOSE) {  
-        return i;  
-      }  
-    }  
-    return -1;  
-  }  
-  
-  const italicOpenPos = findItalicOpenPosition();  
-  const italicClosePos = findItalicClosePosition();  
-  
-  if (italicOpenPos !== -1 && italicClosePos !== -1) {  
-    // Caso: Ya tiene etiquetas <i>, las quitamos  
-    const beforeOpen = fullText.substring(0, italicOpenPos);  
-    const content = fullText.substring(italicOpenPos + ITALIC_OPEN_LENGTH, italicClosePos);  
-    const afterClose = fullText.substring(italicClosePos + ITALIC_CLOSE_LENGTH);  
-      
-    const newText = beforeOpen + content + afterClose;  
-    emit("update:model-value", newText);  
-      
-    nextTick(() => {  
-      const newCursorPos = italicOpenPos + content.length;  
-      if (savedTextareaElement) {  
-        savedTextareaElement.focus();  
-        savedTextareaElement.setSelectionRange(newCursorPos, newCursorPos);  
-      }  
-    });  
-  } else {  
-    // Caso: No tiene etiquetas, las agregamos  
-    const newText = before + ITALIC_OPEN + selection + ITALIC_CLOSE + after;  
-    emit("update:model-value", newText);  
-      
-    nextTick(() => {  
-      const newCursorPos = start + ITALIC_OPEN_LENGTH + selection.length + ITALIC_CLOSE_LENGTH;  
-      if (savedTextareaElement) {  
-        savedTextareaElement.focus();  
-        savedTextareaElement.setSelectionRange(newCursorPos, newCursorPos);  
-      }  
-    });  
-  }  
-}  
-*/  
-  
-// ============================================  
-// FUNCIONES PARA DIV CONTENTEDITABLE (ACTIVO)  
-// ============================================  
-  
-/* function htmlToTextAndFormats(htmlContent: string): { text: string; formats: any[] } {  
-  // Crear un elemento temporal para parsear el HTML  
-  const tempDiv = document.createElement('div');  
-  tempDiv.innerHTML = htmlContent;  
-    
-  let text = "";  
-  const formats: any[] = [];  
-  let pos = 0;  
-    
-  const append = (t: string) => {  
-    if (!t) return;  
-    text += t;  
-    pos += t.length;  
-  };  
-    
-  const processNode = (node: Node, parentFormats: { bold?: boolean; italic?: boolean } = {}) => {  
-    if (node.nodeType === Node.TEXT_NODE) {  
-      const content = node.textContent || "";  
-      if (content) {  
-        const start = pos;  
-        append(content);  
-          
-        // Si hay formatos heredados, crear un objeto de formato  
-        if (parentFormats.bold || parentFormats.italic) {  
-          const fmt: any = { start, end: pos };  
-          if (parentFormats.bold) fmt.bold = true;  
-          if (parentFormats.italic) fmt.italic = true;  
-          formats.push(fmt);  
-        }  
-      }  
-      return;  
-    }  
-      
-    if (node.nodeType === Node.ELEMENT_NODE) {  
-      const el = node as HTMLElement;  
-      const tag = el.tagName.toLowerCase();  
-        
-      // Detectar formatos del elemento actual  
-      const currentFormats = { ...parentFormats };  
-      if (tag === "b" || tag === "strong") currentFormats.bold = true;  
-      if (tag === "i" || tag === "em") currentFormats.italic = true;  
-        
-      // Procesar hijos recursivamente  
-      Array.from(el.childNodes).forEach(child => {  
-        processNode(child, currentFormats);  
-      });  
-    }  
-  };  
-    
-  Array.from(tempDiv.childNodes).forEach(node => {  
-    processNode(node);  
-  });  
-    
-  return { text: text.trim(), formats };  
-} */
 
-function htmlToTextAndFormats(htmlContent: string): { text: string; formats: any[] } {  
+function htmlToTextAndFormats(htmlContent: string): { text: string; formats: TextFormat[] } {  
   const tempDiv = document.createElement('div');  
   tempDiv.innerHTML = htmlContent;  
     
   let text = "";  
-  const formats: any[] = [];  
-  let pos = 0;  
+  const formats: TextFormat[] = [];  
+  let post = 0;
   
-  function processNode(node: Node, currentFormats: { bold?: boolean; italic?: boolean } = {}) {  
+  function processNode(
+    node: Node, 
+    currentFormats: { bold?: boolean; italic?: boolean } = {}, 
+    depth: number = 0
+  ) {  
     if (node.nodeType === Node.TEXT_NODE) {  
       const content = node.textContent || "";  
       if (content) {  
-        const start = pos;  
+        const start = text.length;  
+        post = start;  
         text += content;  
-        pos += content.length;  
+        const end = text.length;  
         
         // Solo crear formato si hay algún estilo activo
         if (currentFormats.bold || currentFormats.italic) {  
           formats.push({  
             start,  
-            end: pos,  
+            end,  
             ...(currentFormats.bold && { bold: true }),  
             ...(currentFormats.italic && { italic: true })  
           });  
@@ -541,19 +300,37 @@ function htmlToTextAndFormats(htmlContent: string): { text: string; formats: any
     if (node.nodeType === Node.ELEMENT_NODE) {  
       const el = node as HTMLElement;  
       const tag = el.tagName.toLowerCase();  
+
+      if (tag === "a") {  
+        const href = el.getAttribute("href") || "";  
+        const linkText = el.textContent?.trim() || "";  
+        if (href && linkText) {  
+          const markdownLink = `[${linkText}](${href})`;  
+          text += markdownLink;  
+          post += markdownLink.length;  
+          return; // No procesar hijos  
+        }  
+      } 
         
-      // Actualizar formatos según la etiqueta
+      // Crear una copia de los formatos actuales para no mutar el objeto padre
       const newFormats = { ...currentFormats };  
-      if (tag === "b" || tag === "strong") newFormats.bold = true;  
-      if (tag === "i" || tag === "em") newFormats.italic = true;  
+      
+      // Manejar etiquetas de formato
+      if (tag === "b" || tag === "strong") {
+        newFormats.bold = true;
+      } else if (tag === "i" || tag === "em") {
+        newFormats.italic = true;
+      }
+      // Ignorar otras etiquetas como div, span, etc. a menos que tengan estilos específicos
         
       // Procesar hijos recursivamente
       Array.from(el.childNodes).forEach(child => {  
-        processNode(child, newFormats);  
+        processNode(child, newFormats, depth + 1);  
       });  
     }  
   }  
     
+  // Procesar todos los nodos hijos del div temporal
   Array.from(tempDiv.childNodes).forEach(node => {  
     processNode(node);  
   });  
@@ -616,7 +393,7 @@ function toggleBold() {
                 ...currentBlock.data.props,
                 text: text,
                 formats: formats
-              }
+              } as any
             }
           }
         });
@@ -655,7 +432,7 @@ function toggleItalic() {
                 ...currentBlock.data.props,
                 text: text,
                 formats: formats
-              }
+              } as any
             }
           }
         });
@@ -682,23 +459,32 @@ function handleContentChange() {
   // Actualizar store
   const blockId = inspectorDrawer.selectedBlockId;
   if (blockId) {
-    const currentBlock = inspectorDrawer.document[blockId];
-    if (currentBlock?.type === 'Text') {
-      inspectorDrawer.setDocument({
-        [blockId]: {
-          ...currentBlock,
-          data: {
-            ...currentBlock.data,
-            props: {
-              ...currentBlock.data.props,
-              text: text,
-              formats: formats
+      const currentBlock = inspectorDrawer.document[blockId];
+      if (currentBlock?.type === 'Text') {
+        // Verificar si realmente hay cambios para evitar loops
+        const currentText = currentBlock.data?.props?.text || '';
+        const currentFormats = currentBlock.data?.props?.formats || [];
+        
+        if (currentText !== text || JSON.stringify(currentFormats) !== JSON.stringify(formats)) {
+          /* console.log('💾 RichTextEditor - Guardando cambios en store'); */
+          inspectorDrawer.setDocument({
+            [blockId]: {
+              ...currentBlock,
+              data: {
+                ...currentBlock.data,
+                props: {
+                  ...currentBlock.data.props,
+                  text: text,
+                  formats: formats
+                } as any
+              }
             }
-          }
+          });
+        } else {
+          console.log('⏭️ RichTextEditor - Sin cambios, omitiendo guardado');
         }
-      });
+      }
     }
-  }
     
   nextTick(() => {  
     restoreCursorPosition();  
@@ -734,27 +520,23 @@ function saveCursorPosition() {
 
 // Agregar handlers de focus/blur  
 function handleFocus() {  
-  isActivelyEditing.value = true;  
+  isActivelyEditing.value = true; 
+  /* console.log('🎯 RichTextEditor - Foco obtenido');  */
 }  
   
 function handleBlur() {  
   setTimeout(() => {  
-    isActivelyEditing.value = false;  
+    isActivelyEditing.value = false; 
+    /* console.log('🎯 RichTextEditor - Foco perdido'); */ 
   }, 150);  
 }  
 
 // Y restoreCursorPosition con logs
 function restoreCursorPosition() {
-  if (!editableDiv.value) {
-    console.log('❌ restoreCursorPosition: editableDiv is null');
-    return;
-  }
+  if (!editableDiv.value) return;
   
   const selection = window.getSelection();
-  if (!selection) {
-    console.log('❌ restoreCursorPosition: no selection');
-    return;
-  }
+  if (!selection) return;
   
   console.log('🔄 restoreCursorPosition: restoring to position', lastCursorPosition.value);
   
@@ -765,7 +547,7 @@ function restoreCursorPosition() {
     range.collapse(true);
     selection.removeAllRanges();
     selection.addRange(range);
-    console.log('📍 Moved to start (position 0)');
+    /* console.log('📍 Moved to start (position 0)'); */
     return;
   }
   
@@ -779,13 +561,13 @@ function restoreCursorPosition() {
       const textLength = node.textContent?.length || 0;
       const nextCharIndex = charIndex + textLength;
       
-      console.log('🔍 Checking text node:', {
+      /* console.log('🔍 Checking text node:', {
         charIndex,
         nextCharIndex,
         target: lastCursorPosition.value,
         textLength,
         textContent: node.textContent?.substring(0, 50) + '...'
-      });
+      }); */
       
       if (lastCursorPosition.value <= nextCharIndex) {
         const offset = lastCursorPosition.value - charIndex;
@@ -795,7 +577,7 @@ function restoreCursorPosition() {
         selection.removeAllRanges();
         selection.addRange(range);
         found = true;
-        console.log('✅ Position restored to text node with offset', offset);
+        /* console.log('✅ Position restored to text node with offset', offset); */
       }
       charIndex = nextCharIndex;
     } else {
@@ -818,226 +600,185 @@ function restoreCursorPosition() {
   }
 }
   
-function insertVariable(variableKey: string) {  
-  console.log('🔧 insertVariable called with:', variableKey);
+function insertVariable(variableKey: string) {
+  /* console.log('🔧 InlineTextEditor - insertVariable called with:', variableKey); */
   
-  if (!editableDiv.value) {  
-    console.error("❌ editableDiv is null");  
-    return;  
-  }  
+  if (!editableDiv.value) return;
 
-  // 1. Enfocar el elemento editable
+  // 1. ENFOCAR primero - esto es crítico
   editableDiv.value.focus();
-  console.log('✅ editableDiv focused');
   
-  // 2. Obtener la selección actual ANTES de cualquier operación
+  // 2. RESTAURAR posición ANTES de cualquier otra operación
+  /* console.log('🔄 Restoring cursor position before insertion...'); */
+  restoreCursorPosition();
+  
+  // 3. Obtener la selección DESPUÉS de restaurar
   const selection = window.getSelection();
-  console.log('🎯 Current selection:', {
-    selection,
-    rangeCount: selection?.rangeCount,
-    isCollapsed: selection?.isCollapsed,
-    anchorNode: selection?.anchorNode,
-    anchorOffset: selection?.anchorOffset,
-    focusNode: selection?.focusNode,
-    focusOffset: selection?.focusOffset
-  });
-  
   if (!selection || selection.rangeCount === 0) {
-    console.warn('⚠️ No selection available, checking cursor position');
+    /* console.error('❌ No selection after restore, using fallback'); */
     
-    // Intentar restaurar la posición guardada
-    if (lastCursorPosition.value > 0) {
-      console.log('🔄 Restoring cursor position:', lastCursorPosition.value);
-      restoreCursorPosition();
-      // Obtener la selección nuevamente después de restaurar
-      const newSelection = window.getSelection();
-      if (newSelection && newSelection.rangeCount > 0) {
-        selection = newSelection;
-        console.log('✅ Selection restored');
-      }
-    }
+    // Fallback robusto: insertar en la posición guardada
+    const currentContent = editableDiv.value.innerHTML;
+    const variableText = `{${variableKey}}`;
     
-    if (!selection || selection.rangeCount === 0) {
-      console.error('❌ Still no selection after restore, inserting at end');
-      // Fallback: insertar al final
-      const variableText = `{${variableKey}}`;
+    if (lastCursorPosition.value >= 0 && lastCursorPosition.value <= currentContent.length) {
+      // Insertar en la posición específica
+      const textContent = editableDiv.value.textContent || '';
+      const before = textContent.substring(0, lastCursorPosition.value);
+      const after = textContent.substring(lastCursorPosition.value);
+      editableDiv.value.textContent = before + variableText + after;
+    } else {
+      // Insertar al final
       editableDiv.value.innerHTML += variableText;
-      
-      isInternalUpdate.value = true;  
-      nextTick(() => {  
-        emit("update:model-value", editableDiv.value?.innerHTML || '');  
-        setTimeout(() => {  
-          isInternalUpdate.value = false;  
-        }, 100);  
-      });  
-      showVariablesDropdown.value = false;
-      return;
     }
+    
+    /* handleInput(); */
+    return;
   }
-  
+
   const range = selection.getRangeAt(0);
-  console.log('📏 Range details:', {
-    startContainer: range.startContainer,
+  /* console.log('🎯 Current range for insertion:', {
+    collapsed: range.collapsed,
     startOffset: range.startOffset,
-    endContainer: range.endContainer,
     endOffset: range.endOffset,
-    commonAncestorContainer: range.commonAncestorContainer,
-    collapsed: range.collapsed
-  });
-  
-  // 3. Verificar que el range está dentro del editableDiv
-  const isInEditable = editableDiv.value.contains(range.commonAncestorContainer);
-  console.log('📍 Is selection inside editableDiv?', isInEditable);
-  
-  if (!isInEditable) {
-    console.warn('⚠️ Selection not in editableDiv, moving to end');
-    // Mover selección al final del contenido
+    startContainer: range.startContainer.nodeName,
+    commonAncestor: range.commonAncestorContainer.nodeName
+  }); */
+
+  // 4. VERIFICAR que la selección esté dentro del editor
+  if (!editableDiv.value.contains(range.commonAncestorContainer)) {
+    console.warn('⚠️ Selection outside editor, moving to end');
     range.selectNodeContents(editableDiv.value);
     range.collapse(false);
     selection.removeAllRanges();
     selection.addRange(range);
-    console.log('✅ Moved selection to end');
   }
+
+  // 5. INTENTAR execCommand PRIMERO (más confiable para contenteditable)
+  const variableText = `{${variableKey}}`;
+  let success = false;
   
-  // 4. Intentar con execCommand primero (más confiable)
   try {
-    console.log('🔄 Attempting execCommand insert');
-    const variableText = `{${variableKey}}`;
-    const success = document.execCommand('insertText', false, variableText);
+    c/* onsole.log('🔄 Attempting execCommand insert...'); */
+    success = document.execCommand('insertText', false, variableText);
     console.log('✅ execCommand result:', success);
-    
-    if (success) {
-      isInternalUpdate.value = true;  
-      nextTick(() => {  
-        const newValue = editableDiv.value?.innerHTML || '';  
-        emit("update:model-value", newValue);  
-        console.log('📤 Emitted update with new value');
-        setTimeout(() => {  
-          isInternalUpdate.value = false;  
-        }, 100);  
-      });  
-      showVariablesDropdown.value = false;
-      return;
-    }
   } catch (error) {
     console.error('❌ execCommand failed:', error);
+    success = false;
   }
-  
-  // 5. Fallback: método manual con Range
-  console.log('🔄 Falling back to manual range insertion');
+
+  if (success) {
+    // execCommand tuvo éxito, el input event se disparará automáticamente
+    console.log('🎉 Variable inserted successfully with execCommand');
+    return;
+  }
+
+  // 6. FALLBACK: Inserción manual
+  /* console.log('🔄 Falling back to manual insertion...'); */
   try {
-    const variableText = `{${variableKey}}`;
-    const textNode = document.createTextNode(variableText);
+    // Para contenteditable, necesitamos manejar la inserción cuidadosamente
+    if (range.collapsed) {
+      // Insertar en posición de cursor
+      const textNode = document.createTextNode(variableText);
+      range.insertNode(textNode);
+      
+      // Mover cursor después del texto insertado
+      range.setStartAfter(textNode);
+      range.collapse(true);
+    } else {
+      // Reemplazar selección
+      const textNode = document.createTextNode(variableText);
+      range.deleteContents();
+      range.insertNode(textNode);
+      range.selectNodeContents(textNode);
+      range.collapse(false);
+    }
     
-    console.log('📝 Inserting text node:', variableText);
-    range.deleteContents();
-    range.insertNode(textNode);
-    
-    // Mover el cursor después de la variable insertada
-    range.setStartAfter(textNode);
-    range.collapse(true);
     selection.removeAllRanges();
     selection.addRange(range);
+    
     console.log('✅ Manual insertion completed');
     
-    isInternalUpdate.value = true;  
-    nextTick(() => {  
-      const newValue = editableDiv.value?.innerHTML || '';  
-      emit("update:model-value", newValue);  
-      setTimeout(() => {  
-        isInternalUpdate.value = false;  
-      }, 100);  
-    });  
+    // Disparar input event manualmente
+    const inputEvent = new Event('input', { bubbles: true });
+    editableDiv.value.dispatchEvent(inputEvent);
+    
   } catch (error) {
     console.error('❌ Manual insertion failed:', error);
     
-    // Último fallback: insertar al final
-    console.warn('🔄 Last resort: inserting at end');
-    const variableText = `{${variableKey}}`;
-    editableDiv.value.innerHTML += variableText;
-    
-    isInternalUpdate.value = true;  
-    nextTick(() => {  
-      emit("update:model-value", editableDiv.value?.innerHTML || '');  
-      setTimeout(() => {  
-        isInternalUpdate.value = false;  
-      }, 100);  
-    });  
+    // ÚLTIMO RECURSO: innerHTML
+    console.warn('🔄 Last resort: innerHTML append');
+    const currentHTML = editableDiv.value.innerHTML;
+    editableDiv.value.innerHTML = currentHTML + variableText;
+    /* handleInput(); */
   }
   
-  showVariablesDropdown.value = false;
   console.log('🎉 insertVariable completed');
 }
 
-function textWithFormatsToHtml(text: string, formats: any[]): string {  
-  if (!formats || formats.length === 0) return text;  
-    
-  // Crear array de caracteres para construir el HTML  
-  const chars = text.split('');  
-  const openTags: { pos: number; tags: string[] }[] = [];  
-  const closeTags: { pos: number; tags: string[] }[] = [];  
-    
-  // Procesar cada formato  
-  formats.forEach(fmt => {  
-    const tags: string[] = [];  
-    if (fmt.bold) tags.push('b');  
-    if (fmt.italic) tags.push('i');  
-      
-    if (tags.length > 0) {  
-      openTags.push({ pos: fmt.start, tags });  
-      closeTags.push({ pos: fmt.end, tags: [...tags].reverse() });  
-    }  
-  });  
-    
-  // Ordenar tags por posición  
-  openTags.sort((a, b) => a.pos - b.pos);  
-  closeTags.sort((a, b) => a.pos - b.pos);  
-    
-  // Construir HTML insertando tags  
-  let html = '';  
-  let openIdx = 0;  
-  let closeIdx = 0;  
-    
-  for (let i = 0; i <= text.length; i++) {  
-    // Insertar tags de cierre en esta posición  
-    while (closeIdx < closeTags.length && closeTags[closeIdx].pos === i) {  
-      closeTags[closeIdx].tags.forEach(tag => {  
-        html += `</${tag}>`;  
-      });  
-      closeIdx++;  
-    }  
-      
-    // Insertar tags de apertura en esta posición  
-    while (openIdx < openTags.length && openTags[openIdx].pos === i) {  
-      openTags[openIdx].tags.forEach(tag => {  
-        html += `<${tag}>`;  
-      });  
-      openIdx++;  
-    }  
-      
-    // Insertar el carácter actual  
-    if (i < text.length) {  
-      html += chars[i];  
-    }  
-  }  
-    
-  return html;  
+function textWithFormatsToHtml(text: string, formats: TextFormat[]): string {  
+  if (!formats || formats.length === 0) return text;  
+  
+  const events: Array<{ position: number; type: 'start' | 'end'; format: Partial<TextFormat> }> = [];
+  formats.forEach(format => {
+    if (format.bold) {
+      events.push({ position: format.start, type: 'start', format: { bold: true } });
+      events.push({ position: format.end, type: 'end', format: { bold: true } });
+    }
+    if (format.italic) {
+      events.push({ position: format.start, type: 'start', format: { italic: true } });
+      events.push({ position: format.end, type: 'end', format: { italic: true } });
+    }
+  });
+  
+  events.sort((a, b) => {
+    if (a.position !== b.position) return a.position - b.position;
+    return a.type === 'end' ? -1 : 1; 
+  });
+  
+  let result = '';
+  let currentPosition = 0;
+  let boldCount = 0;
+  let italicCount = 0;
+  
+  events.forEach(event => {
+    if (event.position > currentPosition) {
+      result += text.substring(currentPosition, event.position);
+    }
+    currentPosition = event.position;
+    
+    if (event.type === 'start') {
+      if (event.format.bold) {
+        if (boldCount === 0) result += '<b>'; 
+        boldCount++;
+      }
+      if (event.format.italic) {
+        if (italicCount === 0) result += '<i>'; 
+        italicCount++;
+      }
+    } else { // event.type === 'end'
+      if (event.format.italic) {
+        italicCount--;
+        if (italicCount === 0) result += '</i>'; 
+      }
+      if (event.format.bold) {
+        boldCount--;
+        if (boldCount === 0) result += '</b>'; 
+      }
+    }
+  });
+  
+  if (currentPosition < text.length) {
+    result += text.substring(currentPosition);
+  }
+  
+  return result;
 }
   
 // ============================================  
 // WATCHERS  
 // ============================================  
 
-watch(() => {    
-  const blockId = inspectorDrawer.selectedBlockId;    
-  if (!blockId) return null;    
-  const block = inspectorDrawer.document[blockId];    
-  return { text: block?.data?.props?.text || '', formats: block?.data?.props?.formats || [] };    
-}, (newData) => {    
-  if (!newData || isActivelyEditing.value || isInternalUpdate.value || !editableDiv.value) return;    
-  // ...  
-}, { deep: true, immediate: true });  
-  
 // POR ESTE:  
 watch([() => props.modelValue, () => props.formats], ([newText, newFormats]) => {    
   if (isActivelyEditing.value || !editableDiv.value) return;    
@@ -1057,12 +798,12 @@ watch([() => props.modelValue, () => props.formats], ([newText, newFormats]) => 
 }, { deep: true, immediate: true });
 
 watch(blockProps, (newProps) => {
-  if (!editableDiv.value || !newProps || isInternalUpdate.value) return;
+  if (!editableDiv.value || !newProps || isInternalUpdate.value || isActivelyEditing.value) return;
 
   const { text, formats } = newProps;
   const htmlContent = textWithFormatsToHtml(text, formats);
 
-  console.log('🔵 RichTextEditor - Sincronizando formatos:', formats);
+  /* console.log('🔵 RichTextEditor - Sincronizando formatos:', formats); */
   
   if (editableDiv.value.innerHTML !== htmlContent) {
     const wasFocused = document.activeElement === editableDiv.value;
