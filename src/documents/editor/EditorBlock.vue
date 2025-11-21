@@ -36,4 +36,3 @@ const block = computed(() => inspectorDrawer.document[props.id])
 }, { deep: true });   */
 
 </script>
-

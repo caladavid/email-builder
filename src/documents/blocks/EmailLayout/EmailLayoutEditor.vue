@@ -13,7 +13,7 @@
       width: '100%',
       minHeight: '100%',
     }"
-    @click="handleClick"
+    @click.self="handleClick"
   >
     <table
       align="center"
@@ -52,7 +52,7 @@
 <script setup lang="ts">
 import { getFontFamily } from '@flyhub/email-core';
 import { currentBlockIdSymbol } from '../../editor/EditorBlock.vue';
-import type { TEditorBlock } from '@flyhub/email-core';
+
 import EditorChildrenIds from '../helpers/EditorChildrenIds.vue';
 import { inject } from 'vue';
 
