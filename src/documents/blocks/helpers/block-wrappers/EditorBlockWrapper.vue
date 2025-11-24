@@ -14,6 +14,7 @@
     @click.prevent.stop="handleClick"    
     @dragstart.stop="handleDragStart"  
     @dragover.prevent="dragAndDrop.handleDragOver"    
+    @dragleave="dragAndDrop.handleDragLeave"
     @drop.prevent.stop="handleDrop"  
     @dragend="dragAndDrop.handleDragEnd"        
   >  

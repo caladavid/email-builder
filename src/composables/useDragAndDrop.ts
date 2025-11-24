@@ -117,46 +117,55 @@ export function useDragAndDrop(getCurrentBlockId: () => string) {
       
     return visited;  
   }  
-    
-    function isValidDrop(draggedId: string, targetId: string): boolean {  
-    const document = inspectorDrawer.document;  
-        
-    if (draggedId === targetId) {  
-        console.log('Cannot drop block on itself');  
-        return false;  
-    }  
-        
-    if (!document[draggedId] || !document[targetId]) {  
-        console.log('Dragged or target block not found');  
-        return false;  
-    }  
-        
-    // ✅ CORRECCIÓN: Verificar AMBAS direcciones  
-    const draggedDescendants = getAllDescendants(draggedId, document);  
-    const targetDescendants = getAllDescendants(targetId, document);  
-        
-    // Si target está en descendientes de dragged, es inválido  
-    if (draggedDescendants.has(targetId)) {  
-        console.log('Cannot drop container into its own descendant');  
-        return false;  
-    }  
-        
-    // ✅ NUEVO: Si dragged está en descendientes de target, también es inválido  
-    if (targetDescendants.has(draggedId)) {  
-        console.log('Cannot drop block into its ancestor');  
-        return false;  
-    }  
-        
-    // Permitir drops entre hermanos  
-    const draggedParent = findParentContainer(document, draggedId);  
-    const targetParent = findParentContainer(document, targetId);  
-        
-    if (draggedParent.parentId && draggedParent.parentId === targetParent.parentId) {  
-        return true;  
-    }  
-        
-    return true;  
+
+  function handleDragLeave(event: DragEvent): void{
+    const relatedTarget = event.relatedTarget as HTMLElement;
+    const currentTarget = event.relatedTarget as HTMLElement;
+
+    if (!currentTarget.contains(relatedTarget)){
+      showDropIndicator.value = false;
     }
+  }
+    
+  function isValidDrop(draggedId: string, targetId: string): boolean {  
+  const document = inspectorDrawer.document;  
+      
+  if (draggedId === targetId) {  
+      console.log('Cannot drop block on itself');  
+      return false;  
+  }  
+      
+  if (!document[draggedId] || !document[targetId]) {  
+      console.log('Dragged or target block not found');  
+      return false;  
+  }  
+      
+  // ✅ CORRECCIÓN: Verificar AMBAS direcciones  
+  const draggedDescendants = getAllDescendants(draggedId, document);  
+  const targetDescendants = getAllDescendants(targetId, document);  
+      
+  // Si target está en descendientes de dragged, es inválido  
+  if (draggedDescendants.has(targetId)) {  
+      console.log('Cannot drop container into its own descendant');  
+      return false;  
+  }  
+      
+  // ✅ NUEVO: Si dragged está en descendientes de target, también es inválido  
+  if (targetDescendants.has(draggedId)) {  
+      console.log('Cannot drop block into its ancestor');  
+      return false;  
+  }  
+      
+  // Permitir drops entre hermanos  
+  const draggedParent = findParentContainer(document, draggedId);  
+  const targetParent = findParentContainer(document, targetId);  
+      
+  if (draggedParent.parentId && draggedParent.parentId === targetParent.parentId) {  
+      return true;  
+  }  
+      
+  return true;  
+  }
       
   function removeBlockFromParent(  
     document: TEditorConfiguration,  
@@ -550,6 +559,7 @@ function moveBlock(
     handleDragOver,  
     handleDrop,  
     handleDragEnd,  
+    handleDragLeave,
     // Funciones helper para ContainerEditor  
     removeBlockFromParent,  
     appendBlockToContainer,  

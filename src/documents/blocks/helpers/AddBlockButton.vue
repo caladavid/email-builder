@@ -5,6 +5,7 @@
       height: placeholder ? 'auto' :  '10px',
       margin: '-5px 0',
       width: '100%',
+      zIndex: 1001,
     }"
     @mouseenter="visible = true"
     @mouseleave="visible = false"
