@@ -131,6 +131,7 @@ const emit = defineEmits<{
 // REFS & STATE  
 // ============================================  
 const inspectorDrawer = useInspectorDrawer();  
+let animationFrameId: number | null = null;  
   
 // Contenteditable refs (currently active)  
 const editableDiv = ref<HTMLDivElement | null>(null);  
@@ -317,6 +318,7 @@ function htmlToTextAndFormats(htmlContent: string): { text: string; formats: Tex
   return { text, formats };  
 }
 
+
 function toggleBold() {    
   if (!editableDiv.value) return;    
       
@@ -404,7 +406,7 @@ function handleContentChange() {
   const htmlContent = editableDiv.value.innerHTML;  
   const { text, formats } = htmlToTextAndFormats(htmlContent); 
   
-  console.log('🔵 RichTextEditor - Formatos detectados:', formats);
+  /* console.log('🔵 RichTextEditor - Formatos detectados:', formats); */
     
   // Actualizar store
   const blockId = inspectorDrawer.selectedBlockId;
@@ -460,12 +462,12 @@ function saveCursorPosition() {
   preCaretRange.setEnd(range.endContainer, range.endOffset);
   lastCursorPosition.value = preCaretRange.toString().length;
   
-  console.log('💾 saveCursorPosition: saved position', lastCursorPosition.value, {
+  /* console.log('💾 saveCursorPosition: saved position', lastCursorPosition.value, {
     startContainer: range.startContainer,
     startOffset: range.startOffset,
     endContainer: range.endContainer,
     endOffset: range.endOffset
-  });
+  }); */
 }
 
 // Agregar handlers de focus/blur  
@@ -488,7 +490,7 @@ function restoreCursorPosition() {
   const selection = window.getSelection();
   if (!selection) return;
   
-  console.log('🔄 restoreCursorPosition: restoring to position', lastCursorPosition.value);
+/*   console.log('🔄 restoreCursorPosition: restoring to position', lastCursorPosition.value); */
   
   // Caso especial: si la posición es 0, ir al inicio
   if (lastCursorPosition.value === 0) {
@@ -750,21 +752,29 @@ watch([() => props.modelValue, () => props.formats], ([newText, newFormats]) => 
 watch(blockProps, (newProps) => {
   if (!editableDiv.value || !newProps || isInternalUpdate.value || isActivelyEditing.value) return;
 
-  const { text, formats } = newProps;
-  const htmlContent = textWithFormatsToHtml(text, formats);
+  if (animationFrameId) {  
+    cancelAnimationFrame(animationFrameId);  
+  }  
+ 
+  animationFrameId = requestAnimationFrame(() => {
+    if (!editableDiv.value) return
 
-  /* console.log('🔵 RichTextEditor - Sincronizando formatos:', formats); */
+    const { text, formats } = newProps;
+    const htmlContent = textWithFormatsToHtml(text, formats);
   
-  if (editableDiv.value.innerHTML !== htmlContent) {
-    const wasFocused = document.activeElement === editableDiv.value;
-    if (wasFocused) saveCursorPosition();
+    /* console.log('🔵 RichTextEditor - Sincronizando formatos:', formats); */
     
-    editableDiv.value.innerHTML = htmlContent;
-    
-    if (wasFocused) {
-      nextTick(() => restoreCursorPosition());
+    if (editableDiv.value.innerHTML !== htmlContent) {
+      const wasFocused = document.activeElement === editableDiv.value;
+      if (wasFocused) saveCursorPosition();
+      
+      editableDiv.value.innerHTML = htmlContent;
+      
+      if (wasFocused) {
+        nextTick(() => restoreCursorPosition());
+      }
     }
-  }
+  })
 }, { deep: true, immediate: true });
 
 
