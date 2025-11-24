@@ -22,11 +22,11 @@
       </UButton>
     </div> -->
 
-    <BooleanInput
+    <!-- <BooleanInput
       label="Formato Markdown"
       :model-value="Boolean(data.props?.markdown)"
       @update:model-value="handleUpdateData({ ...data, props: { ...data.props, markdown: $event } })"
-    />
+    /> -->
 
     <div class="mt-3">
       <UButton
