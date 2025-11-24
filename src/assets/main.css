@@ -27,3 +27,12 @@
 /*   --ui-bg-hover: #ff9900; */
 }
 
+/* z index for import template modal */
+[data-dismissable-layer][role="dialog"].top-1\/2.left-1\/2 {  
+  z-index: 10000 !important;  
+}
+
+[data-dismissable-layer][role="dialog"].top-1\/2.left-1\/2 ~ div.fixed.inset-0,  
+div.fixed.inset-0:has(+ [data-dismissable-layer][role="dialog"].top-1\/2.left-1\/2) {  
+  z-index: 9999 !important;  
+}

@@ -10,7 +10,6 @@
           @keydown="handleKeydown"  
           @focus="handleFocus"  
           @blur="handleBlur" 
-          @click="updateCursorPosition"  
           @mouseup="handleTextSelection"  
           @keyup="handleTextSelection"  
           :data-placeholder="placeholder"  
@@ -225,37 +224,17 @@ function handleKeydown(event: KeyboardEvent) {
 // ============================================  
 // EVENT HANDLERS - CONTENTEDITABLE (Active)  
 // ============================================  
-
-function updateCursorPosition() {  
-  // Contenteditable version (currently active)  
-  // No specific action needed for contenteditable  
-    
-  // Textarea version (commented)  
-  /*  
-  if (savedTextareaElement) {  
-    cursorPosition.value = savedTextareaElement.selectionStart || 0;  
-  }  
-  */  
-}  
   
 function handleTextSelection() {  
-  // Contenteditable version (currently active)  
-  // Selection is handled by browser for contenteditable  
-    
-  // Textarea version (commented)  
-  /*  
-  if (!savedTextareaElement) return;    
-      
-  const start = savedTextareaElement.selectionStart || 0;    
-  const end = savedTextareaElement.selectionEnd || 0;    
-      
-  if (start !== end) {    
-    const selection = props.modelValue.substring(start, end);    
-    selectedText.value = selection;    
-    emit('text-selected', selection);    
-  }  
-  */  
-}  
+  const selection = window.getSelection(); 
+  if (!selection || selection.rangeCount === 0) return;
+
+  const selectedText = selection.toString().trim();
+
+  if (selectedText.length > 0){
+    emit('text-selected', selectedText)
+  }
+};
   
 function getCurrentSelection(): string {  
   // Contenteditable version (currently active)  
@@ -336,35 +315,6 @@ function htmlToTextAndFormats(htmlContent: string): { text: string; formats: Tex
   });  
     
   return { text, formats };  
-}
-
-// Función para forzar la herencia de formatos durante la escritura
-function getCurrentFormatState(): { bold: boolean; italic: boolean } {
-  if (!editableDiv.value) return { bold: false, italic: false };
-  
-  const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0) return { bold: false, italic: false };
-  
-  const range = selection.getRangeAt(0);
-  let element = range.startContainer as Element;
-  
-  // Si es un nodo de texto, subir al elemento padre
-  if (element.nodeType === Node.TEXT_NODE) {
-    element = element.parentElement!;
-  }
-  
-  let bold = false;
-  let italic = false;
-  
-  // Verificar si el elemento o sus padres tienen formato
-  while (element && element !== editableDiv.value) {
-    const tagName = element.tagName.toLowerCase();
-    if (tagName === 'b' || tagName === 'strong') bold = true;
-    if (tagName === 'i' || tagName === 'em') italic = true;
-    element = element.parentElement!;
-  }
-  
-  return { bold, italic };
 }
 
 function toggleBold() {    
@@ -659,7 +609,7 @@ function insertVariable(variableKey: string) {
   let success = false;
   
   try {
-    c/* onsole.log('🔄 Attempting execCommand insert...'); */
+    /* console.log('🔄 Attempting execCommand insert...'); */
     success = document.execCommand('insertText', false, variableText);
     console.log('✅ execCommand result:', success);
   } catch (error) {

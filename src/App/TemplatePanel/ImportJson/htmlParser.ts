@@ -775,10 +775,6 @@ export class HTMLToBlockParser {
 
         // Detectar si el texto contiene enlaces markdown  
         const hasMarkdownLinks = /\[([^\]]+)\]\(([^)]+)\)/.test(text);
-        const hasFormats = formats && formats.length > 0;
-
-        // Activar markdown si hay enlaces O formatos  
-        const shouldEnableMarkdown = hasMarkdownLinks || hasFormats;
 
         this.blocks[id] = {
             type: "Text",
@@ -791,7 +787,7 @@ export class HTMLToBlockParser {
                 props: {
                     text,
                     formats,
-                    markdown: shouldEnableMarkdown // Activar markdown si hay enlaces  
+                    markdown: hasMarkdownLinks // Activar markdown si hay enlaces  
                 }
             }
         };

@@ -1,7 +1,7 @@
 <template>
   <div class="relative">
     <UFormField :label="label">
-      <div class="absolute right-0 -top-8 w-fit flex flex-row-reverse border-2 border-[var(--ui-bg)] bg-[var(--ui-bg)] rounded-tl-lg rounded-tr-lg">
+      <div class="absolute right-0 -top-8 w-fit flex flex-row-reverse border-2 border-[var(--ui-bg)] bg-[var(--ui-bg)] rounded-tl-lg rounded-tr-lg z-10">
 
         <UPopover v-model:open="showVariablesDropdown">
           <UTooltip 

@@ -38,11 +38,6 @@
       </UButton>
     </div>
 
-    <!-- <RichTextLink 
-        v-model="rtValue"
-        placeholder="Escribe tu texto. Selecciona para agregar enlace (Ctrl/Cmd + K)"
-      /> -->
-
     <!-- Nueva sección de enlaces -->  
     <div v-if="showLinkPanel" class="mt-4 p-3 border border-gray-200 rounded-lg ">  
       <h4 class="text-sm font-medium mb-3">Opciones de Link</h4>  
@@ -84,10 +79,9 @@
 <script setup lang="ts">
 import BaseSidebarPanel from './helpers/BaseSidebarPanel.vue';
 import MultiStylePropertyPanel from './helpers/style-inputs/MultiStylePropertyPanel.vue';
-import BooleanInput from './helpers/inputs/BooleanInput.vue';
 import type { TextProps } from '@flyhub/email-block-text';
 import { TextPropsSchema } from '@flyhub/email-block-text';
-import { computed, ref, watch } from 'vue';
+import { ref, watch } from 'vue';
 import { useInspectorDrawer } from '../../../../documents/editor/editor.store';
 import RichTextEditor from '../input-panels/RichTextEditor.vue';
 
@@ -112,14 +106,6 @@ const inspectorDrawer = useInspectorDrawer();
 /** Computed */ 
 
 /** Functions */
-
-// v-model del editor rich text (HTML)
-const rtValue = computed<string>({
-  get: () => props.data.props?.text ?? '',
-  set: (val) => {
-    handleUpdateData({ ...props.data, props: { ...props.data.props, text: val } })
-  }
-})
 
 function handleUpdateData(data: unknown) {
   const res = TextPropsSchema.safeParse(data);
@@ -150,27 +136,7 @@ function toggleLinkPanel() {
     // no-op: ya llega por @text-selected; aquí podrías forzar lectura si hiciera falta
   }
 }
-function cancelLinkPanel() {
-  showLinkPanel.value = false
-  linkUrl.value = ''
-  // no borramos selectedText para poder reintentar
-}
 
-function updateVariablesInStore() {
-  if (inspectorDrawer.selectedBlockId){
-    const currentBlock = inspectorDrawer.document[inspectorDrawer.selectedBlockId];
-
-    if(currentBlock && currentBlock.type === "Text") {
-      handleUpdateData({
-        ...currentBlock.data,
-        props: {
-          ...currentBlock.data.props,
-          variables: variables.value
-        }
-      })
-    }
-  }
-} 
 
 function handleTextUpdate(newText: string) {  
    console.log('📝 handleTextUpdate called with:', newText);

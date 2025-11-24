@@ -1,5 +1,12 @@
-<template>  
-  <UModal v-model:open="open" title="Importar plantilla" :ui="{ close: 'cursor-pointer' }">  
+<template class="z-50">  
+  <UModal 
+      class="z-50"
+      v-model:open="open" 
+      title="Importar plantilla" 
+      :ui="{ 
+        close: 'cursor-pointer', 
+        wrapper: 'import-modal-high-z'    
+        }">  
     <UTooltip text="Importar plantilla">  
       <UButton  
         variant="ghost"  
@@ -10,7 +17,7 @@
     </UTooltip>  
   
     <template #body>  
-      <div class="space-y-4">  
+      <div class="space-y-4 z-50">  
         <UTabs :items="importTabs" variant="link">  
           <template #json>  
             <div class="space-y-4">  
@@ -79,7 +86,7 @@
     </template>  
   
     <template #footer>  
-      <div class="flex justify-end w-full gap-2">  
+      <div class="flex justify-end w-full gap-2 z-50">  
         <UButton variant="ghost" color="neutral" label="Cancelar" @click="handleCancel" class="cursor-pointer" />  
         <UButton   
           label="Importar"   
@@ -209,3 +216,19 @@ function getMimeType(extension: string): string {
 
 
 </script>
+<style>
+/* Sobrescribir z-index del modal de Nuxt UI */  
+[data-headlessui-portal] {  
+  z-index: 10000 !important;  
+}  
+  
+/* Sobrescribir z-index del overlay/backdrop */  
+[data-headlessui-portal] > div[data-headlessui-state] {  
+  z-index: 9999 !important;  
+}  
+  
+/* Alternativa: usar clases de Nuxt UI */  
+.fixed.inset-0[role="dialog"] {  
+  z-index: 10000 !important;  
+}  
+</style>
