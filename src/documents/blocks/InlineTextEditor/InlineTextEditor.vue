@@ -5,6 +5,7 @@
     :editable-element="editableDiv" 
     @toolbar-action="handleToolbarAction"   
     :variable-items="variableItems"
+    :show-format-buttons="true" 
   />  
 
   <div                     
@@ -22,7 +23,7 @@
 </template>                    
                   
 <script setup lang="ts">  
-import { computed, inject, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue';  
+import { computed, inject, nextTick, onMounted, provide, ref, watch } from 'vue';  
 import { useInspectorDrawer } from '../../editor/editor.store';  
 import { currentBlockIdSymbol } from '../../editor/EditorBlock.vue';  
 import InlineTextToolbar from '../../../App/InspectorDrawer/ConfigurationPanel/input-panels/InlineTextToolbar.vue';  
@@ -171,7 +172,6 @@ function restoreCursorPosition() {
     editableDiv.value,
     NodeFilter.SHOW_TEXT,
     null,
-    false
   );
   
   let currentPosition = 0;

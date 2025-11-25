@@ -31,47 +31,44 @@ import { textWithFormatsToMarkdownRobust, validateFormats } from "./markdown-for
   return result;  
 } */
 
-export const createProcessedDocument = (document: TEditorConfiguration, globalVariables: Record<string, string>): TEditorConfiguration => {
-    const processedDoc = JSON.parse(JSON.stringify(document)); // Deep clone  
-
-    // Procesar todos los bloques que contienen texto  
-    Object.keys(processedDoc).forEach(blockId => {
-        const block = processedDoc[blockId];
-
-        // Procesar diferentes tipos de bloques con texto  
+export const createProcessedDocument = (document: TEditorConfiguration, globalVariables: Record<string, string>): TEditorConfiguration => {  
+    const processedDoc = JSON.parse(JSON.stringify(document));  
+  
+    Object.keys(processedDoc).forEach(blockId => {  
+        const block = processedDoc[blockId];  
+  
         if (block.data?.props?.text) {  
-            let processedText = processDocumentVariables(  
-                block.data.props.text,  
-                globalVariables || {}  
-            );  
+            let processedText = block.data.props.text;  
               
-            // ✅ CAMBIO: Convertir a MARKDOWN en lugar de HTML  
+            // ✅ CAMBIO 1: Convertir formatos a Markdown PRIMERO (antes de variables)  
             if (block.type === 'Text' && block.data.props.formats && block.data.props.formats.length > 0) {  
-                
-                const validation = validateFormats(processedText, block.data.props.formats);
-                if (!validation.isValid) {
-                    console.warn('Formatos inválidos detectados:', validation.errors);
-                }
-
+                const validation = validateFormats(processedText, block.data.props.formats);  
+                if (!validation.isValid) {  
+                    console.warn('Formatos inválidos detectados:', validation.errors);  
+                }  
+  
                 processedText = textWithFormatsToMarkdownRobust(processedText, block.data.props.formats);  
-                  
-                // ✅ IMPORTANTE: Activar el flag de markdown  
                 block.data.props.markdown = true;  
             }  
               
+            // ✅ CAMBIO 2: Sustituir variables DESPUÉS (sobre el texto con Markdown)  
+            processedText = processDocumentVariables(  
+                processedText,  
+                globalVariables || {}  
+            );  
+              
             block.data.props.text = processedText;  
         }  
-
-        if (block.data?.props?.contents) {
-            // Para bloques Html  
-            block.data.props.contents = processDocumentVariables(
-                block.data.props.contents,
-                globalVariables || {}
-            );
-        }
-    });
-
-    return processedDoc;
+  
+        if (block.data?.props?.contents) {  
+            block.data.props.contents = processDocumentVariables(  
+                block.data.props.contents,  
+                globalVariables || {}  
+            );  
+        }  
+    });  
+  
+    return processedDoc;  
 };
 
 export function processDocumentVariables(text: string, variables: Record<string, string>): string {

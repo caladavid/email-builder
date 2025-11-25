@@ -24,6 +24,8 @@ import { useInspectorDrawer } from './editor.store';
 import RichTextLinkPropsSchema from '../blocks/RichTextLink/RichTextLinkPropsSchema';
 import RichTextLinkEditor from '../blocks/RichTextLink/RichTextLinkEditor.vue';
 import InlineTextEditor from '../blocks/InlineTextEditor/InlineTextEditor.vue';
+import InlineHeadingEditor from '../blocks/InlineHeadingEditor/InlineHeadingEditor.vue';
+import InlineButtonEditor from '../blocks/InlineButtonEditor/InlineButtonEditor.vue';
 
 /* const globalVariables = ref<Record<string, string>>({
   // Variables de ejemplo  
@@ -58,7 +60,17 @@ export const EDITOR_DICTIONARY = buildBlockConfigurationDictionary({
       return (
         // Cambiar ...data por ...processedProps, para obtener su value
         <EditorBlockWrapper>
-          <Button {...data} />
+          <InlineButtonEditor 
+            text={data.props?.text || ""}  
+            style={data.style ?? undefined}  
+            buttonTextColor={data.props?.buttonTextColor ?? undefined}  
+            buttonBackgroundColor={data.props?.buttonBackgroundColor ?? undefined}  
+            buttonStyle={data.props?.buttonStyle ?? undefined}  
+            size={data.props?.size ?? undefined}  
+            url={data.props?.url ?? undefined}   
+            fullWidth={data.props?.fullWidth ?? undefined}  
+          />
+          {/* <Button {...data} /> */}
         </EditorBlockWrapper>
       );
     },
@@ -102,7 +114,12 @@ export const EDITOR_DICTIONARY = buildBlockConfigurationDictionary({
       // Cambiar ...data por ...processedProps, para obtener su value
       return (
         <EditorBlockWrapper>
-          <Heading {...data} />
+          {/* <Heading {...data} /> */}
+          <InlineHeadingEditor 
+            text={data.props?.text || ""}    
+            style={data.style ?? undefined} 
+            level={data.props?.level || "h2"}
+          />
         </EditorBlockWrapper>
       );
     },

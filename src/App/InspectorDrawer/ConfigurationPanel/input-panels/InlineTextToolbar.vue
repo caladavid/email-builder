@@ -36,7 +36,8 @@
           </template>
         </UPopover>
         
-        <UTooltip 
+        <UTooltip
+          v-if="showFormatButtons !== false" 
           text="Colocar negritas" 
           arrow 
           :delay-duration="0" 
@@ -51,7 +52,8 @@
           />
         </UTooltip>
         
-        <UTooltip 
+        <UTooltip
+          v-if="showFormatButtons !== false" 
           text="Colocar italic" 
           arrow 
           :delay-duration="0" 
@@ -79,6 +81,7 @@ import { useInspectorDrawer } from "../../../../documents/editor/editor.store";
 const props = defineProps<{
   editableElement?: HTMLElement | null;
   variableItems?: Array<{key: string, value: string, label: string}>;
+  showFormatButtons?: boolean;
 }>();
 
 // Emits simplificados
