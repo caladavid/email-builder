@@ -1,5 +1,5 @@
 <template>
-  <UTabs :items="tabs" variant="link" class="h-full" :ui="tabsUi"
+  <UTabs :items="tabs" variant="link" class="h-full " :ui="tabsUi"
 >
    
     <template #list-leading >  
@@ -115,7 +115,7 @@ const mainBoxStyle = computed(() => {
       margin: '32px auto',
       width: '100%',
       maxWidth: '370px',   
-      height: 'auto',   
+      height: 'auto',    
       boxShadow:
         'rgba(33, 36, 67, 0.04) 0px 10px 20px, rgba(33, 36, 67, 0.04) 0px 2px 6px, rgba(33, 36, 67, 0.04) 0px 0px 1px',
     }
@@ -144,7 +144,7 @@ const mainBoxStyle = computed(() => {
 
 const tabsUi = computed(() => {
   if (inspectorDrawer.selectedScreenSize === 'mobile') {
-    return { content: 'bg-gray-100 h-full w-full  ' }
+    return { content: 'bg-gray-100 h-full w-full overflow-x-hidden ' }
   }
   return { content: 'bg-gray-100 h-full overflow-x-hidden' }
 })
