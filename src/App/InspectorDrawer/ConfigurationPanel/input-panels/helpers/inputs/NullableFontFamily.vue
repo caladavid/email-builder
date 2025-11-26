@@ -10,13 +10,19 @@
         item: 'bg-white text-black hover:bg-[var(--ui-primary)]',
         itemLabel: 'text-black',
       }"
-    />
+    >
+    <template #item="{ item }">  
+      <span :style="{ fontFamily: getFontFamily(item.value as any) }">  
+        {{ item.label }}  
+      </span>  
+    </template>  
+  </USelect>
   </UFormField>
 </template>
 
 <script setup lang="ts">
 import type { SelectItem } from '@nuxt/ui';
-import { FONT_FAMILIES } from '@flyhub/email-core';
+import { FONT_FAMILIES, getFontFamily } from '@flyhub/email-core';
 import { ref } from 'vue';
 
 const props = defineProps<{

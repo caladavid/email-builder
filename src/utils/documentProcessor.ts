@@ -44,7 +44,7 @@ export const createProcessedDocument = (document: TEditorConfiguration, globalVa
             if (block.type === 'Text' && block.data.props.formats && block.data.props.formats.length > 0) {  
                 const validation = validateFormats(processedText, block.data.props.formats);  
                 if (!validation.isValid) {  
-                    console.warn('Formatos inválidos detectados:', validation.errors);  
+                    console.log('Formatos inválidos detectados:', validation.errors);  
                 }  
   
                 processedText = textWithFormatsToMarkdownRobust(processedText, block.data.props.formats);  

@@ -41,7 +41,7 @@ function handleClick(item: typeof BUTTONS[number]) {
 watch(open, (newValue, oldValue) => {
   // Evita hacer cálculos innecesarios si el estado no ha cambiado
   if (newValue !== oldValue) {
-    console.log(`Estado 'open' cambiado: de ${oldValue} a ${newValue}`);
+    /* console.log(`Estado 'open' cambiado: de ${oldValue} a ${newValue}`); */
     emit('open', newValue);
   }
 });

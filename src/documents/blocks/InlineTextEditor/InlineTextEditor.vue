@@ -27,7 +27,7 @@ import { computed, inject, nextTick, onMounted, provide, ref, watch } from 'vue'
 import { useInspectorDrawer } from '../../editor/editor.store';  
 import { currentBlockIdSymbol } from '../../editor/EditorBlock.vue';  
 import InlineTextToolbar from '../../../App/InspectorDrawer/ConfigurationPanel/input-panels/InlineTextToolbar.vue';  
-  
+import { getFontFamily } from '@flyhub/email-core';
 // ============================================  
 // TYPES  
 // ============================================  
@@ -97,16 +97,25 @@ const showToolBar = computed(() => {
 });  
   
 const computedStyles = computed(() => {  
-  const fontFamilyMap: Record<string, string> = {  
+/*   const fontFamilyMap: Record<string, string> = {  
     'MODERN_SANS': 'Helvetica, Arial, sans-serif',  
+    'BOOK_SANS': 'Arial, Helvetica, sans-serifserif',  
+    'ORGANIC_SANS': 'Optima, Segoe UI, sans-serif',  
+    'GEOMETRIC_SANS': 'Futura, sans-serif',  
+    'HEAVY_SANS': 'Impact, Arial Black, Gadget, sans-serifserif',  
+    'ROUNDED_SANS': '"Arial Rounded MT Bold",, Helvetica, sans-serif',  
+    'MODERN_SERIF': 'Times New Roman, serif',  
+    'BOOK_SERIF': 'Georgia, serif',  
+    'MONOSPACE': '"Courier New", Courier, monospace',  
     'BOOK_ANTIQUA': 'Georgia, "Times New Roman", serif',  
-    'MONOSPACE': '"Courier New", Courier, monospace'  
-  };  
+    'inherit': 'inherit'  
+  };   */
   
   const rawFontFamily = props.style?.fontFamily;  
-  const mappedFontFamily = rawFontFamily && fontFamilyMap[rawFontFamily]  
+/*   const mappedFontFamily = rawFontFamily && fontFamilyMap[rawFontFamily]  
     ? fontFamilyMap[rawFontFamily]  
-    : rawFontFamily || 'inherit';  
+    : rawFontFamily || 'inherit';   */
+    const mappedFontFamily = getFontFamily(rawFontFamily) || 'inherit';  
   
   return {  
     padding: props.style?.padding  

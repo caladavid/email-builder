@@ -542,7 +542,7 @@ function restoreCursorPosition() {
   }
   
   if (!found) {
-    console.warn('⚠️ Position not found, moving to end');
+    console.log('⚠️ Position not found, moving to end');
     // Mover al final
     const range = document.createRange();
     range.selectNodeContents(editableDiv.value);
@@ -599,7 +599,7 @@ function insertVariable(variableKey: string) {
 
   // 4. VERIFICAR que la selección esté dentro del editor
   if (!editableDiv.value.contains(range.commonAncestorContainer)) {
-    console.warn('⚠️ Selection outside editor, moving to end');
+    console.log('⚠️ Selection outside editor, moving to end');
     range.selectNodeContents(editableDiv.value);
     range.collapse(false);
     selection.removeAllRanges();
@@ -659,7 +659,7 @@ function insertVariable(variableKey: string) {
     console.error('❌ Manual insertion failed:', error);
     
     // ÚLTIMO RECURSO: innerHTML
-    console.warn('🔄 Last resort: innerHTML append');
+    console.log('🔄 Last resort: innerHTML append');
     const currentHTML = editableDiv.value.innerHTML;
     editableDiv.value.innerHTML = currentHTML + variableText;
     /* handleInput(); */

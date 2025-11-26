@@ -175,7 +175,7 @@ export class HTMLToBlockParser {
                     this.imageMap.set(fileName, dataUrl);
                     this.imageMap.set(lower, dataUrl);
                 } catch (e) {
-                    console.warn(`Error procesando imagen ${path}:`, e);
+                    console.log(`Error procesando imagen ${path}:`, e);
                 }
             })
         ).then(() => undefined);
@@ -199,7 +199,7 @@ export class HTMLToBlockParser {
                     const f = contents.file(p);
                     if (f) all += await f.async("string");
                 } catch (e) {
-                    console.warn(`Error procesando CSS ${p}:`, e);
+                    console.log(`Error procesando CSS ${p}:`, e);
                 }
             })
         );

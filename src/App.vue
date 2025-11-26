@@ -30,10 +30,10 @@ onMounted(() => {
       return;
     } */
 
-   if (!isOriginAllowed(event.origin)){
+/*    if (!isOriginAllowed(event.origin)){
     console.warn('Mensaje ignorado, origen no seguro:', event.origin);
     return;
-   }
+   } */
 
     const data = event.data;
 
