@@ -5,6 +5,11 @@
       :items="options"
       class="w-full"
       @update:model-value="handleChange($event as string)"
+      :ui="{
+        base: 'w-full',
+        item: 'bg-white text-black hover:bg-[var(--ui-primary)]',
+        itemLabel: 'text-black',
+      }"
     />
   </UFormField>
 </template>
