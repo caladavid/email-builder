@@ -36,3 +36,27 @@
 div.fixed.inset-0:has(+ [data-dismissable-layer][role="dialog"].top-1\/2.left-1\/2) {  
   z-index: 9999 !important;  
 }
+/* 
+.customButtonColor{
+  background-color: var(--ui-primary);
+  color: var(--tw-ring-color);
+}
+
+.customButtonColor:hover{
+  background-color: color-mix(in oklab, var(--ui-primary) 75%, transparent);
+}
+ */
+
+input[type="text"],  
+input[type="url"],  
+input[type="file"] {  
+  @apply bg-white text-black;  
+}  
+  
+input::placeholder {  
+  @apply text-gray-400;  
+}  
+  
+input:focus {  
+  @apply border-gray-600;  
+}  

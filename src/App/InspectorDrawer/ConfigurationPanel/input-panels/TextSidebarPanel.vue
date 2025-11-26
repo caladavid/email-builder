@@ -8,7 +8,7 @@
         @update:model-value="handleTextUpdate"  
         @update:formats="handleFormatsUpdate" 
         @text-selected="selectedText = $event"
-        placeholder="Escribe tu texto aquí. Usa Ctrl+Space para insertar variables"  
+        placeholder="Escribe tu texto aquí."  
       />  
     </UFormField>
 
@@ -46,7 +46,10 @@
         <UInput  
           v-model="selectedText"  
           placeholder="Texto a convertir en enlace"  
-          class="w-full"  
+          class="w-full pb-4"
+          :ui="{
+            base: 'bg-white text-black',
+          }"  
         />  
       </UFormField>  
         
@@ -54,7 +57,10 @@
         <UInput  
           v-model="linkUrl"  
           placeholder="https://ejemplo.com"  
-          class="w-full"  
+          class="w-full pb-2"  
+          :ui="{
+            base: 'bg-white text-black',
+          }" 
         />  
       </UFormField>  
         
@@ -71,6 +77,7 @@
     <MultiStylePropertyPanel
       :names="['color', 'backgroundColor', 'fontFamily', 'fontSize', 'fontWeight', 'textAlign', 'padding']"
       :model-value="data.style"
+
       @update:model-value="handleUpdateData({ ...data, style: $event })"
     />
   </BaseSidebarPanel>

@@ -787,6 +787,8 @@ defineExpose({
 <style scoped>  
 .rich-text-editable {  
   width: 100%;  
+  color: black;
+  background-color: white;
   padding: 0.5rem 0.75rem;  
   border: 1px solid #d1d5db;  
   border-radius: 0.375rem;  
