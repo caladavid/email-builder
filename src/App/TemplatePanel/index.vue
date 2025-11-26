@@ -1,5 +1,5 @@
 <template>
-  <UTabs :items="tabs" variant="link" class="h-full utabsCss" :ui="tabsUi"
+  <UTabs :items="tabs" variant="link" class="h-full" :ui="tabsUi"
 >
    
     <template #list-leading >  
@@ -113,8 +113,10 @@ const mainBoxStyle = computed(() => {
   if (inspectorDrawer.selectedScreenSize === 'mobile') {
     return {
       margin: '32px auto',
+      width: '100%',
       maxWidth: '370px',   
-      height: 'auto',    
+      height: 'auto',   
+      overflowX: 'hidden', 
       boxShadow:
         'rgba(33, 36, 67, 0.04) 0px 10px 20px, rgba(33, 36, 67, 0.04) 0px 2px 6px, rgba(33, 36, 67, 0.04) 0px 0px 1px',
     }
@@ -170,8 +172,3 @@ const processedDocument = computed(() => {
 });  
 
 </script>
-<style>
-.utabsCss{
-  scrollbar-gutter: stable;
-}
-</style>
