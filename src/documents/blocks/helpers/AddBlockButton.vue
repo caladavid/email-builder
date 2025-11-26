@@ -1,5 +1,6 @@
 <template>
   <div
+    class="z-20"
     :style="{
       position: placeholder ? 'relative' : 'absolute',
       height: placeholder ? 'auto' :  '10px',
