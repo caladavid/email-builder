@@ -21,6 +21,12 @@ import getConfiguration from './getConfiguration';
 const editorStore = useInspectorDrawer();
 
 function handleKeyboardShortcuts(event: KeyboardEvent){
+  const activeElement = document.activeElement;
+
+  const isTextEditor = activeElement?.classList.contains('inline-text-editor') ||
+                      activeElement?.classList.contains('rich-text-editable');
+
+  if (isTextEditor) return;
   // Ctrl+Z para undo  
   if (event.ctrlKey && event.key === "z" && !event.shiftKey){
     event.preventDefault();
