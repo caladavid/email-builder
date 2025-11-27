@@ -14,11 +14,31 @@
 
     <template #list-trailing class="bg-red-300">
       <div class="flex w-full justify-end gap-x-2">
+        <UTooltip text="Deshacer">
+          <UButton   
+            icon="material-symbols:undo"  
+            :disabled="!inspectorDrawer.canUndo()"  
+            @click="inspectorDrawer.undo()"  
+            variant="ghost"  
+            color="neutral"  
+          />  
+        </UTooltip>
+        
+        <UTooltip text="Rehacer">
+          <UButton   
+            icon="material-symbols:redo"  
+            :disabled="!inspectorDrawer.canRedo()"  
+            @click="inspectorDrawer.redo()"  
+            variant="ghost"  
+            color="neutral"  
+          />  
+        </UTooltip>
+        
         <!-- <DownloadJson /> -->
         <ImportJson />
-
+        
         <!-- <VariablesModal /> -->
-
+        
         <UButtonGroup>
           <UTooltip text="Vista de escritorio">
             <UButton

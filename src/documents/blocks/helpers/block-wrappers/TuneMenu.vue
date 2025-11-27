@@ -33,6 +33,7 @@ let idCounter = 0;
 const generateId = () => `block-${Date.now()}-${++idCounter}`; 
 
 function handleDeleteClick() {
+  inspectorDrawer.saveToHistory();
   const filterChildrenIds = (childrenIds: string[] | null | undefined) => {
     if (!childrenIds) return childrenIds
 
@@ -97,6 +98,8 @@ function handleDeleteClick() {
 }
 
 function handleMoveClick(direction: 'up' | 'down') {
+  inspectorDrawer.debouncedSaveToHistory();
+
   const moveChildrenIds = (ids: string[] | null | undefined) => {
     if (!ids) return ids
 
@@ -205,7 +208,8 @@ function deepCloneBlock(blockId: string, document: TEditorConfiguration): { newI
   return { newId, newBlocks };  
 }  
   
-function handleDuplicateClick() {  
+function handleDuplicateClick() { 
+  inspectorDrawer.saveToHistory(); 
   const currentDocument = inspectorDrawer.document;  
   const { newId, newBlocks } = deepCloneBlock(props.blockId, currentDocument);  
     
@@ -260,7 +264,8 @@ function handleDuplicateClick() {
               props: { ...block.data.props, columns: newColumns }  
             }  
           };  
-          inspectorDrawer.setDocument(newDocument);  
+          inspectorDrawer.setDocument(newDocument); 
+          inspectorDrawer.setSelectedBlockId(newId); 
           return;  
         }  
       }  

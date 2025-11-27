@@ -24,14 +24,14 @@
     
     const STORAGE_KEY = 'email-builder-variables';  
     
-    function loadVariablesFromStorage(): Record<string, string> {  
-    try {  
-        const stored = localStorage.getItem(STORAGE_KEY);  
-        return stored ? JSON.parse(stored) : {};  
-    } catch {  
-        return {};  
-    }  
-    }  
+/*     function loadVariablesFromStorage(): Record<string, string> {  
+        try {  
+            const stored = localStorage.getItem(STORAGE_KEY);  
+            return stored ? JSON.parse(stored) : {};  
+        } catch {  
+            return {};  
+        }  
+    }  */ 
     
     function saveVariablesToStorage(variables: Record<string, string>) {  
     try {  
@@ -56,6 +56,7 @@
     const receivedVariables = ref<{ [key: string]: any } | null>(null);  
     /* const globalVariables = ref<TValue['globalVariables']>(loadVariablesFromStorage()); */  
     const globalVariables = ref<TValue['globalVariables']>({});  
+
     
     function initializeGlobalVariables(variables: Record<string, string>) {  
         /* const merged = { ...loadVariablesFromStorage(), ...variables };  
@@ -177,6 +178,7 @@
         };  
         setGlobalVariables(mergedVariables);  
     }  
+
     
     return {  
         // State - Todas las propiedades del store de Zustand  

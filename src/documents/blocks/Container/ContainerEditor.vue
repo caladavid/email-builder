@@ -68,7 +68,8 @@ const dropZoneTextStyle = {
   fontFamily: 'monospace'    
 };    
     
-function handleUpdateChildrenIds({ block, blockId, childrenIds }: EditorChildrenChange) {    
+function handleUpdateChildrenIds({ block, blockId, childrenIds }: EditorChildrenChange) {
+  inspectorDrawer.debouncedSaveToHistory();    
   const document = inspectorDrawer.document;    
     
   inspectorDrawer.setDocument({    
@@ -116,12 +117,14 @@ function handleContainerDragLeave(event: DragEvent) {
   
 function handleContainerDrop(event: DragEvent) {  
   const draggedId = event.dataTransfer?.getData('text/plain');  
-    
+  
   // ⚠️ CLAVE: Solo prevenir si es un bloque existente  
   if (!draggedId || !inspectorDrawer.document[draggedId]) {  
     // No es un bloque existente, NO prevenir - dejar que AddBlockButton lo maneje  
     return;  
   }  
+
+  inspectorDrawer.debouncedSaveToHistory(); 
     
   // Solo ahora prevenimos el evento  
   event.preventDefault();  

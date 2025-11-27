@@ -25,6 +25,9 @@ type TValue = {
   samplesDrawerOpen: boolean;
 
   globalVariables: Record<string, string>;
+  history: TEditorConfiguration[]; // Array de estados anteriores  
+  historyIndex: number; // Posición actual en el historial 
+  maxHistorySize: number;  // Límite de tamaño del historial
 };
 
 const STORAGE_KEY = 'email-builder-variables'
@@ -57,6 +60,10 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   const SAMPLES_DRAWER_WIDTH = 240
   const receivedVariables = ref<{ [key: string]: any } | null>(null); // Variable para guardar los datos
   const samplesDrawerOpen = ref<boolean>(false);
+  const history = ref<TEditorConfiguration[]>([]);
+  const historyIndex = ref<number>(-1);
+  const maxHistorySize = ref<number>(50);
+  let debounceTimer: NodeJS.Timeout | null = null;
 
   /* const globalVariables = ref<TValue['globalVariables']>(loadVariablesFromStorage()); */
   const globalVariables = ref<TValue['globalVariables']>({}); 
@@ -129,9 +136,13 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     selectedSidebarTab.value = 'styles'
     selectedBlockId.value = null
 
-     // Limpiar variables globales  
+    // Limpiar variables globales  
     globalVariables.value = {}  
     saveVariablesToStorage({})
+
+    // Inicializar historial con el primer estado  
+    history.value = [JSON.parse(JSON.stringify(newDocument))];  
+    historyIndex.value = 0;  
   }
 
   // Agregar función para recibir variables individuales  
@@ -248,6 +259,60 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
 
   }
 
+  
+  function saveToHistory(){
+      // Clonar el estado actual del documento  
+      const currentState = JSON.parse(JSON.stringify(document.value));
+
+      // Eliminar estados futuros si no estamos al final  
+      if (historyIndex.value < history.value.length - 1){
+          history.value = history.value.slice(0, historyIndex.value + 1)
+      };
+
+      // Agregar nuevo estado  
+      history.value.push(currentState);
+      historyIndex.value = history.value.length - 1;
+
+      // Mantener límite del tamaño
+      if (history.value.length > maxHistorySize.value){
+          history.value.shift();
+          historyIndex.value--;
+      }
+  }
+
+  function debouncedSaveToHistory(){
+    if (debounceTimer){
+      clearTimeout(debounceTimer)
+    };
+
+    debounceTimer = setTimeout(() => {
+      saveToHistory()
+      debounceTimer = null;
+    }, 300);
+  }
+
+  function undo(){
+      if (canUndo()){
+          historyIndex.value--;
+          document.value = JSON.parse(JSON.stringify(history.value[historyIndex.value]));
+      }
+  }
+  
+  function redo(){
+      if (canRedo()){
+          historyIndex.value++;
+          document.value = JSON.parse(JSON.stringify(history.value[historyIndex.value]));
+      }
+  }
+
+  function canUndo(){
+      return historyIndex.value > 0;
+  }
+
+  function canRedo(){
+      return historyIndex.value < history.value.length - 1;
+  }
+
   return {
     document,
     globalVariables,
@@ -274,5 +339,14 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     loadTemplateFromParent,
     exportJsonToParent,
     exportHtmlAndJsonToParent,
+    history,  
+    historyIndex,  
+    maxHistorySize,  
+    saveToHistory,  
+    debouncedSaveToHistory,
+    undo,  
+    redo,  
+    canUndo,  
+    canRedo,  
   }
 });

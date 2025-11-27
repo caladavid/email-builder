@@ -12,13 +12,33 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import Editor from './App/index.vue'
 import { useInspectorDrawer } from './documents/editor/editor.store';
 import { isOriginAllowed } from './utils/allowedOrigins';
 import getConfiguration from './getConfiguration';
 
 const editorStore = useInspectorDrawer();
+
+function handleKeyboardShortcuts(event: KeyboardEvent){
+  // Ctrl+Z para undo  
+  if (event.ctrlKey && event.key === "z" && !event.shiftKey){
+    event.preventDefault();
+
+    if (editorStore.canUndo()){
+      editorStore.undo();
+    }
+  }
+
+   // Ctrl+Y
+   if(event.ctrlKey && event.key === "y"){
+    event.preventDefault();
+
+    if (editorStore.canRedo()){
+      editorStore.redo();
+    }
+   } 
+}
 
 // Escuchar los mensajes desde el padre (página principal)
 onMounted(() => {
@@ -69,7 +89,13 @@ onMounted(() => {
         console.log('Mensaje no reconocido:', data); 
      }
   });
+
+  window.addEventListener('keydown', handleKeyboardShortcuts);
 });
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeyboardShortcuts);
+})
 </script>
 
 <style scoped>

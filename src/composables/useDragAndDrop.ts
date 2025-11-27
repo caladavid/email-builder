@@ -11,6 +11,7 @@ export function useDragAndDrop(getCurrentBlockId: () => string) {
   const dropPosition = ref<'before' | 'after'>('after');  
   const draggedBlockId = ref<string | null>(null);  
   const validationCache = new Map<string, boolean>();  
+  let cleanupTimer: NodeJS.Timeout | null = null;
       
   const dropIndicatorStyle = computed(() => ({  
     position: 'absolute' as const,  
@@ -18,7 +19,7 @@ export function useDragAndDrop(getCurrentBlockId: () => string) {
     right: 0,  
     height: '3px',  
     backgroundColor: 'rgba(0, 121, 204, 1)',  
-    zIndex: 1000,  
+    zIndex: 10,  
     [dropPosition.value === 'before' ? 'top' : 'bottom']: '-2px'  
   }));  
       
@@ -171,6 +172,7 @@ export function useDragAndDrop(getCurrentBlockId: () => string) {
     document: TEditorConfiguration,  
     blockId: string  
   ): TEditorBlock | null {  
+    inspectorDrawer.saveToHistory();
     const parentInfo = findParentContainer(document, blockId);  
         
     if (!parentInfo.parentId || !parentInfo.parentBlock) {  
@@ -234,6 +236,7 @@ export function useDragAndDrop(getCurrentBlockId: () => string) {
     targetId: string,  
     position: 'before' | 'after'  
   ): boolean {  
+    inspectorDrawer.debouncedSaveToHistory();
     const targetParentInfo = findParentContainer(document, targetId);  
         
     if (!targetParentInfo.parentId || !targetParentInfo.parentBlock) {  
@@ -301,6 +304,7 @@ export function useDragAndDrop(getCurrentBlockId: () => string) {
     blockId: string,  
     containerId: string  
   ): boolean {  
+    inspectorDrawer.debouncedSaveToHistory();
     const containerBlock = document[containerId];  
       
     if (!containerBlock) {  
@@ -346,6 +350,7 @@ export function useDragAndDrop(getCurrentBlockId: () => string) {
     containerId: string,  
     columnIndex: number  
   ): boolean {  
+    inspectorDrawer.debouncedSaveToHistory();
     const containerBlock = document[containerId];  
       
     if (!containerBlock || containerBlock.type !== 'ColumnsContainer') {  
@@ -376,121 +381,123 @@ export function useDragAndDrop(getCurrentBlockId: () => string) {
     return true;  
   }  
       
-function moveBlock(  
-  draggedId: string,  
-  targetId: string,  
-  position: 'before' | 'after'  
-): void {  
-  const nDocument = { ...inspectorDrawer.document };  
-    
-  // ✅ Obtener información de ambos bloques  
-  const draggedParent = findParentContainer(nDocument, draggedId);  
-  const targetParent = findParentContainer(nDocument, targetId);  
-    
-  // ✅ CASO 1: Mismo contenedor - usar swap directo (patrón TuneMenu)  
-  if (draggedParent.parentId && draggedParent.parentId === targetParent.parentId) {  
-    const parentBlock = nDocument[draggedParent.parentId];  
+  function moveBlock(  
+    draggedId: string,  
+    targetId: string,  
+    position: 'before' | 'after'  
+  ): void {  
+    inspectorDrawer.debouncedSaveToHistory();
+
+    const nDocument = { ...inspectorDrawer.document };  
       
-    if (parentBlock.type === 'Container') {  
-      const childrenIds = [...(parentBlock.data.props?.childrenIds || [])];  
-      const draggedIndex = childrenIds.indexOf(draggedId);  
-      const targetIndex = childrenIds.indexOf(targetId);  
+    // ✅ Obtener información de ambos bloques  
+    const draggedParent = findParentContainer(nDocument, draggedId);  
+    const targetParent = findParentContainer(nDocument, targetId);  
+      
+    // ✅ CASO 1: Mismo contenedor - usar swap directo (patrón TuneMenu)  
+    if (draggedParent.parentId && draggedParent.parentId === targetParent.parentId) {  
+      const parentBlock = nDocument[draggedParent.parentId];  
         
-      // Remover el dragged  
-      childrenIds.splice(draggedIndex, 1);  
+      if (parentBlock.type === 'Container') {  
+        const childrenIds = [...(parentBlock.data.props?.childrenIds || [])];  
+        const draggedIndex = childrenIds.indexOf(draggedId);  
+        const targetIndex = childrenIds.indexOf(targetId);  
+          
+        // Remover el dragged  
+        childrenIds.splice(draggedIndex, 1);  
+          
+        // Calcular nuevo índice después de remover  
+        const newTargetIndex = targetIndex > draggedIndex ? targetIndex - 1 : targetIndex;  
+        const insertIndex = position === 'before' ? newTargetIndex : newTargetIndex + 1;  
+          
+        // Insertar en nueva posición  
+        childrenIds.splice(insertIndex, 0, draggedId);  
+          
+        nDocument[draggedParent.parentId] = {  
+          ...parentBlock,  
+          data: {  
+            ...parentBlock.data,  
+            props: {  
+              ...parentBlock.data.props,  
+              childrenIds  
+            }  
+          }  
+        };  
+          
+        inspectorDrawer.setDocument(nDocument);  
+        return;  
+      }  
         
-      // Calcular nuevo índice después de remover  
-      const newTargetIndex = targetIndex > draggedIndex ? targetIndex - 1 : targetIndex;  
-      const insertIndex = position === 'before' ? newTargetIndex : newTargetIndex + 1;  
-        
-      // Insertar en nueva posición  
-      childrenIds.splice(insertIndex, 0, draggedId);  
-        
-      nDocument[draggedParent.parentId] = {  
-        ...parentBlock,  
-        data: {  
-          ...parentBlock.data,  
-          props: {  
-            ...parentBlock.data.props,  
+      if (parentBlock.type === 'EmailLayout') {  
+        const childrenIds = [...(parentBlock.data.childrenIds || [])];  
+        const draggedIndex = childrenIds.indexOf(draggedId);  
+        const targetIndex = childrenIds.indexOf(targetId);  
+          
+        childrenIds.splice(draggedIndex, 1);  
+        const newTargetIndex = targetIndex > draggedIndex ? targetIndex - 1 : targetIndex;  
+        const insertIndex = position === 'before' ? newTargetIndex : newTargetIndex + 1;  
+        childrenIds.splice(insertIndex, 0, draggedId);  
+          
+        nDocument[draggedParent.parentId] = {  
+          ...parentBlock,  
+          data: {  
+            ...parentBlock.data,  
             childrenIds  
           }  
-        }  
-      };  
+        };  
+          
+        inspectorDrawer.setDocument(nDocument);  
+        return;  
+      }  
         
-      inspectorDrawer.setDocument(nDocument);  
-      return;  
-    }  
-      
-    if (parentBlock.type === 'EmailLayout') {  
-      const childrenIds = [...(parentBlock.data.childrenIds || [])];  
-      const draggedIndex = childrenIds.indexOf(draggedId);  
-      const targetIndex = childrenIds.indexOf(targetId);  
-        
-      childrenIds.splice(draggedIndex, 1);  
-      const newTargetIndex = targetIndex > draggedIndex ? targetIndex - 1 : targetIndex;  
-      const insertIndex = position === 'before' ? newTargetIndex : newTargetIndex + 1;  
-      childrenIds.splice(insertIndex, 0, draggedId);  
-        
-      nDocument[draggedParent.parentId] = {  
-        ...parentBlock,  
-        data: {  
-          ...parentBlock.data,  
-          childrenIds  
-        }  
-      };  
-        
-      inspectorDrawer.setDocument(nDocument);  
-      return;  
-    }  
-      
-    if (parentBlock.type === 'ColumnsContainer' &&   
-        draggedParent.columnIndex !== undefined &&   
-        targetParent.columnIndex !== undefined &&  
-        draggedParent.columnIndex === targetParent.columnIndex) {  
-        
-      const newColumns = [...(parentBlock.data.props?.columns || [])];  
-      const childrenIds = [...newColumns[draggedParent.columnIndex].childrenIds];  
-      const draggedIndex = childrenIds.indexOf(draggedId);  
-      const targetIndex = childrenIds.indexOf(targetId);  
-        
-      childrenIds.splice(draggedIndex, 1);  
-      const newTargetIndex = targetIndex > draggedIndex ? targetIndex - 1 : targetIndex;  
-      const insertIndex = position === 'before' ? newTargetIndex : newTargetIndex + 1;  
-      childrenIds.splice(insertIndex, 0, draggedId);  
-        
-      newColumns[draggedParent.columnIndex] = { childrenIds };  
-        
-      nDocument[draggedParent.parentId] = {  
-        type: 'ColumnsContainer',  
-        data: {  
-          style: parentBlock.data.style,  
-          props: {  
-            ...parentBlock.data.props,  
-            columns: newColumns  
+      if (parentBlock.type === 'ColumnsContainer' &&   
+          draggedParent.columnIndex !== undefined &&   
+          targetParent.columnIndex !== undefined &&  
+          draggedParent.columnIndex === targetParent.columnIndex) {  
+          
+        const newColumns = [...(parentBlock.data.props?.columns || [])];  
+        const childrenIds = [...newColumns[draggedParent.columnIndex].childrenIds];  
+        const draggedIndex = childrenIds.indexOf(draggedId);  
+        const targetIndex = childrenIds.indexOf(targetId);  
+          
+        childrenIds.splice(draggedIndex, 1);  
+        const newTargetIndex = targetIndex > draggedIndex ? targetIndex - 1 : targetIndex;  
+        const insertIndex = position === 'before' ? newTargetIndex : newTargetIndex + 1;  
+        childrenIds.splice(insertIndex, 0, draggedId);  
+          
+        newColumns[draggedParent.columnIndex] = { childrenIds };  
+          
+        nDocument[draggedParent.parentId] = {  
+          type: 'ColumnsContainer',  
+          data: {  
+            style: parentBlock.data.style,  
+            props: {  
+              ...parentBlock.data.props,  
+              columns: newColumns  
+            }  
           }  
-        }  
-      };  
-        
-      inspectorDrawer.setDocument(nDocument);  
+        };  
+          
+        inspectorDrawer.setDocument(nDocument);  
+        return;  
+      }  
+    }  
+      
+    // ✅ CASO 2: Diferentes contenedores - usar remove + insert  
+    const draggedBlock = removeBlockFromParent(nDocument, draggedId);  
+    if (!draggedBlock) {  
+      console.log(`Block ${draggedId} not found in any parent container`);  
       return;  
     }  
-  }  
-    
-  // ✅ CASO 2: Diferentes contenedores - usar remove + insert  
-  const draggedBlock = removeBlockFromParent(nDocument, draggedId);  
-  if (!draggedBlock) {  
-    console.log(`Block ${draggedId} not found in any parent container`);  
-    return;  
-  }  
-    
-  const inserted = insertBlockAtPosition(nDocument, draggedId, targetId, position);  
-  if (!inserted) {  
-    console.log(`Could not insert block ${draggedId} at target ${targetId}`);  
-    return;  
-  }  
-    
-  inspectorDrawer.setDocument(nDocument);  
-}
+      
+    const inserted = insertBlockAtPosition(nDocument, draggedId, targetId, position);  
+    if (!inserted) {  
+      console.log(`Could not insert block ${draggedId} at target ${targetId}`);  
+      return;  
+    }  
+      
+    inspectorDrawer.setDocument(nDocument);  
+  }
       
   function handleDragStart(event: DragEvent): void {  
     isDragging.value = true;  
@@ -508,7 +515,20 @@ function moveBlock(
       event.dataTransfer.effectAllowed = 'move';  
       event.dataTransfer.setData('text/plain', blockId);  
     }  
-  }  
+  } 
+  
+  function showDropIndicatorTemporarily(){
+    showDropIndicator.value = true;
+
+    if (cleanupTimer){
+      clearTimeout(cleanupTimer)
+    }
+
+    cleanupTimer = setTimeout(() => {
+      showDropIndicator.value = false;
+      cleanupTimer = null
+    }, 500)
+  }
       
   function handleDragOver(event: DragEvent): void {  
     event.preventDefault();  
@@ -520,7 +540,8 @@ function moveBlock(
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();  
     const midpoint = rect.top + rect.height / 2;  
     dropPosition.value = event.clientY < midpoint ? 'before' : 'after';  
-    showDropIndicator.value = true;  
+    /* showDropIndicator.value = true;  */ 
+    showDropIndicatorTemporarily();
   }  
       
   function handleDrop(event: DragEvent): void {  
@@ -547,6 +568,7 @@ function moveBlock(
     isDragging.value = false;  
     showDropIndicator.value = false;  
     draggedBlockId.value = null;  
+    dropPosition.value = 'after';
   }  
       
   return {  

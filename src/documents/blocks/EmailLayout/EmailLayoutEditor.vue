@@ -57,6 +57,7 @@ import EditorChildrenIds from '../helpers/EditorChildrenIds.vue';
 import { inject } from 'vue';
 
 import { useInspectorDrawer } from '../../editor/editor.store';
+import type { TEditorBlock } from '../../editor/core';
 
 type Props = {
     backdropColor?: string | null;
@@ -85,6 +86,7 @@ function handleClick() {
 }
 
 function handleChangeChildren(args: { block: TEditorBlock, blockId: string, childrenIds: string[] }) {
+  inspectorDrawer.saveToHistory(); 
   const { block, blockId, childrenIds } = args;
 
   const document = inspectorDrawer.document;

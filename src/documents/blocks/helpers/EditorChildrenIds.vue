@@ -21,6 +21,7 @@ export type EditorChildrenChange = {
 import type { TEditorBlock } from '../../editor/core';
 import AddBlockButton from './AddBlockButton.vue';
 import EditorBlock from '../../editor/EditorBlock.vue';
+import { useInspectorDrawer } from '../../editor/editor.store';
 
 type EditorChildrenIdsProps = {
   childrenIds: string[] | null | undefined
@@ -31,6 +32,7 @@ const emit = defineEmits<{
 }>()
 
 const props = defineProps<EditorChildrenIdsProps>()
+const editorStore = useInspectorDrawer()
 
 /** Functions */
 
@@ -38,7 +40,9 @@ let idCounter = 0;
 const generateId = () => `block-${Date.now()}-${++idCounter}`
 
 function handleInsertBlock(block: TEditorBlock, index: number) {
-  const blockId = generateId()
+  editorStore.debouncedSaveToHistory();
+
+  const blockId = generateId();
   const newChildrenIds = [...(props.childrenIds || [])]
   newChildrenIds.splice(index, 0, blockId)
 
@@ -50,7 +54,9 @@ function handleInsertBlock(block: TEditorBlock, index: number) {
 }
 
 function handleAppendBlock(block: TEditorBlock) {
-  const blockId = generateId()
+  editorStore.debouncedSaveToHistory();
+
+  const blockId = generateId();
 
   emit('change', {
     blockId,
