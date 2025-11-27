@@ -9,7 +9,7 @@
       letterSpacing: '0.15008px',
       lineHeight: '1.5',
       margin: '0',
-      padding: '32px 0',
+      padding: isMobile ? '0' : '32px 0',
       width: '100%',
       minHeight: '100%',
     }"
@@ -54,7 +54,7 @@ import { getFontFamily } from '@flyhub/email-core';
 import { currentBlockIdSymbol } from '../../editor/EditorBlock.vue';
 
 import EditorChildrenIds from '../helpers/EditorChildrenIds.vue';
-import { inject } from 'vue';
+import { computed, inject } from 'vue';
 
 import { useInspectorDrawer } from '../../editor/editor.store';
 import type { TEditorBlock } from '../../editor/core';
@@ -78,6 +78,10 @@ const inspectorDrawer = useInspectorDrawer()
 /** Injections */
 
 const currentBlockId = inject(currentBlockIdSymbol)!
+
+/** Computed */
+
+const isMobile = computed(() => inspectorDrawer.selectedScreenSize === "mobile")
 
 /** Functions */
 
