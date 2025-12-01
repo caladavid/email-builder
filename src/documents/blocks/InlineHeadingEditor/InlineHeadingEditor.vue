@@ -11,6 +11,7 @@
     <div 
         ref="editableDiv"
         contenteditable="true"
+        class="outline-0"
         @input="handleInput"
         @focus="handleFocus"
         @blur="handleBlur"
