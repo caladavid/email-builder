@@ -16,7 +16,7 @@
     @focus="handleFocus"                    
     @keydown="handleKeydown"  
     @mousedown="handleMouseDown"                  
-    class="inline-text-editor"                    
+    class="outline-0"                    
     :style="computedStyles"                    
   />   
              
@@ -799,26 +799,9 @@ defineExpose({
 
   
 <style scoped>  
-/** 
-.inline-text-editor {  
-  min-height: 20px;  
-  outline: none;  
-  cursor: text;  
-  transition: background-color 0.2s;  
-  white-space: pre-wrap;  
-  word-wrap: break-word;  
-}  
-  
+
 .inline-text-editor:focus {  
-  background-color: rgba(255, 153, 0, 0.05);  
-  outline: 2px solid var(--ui-primary);  
-  outline-offset: 2px;  
+  outline: none !important;  
+  background-color: transparent !important;  
 }  
-  
-.inline-text-editor:empty:before {  
-  content: 'Haz clic para editar...';  
-  color: #999;  
-  font-style: italic;  
-}  
-  */
 </style>

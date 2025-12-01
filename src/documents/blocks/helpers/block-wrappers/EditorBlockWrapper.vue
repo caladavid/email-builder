@@ -20,6 +20,11 @@
     @dragend="dragAndDrop.handleDragEnd"       
   >  
 
+    <!-- <DragHandle   
+      v-if="isDraggable && (mouseInside || inspectorDrawer.selectedBlockId === currentBlockId)"   
+      :block-id="currentBlockId"   
+    /> -->
+
     <!-- ✅ Indicador mejorado con vista previa -->  
     <div     
       v-if="dragAndDrop.showDropIndicator.value && isDraggingFromSidebar()"     
@@ -86,6 +91,7 @@ function handleDragStart(event: DragEvent) {
     event.preventDefault();  
     return;  
   }  
+  
   dragAndDrop.handleDragStart(event);  
 }  
   
