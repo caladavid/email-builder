@@ -85,6 +85,7 @@ export const EDITOR_DICTIONARY = buildBlockConfigurationDictionary({
   },  
   Container: {
     schema: ContainerPropsSchema,
+    /* Component: (props) => <ContainerEditor {...props} />, */
     Component: (props) => (
       <EditorBlockWrapper>
         <ContainerEditor {...props} />

@@ -1,11 +1,11 @@
 <template>
-  <AddBlockButton v-if="!childrenIds?.length" placeholder @select="handleAppendBlock" />
+  <AddBlockButton v-if="!childrenIds?.length" placeholder @select="handleAppendBlock" @replace="handleReplaceBlock" />
   <template v-else>
     <template v-for="childId, i in childrenIds" :key="childId">
-      <AddBlockButton @select="handleInsertBlock($event, i)" />
+      <AddBlockButton @select="handleInsertBlock($event, i)" @replace="handleReplaceBlock($event, i)" />
       <EditorBlock :id="childId" />
     </template>
-    <AddBlockButton @select="handleAppendBlock($event)" />
+    <AddBlockButton @select="handleAppendBlock($event)" @replace="handleReplaceBlock($event)" />
   </template>
 </template>
 
@@ -63,5 +63,34 @@ function handleAppendBlock(block: TEditorBlock) {
     block,
     childrenIds: [...(props.childrenIds || []), blockId]
   })
+}
+
+function handleReplaceBlock(block: TEditorBlock, index?: number) {  
+/*   console.log('🔄 EditorChildrenIds handleReplaceBlock llamado');  
+  console.log('📦 Bloque a reemplazar:', block);  */ 
+  editorStore.debouncedSaveToHistory();  
+  const blockId = generateId();  
+
+ /*  console.log('🆔 Nuevo blockId:', blockId);  
+  console.log('📝 Emitiendo cambio con:', { blockId, block, childrenIds: [blockId] });   */
+    
+  if (index !== undefined) {  
+    // Reemplazar bloque específico en posición  
+    const newChildrenIds = [...(props.childrenIds || [])];  
+    newChildrenIds[index] = blockId;  
+      
+    emit('change', {  
+      blockId,  
+      block,  
+      childrenIds: newChildrenIds  
+    });  
+  } else {  
+    // Reemplazar todo (solo para placeholder)  
+    emit('change', {  
+      blockId,  
+      block,  
+      childrenIds: [blockId]  
+    });  
+  }  
 }
 </script>

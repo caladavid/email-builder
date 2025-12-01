@@ -59,7 +59,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   const INSPECTOR_DRAWER_WIDTH = 335
   const SAMPLES_DRAWER_WIDTH = 240
   const receivedVariables = ref<{ [key: string]: any } | null>(null); // Variable para guardar los datos
-  const samplesDrawerOpen = ref<boolean>(false);
+  const samplesDrawerOpen = ref<boolean>(true);
   const history = ref<TEditorConfiguration[]>([]);
   const historyIndex = ref<number>(-1);
   const maxHistorySize = ref<number>(50);

@@ -2,6 +2,7 @@ import { ref, computed } from 'vue';
 import { useInspectorDrawer } from '../documents/editor/editor.store';  
 import type { TEditorBlock, TEditorConfiguration } from '../documents/editor/core';  
 import type { ColumnsContainerProps } from '../documents/blocks/ColumnsContainer/ColumnsContainerPropsSchema';  
+import { BUTTONS } from '../documents/blocks/helpers/buttons';
   
 export function useDragAndDrop(getCurrentBlockId: () => string) {  
   const inspectorDrawer = useInspectorDrawer();  
@@ -13,15 +14,25 @@ export function useDragAndDrop(getCurrentBlockId: () => string) {
   const validationCache = new Map<string, boolean>();  
   let cleanupTimer: NodeJS.Timeout | null = null;
       
-  const dropIndicatorStyle = computed(() => ({  
-    position: 'absolute' as const,  
-    left: 0,  
-    right: 0,  
-    height: '3px',  
-    backgroundColor: 'rgba(0, 121, 204, 1)',  
-    zIndex: 10,  
-    [dropPosition.value === 'before' ? 'top' : 'bottom']: '-2px'  
-  }));  
+const dropIndicatorStyle = computed(() => ({    
+  position: 'absolute' as const,    
+  left: 0,    
+  right: 0,  
+  height: '60px', // ✅ Altura similar a un bloque real  
+  backgroundColor: 'rgba(0, 51, 160, 0.1)', // ✅ Fondo semitransparente  
+  border: '2px dashed rgba(0, 121, 204, 0.5)', // ✅ Borde punteado  
+  borderRadius: '8px', // ✅ Bordes redondeados  
+  zIndex: 10,    
+  display: 'flex',  
+  alignItems: 'center',  
+  justifyContent: 'center',  
+  fontSize: '12px',  
+  color: 'rgba(0, 121, 204, 0.8)',  
+  fontFamily: 'monospace',  
+  [dropPosition.value === 'before' ? 'top' : 'bottom']: '-30px', // ✅ Desplazar más  
+  transform: 'translateY(0)', // ✅ Sin transformación adicional  
+  transition: 'all 0.2s ease' // ✅ Transición suave  
+}));
       
   function findParentContainer(  
     document: TEditorConfiguration,  
@@ -121,7 +132,9 @@ export function useDragAndDrop(getCurrentBlockId: () => string) {
 
   function handleDragLeave(event: DragEvent): void{
     const relatedTarget = event.relatedTarget as HTMLElement;
-    const currentTarget = event.relatedTarget as HTMLElement;
+    const currentTarget = event.currentTarget as HTMLElement;
+
+    if (!currentTarget || !currentTarget.contains) return;
 
     if (!currentTarget.contains(relatedTarget)){
       showDropIndicator.value = false;
@@ -570,6 +583,22 @@ export function useDragAndDrop(getCurrentBlockId: () => string) {
     draggedBlockId.value = null;  
     dropPosition.value = 'after';
   }  
+
+function createBlockFromType(blockType: string): TEditorBlock | null {  
+/*   console.log('🔍 Buscando bloque:', blockType);  
+  console.log('📋 BUTTONS disponibles:', BUTTONS.map(b => b.label));   */
+    
+  const blockConfig = BUTTONS.find(b => b.label.toLowerCase() === blockType.toLowerCase());  
+    
+  if (!blockConfig) {  
+    console.log('❌ No se encontró configuración para:', blockType);  
+    return null;  
+  }  
+    
+  const block = blockConfig.block();  
+/*   console.log('✅ Bloque creado:', block);   */
+  return block;  
+}
       
   return {  
     isDragging,  
@@ -582,10 +611,13 @@ export function useDragAndDrop(getCurrentBlockId: () => string) {
     handleDrop,  
     handleDragEnd,  
     handleDragLeave,
+    findParentContainer,
+    insertBlockAtPosition,
     // Funciones helper para ContainerEditor  
     removeBlockFromParent,  
     appendBlockToContainer,  
     appendBlockToColumn,  
-    isDescendant  
+    isDescendant,
+    createBlockFromType
   };  
 }
