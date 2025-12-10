@@ -14,8 +14,7 @@
     @input="handleInput"                    
     @blur="handleBlur"                    
     @focus="handleFocus"                    
-    @keydown="handleKeydown"  
-    @mousedown="handleMouseDown"                  
+    @keydown="handleKeydown"         
     class="outline-0"                    
     :style="computedStyles"                    
   />   
@@ -646,12 +645,6 @@ function handleBlur() {
   
 // Evitar que tener que darle doble click al bloque de text
 function handleMouseDown(event: MouseEvent) {  
-  // Solo detener propagación si el bloque ya está seleccionado  
-  // Esto permite que el primer click seleccione el bloque  
-  // y el contenido sea editable inmediatamente después
-  /* if (editorStore.selectedBlockId === blockId) {  
-    event.stopPropagation();  
-    }  */ 
    if (editorStore.selectedBlockId !== blockId && blockId) {  
      editorStore.setSelectedBlockId(blockId);  
     }

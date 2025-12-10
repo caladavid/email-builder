@@ -7,6 +7,7 @@
       margin: '-5px 0',
       width: '100%',
     }"
+    data-add-block="true"
     @mouseenter="visible = true"
     @mouseleave="visible = false"
     @dragover="handleDragOver"

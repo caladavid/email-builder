@@ -8,25 +8,24 @@
       outline,  
       opacity: dragAndDrop.isDragging.value ? 0.5 : 1,  
       transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)', // ✅ Transición suave  
-      transform: getBlockTransform() 
+      transform: getBlockTransform() ,  
+      cursor: getCursorStyle()
     }"  
-    @mouseenter.stop="mouseInside = true"    
-    @mouseleave="mouseInside = false"    
+    @mouseenter.stop="mouseInside = true"
+    @mouseleave="handleMouseLeave"     
+    @mousemove="handleMouseMove" 
     @click.prevent.stop="handleClick"      
     @dragstart.stop="handleDragStart"    
     @dragover="handleDragOver"      
     @dragleave="dragAndDrop.handleDragLeave"  
     @drop="handleDrop"    
     @dragend="dragAndDrop.handleDragEnd"       
-  >  
-
-    <!-- <DragHandle   
-      v-if="isDraggable && (mouseInside || inspectorDrawer.selectedBlockId === currentBlockId)"   
-      :block-id="currentBlockId"   
-    /> -->
+    >  
+<!--     @mouseleave="mouseInside = false"  -->  
+     
 
     <!-- ✅ Indicador mejorado con vista previa -->  
-    <div     
+<!--     <div     
       v-if="dragAndDrop.showDropIndicator.value && isDraggingFromSidebar()"     
       :style="dragAndDrop.dropIndicatorStyle.value"    
     >    
@@ -36,9 +35,21 @@
           {{ getDraggedBlockPreview()?.displayName }}    
         </div>    
       </div>    
-    </div> 
+    </div>  -->
 
-    <div v-if="dragAndDrop.showDropIndicator.value" :style="dragAndDrop.dropIndicatorStyle.value" />  
+    <div       
+      v-if="dragAndDrop.showDropIndicator.value"       
+      :style="dragAndDrop.dropIndicatorStyle.value"      
+    >      
+      <div v-if="isDraggingFromSidebar() && getDraggedBlockPreview()" style="text-align: center;">      
+        <UIcon :name="getDraggedBlockPreview()?.icon || ''" style="font-size: 24px; opacity: 0.6;" />      
+        <div style="margin-top: 4px; font-size: 10px;">      
+          {{ getDraggedBlockPreview()?.displayName }}      
+        </div>      
+      </div>      
+    </div>
+
+    <!-- <div v-if="dragAndDrop.showDropIndicator.value" :style="dragAndDrop.dropIndicatorStyle.value" />   -->
     <TuneMenu v-if="inspectorDrawer.selectedBlockId === currentBlockId" :block-id="currentBlockId" />  
     <slot />  
   </div>  
@@ -55,11 +66,13 @@ import type { TEditorBlock } from '../../../editor/core';
 import { BUTTONS } from '../buttons';
   
 const inspectorDrawer = useInspectorDrawer();  
+let edgeThresholdPixel = 16;  
+
   
 /** Refs */  
 const mouseInside = ref(false);
-const alwaysShowHandle = ref(false);  
 const showDropIndicator = ref(false);  
+const isNearDragEdge = ref(false);
   
 /** Injections */  
 const currentBlockId = inject(currentBlockIdSymbol)!;  
@@ -91,57 +104,138 @@ function handleDragStart(event: DragEvent) {
     event.preventDefault();  
     return;  
   }  
+
+  const currentBlock = inspectorDrawer.document[currentBlockId];  
+  const isTextBlock = currentBlock?.type === "Text";
+  const isHeadingBlock = currentBlock?.type === "Heading";
+
+  if (isTextBlock || isHeadingBlock) {  
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();  
+    const x = event.clientX - rect.left;  
+    const y = event.clientY - rect.top;  
+    const edgeThreshold = edgeThresholdPixel;  
+      
+    const isNearEdge = x <= edgeThreshold ||   
+                      x >= rect.width - edgeThreshold ||   
+                      y <= edgeThreshold ||   
+                      y >= rect.height - edgeThreshold;  
+  
+    if (!isNearEdge) {  
+      event.preventDefault();  
+      return;  
+    }  
+  }  
   
   dragAndDrop.handleDragStart(event);  
 }  
+
+/* function handleMouseDown(event: MouseEvent){
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();  
+  const x = event.clientX - rect.left;  
+  const y = event.clientY - rect.top;  
+  const edgeThreshold = edgeThresholdPixel;  
+    
+  const isNearEdge = x <= edgeThreshold ||   
+                    x >= rect.width - edgeThreshold ||   
+                    y <= edgeThreshold ||   
+                    y >= rect.height - edgeThreshold;
+
+  if (isNearEdge){
+    // Habilitar drag solo para este evento  
+    (event.currentTarget as HTMLElement).draggable = true;
+    setTimeout(() => {
+      const dragEvent = new DragEvent("dragstart", {
+        bubbles: true,
+        cancelable: true,
+      });
+      (event.currentTarget as HTMLElement).dispatchEvent(dragEvent)
+    }, 0);
+  } else {
+    (event.currentTarget as HTMLElement).draggable = false;
+  }
+} */
   
-function handleDrop(event: DragEvent) {  
-/*   console.log('🎯 EditorBlockWrapper handleDrop llamado');   */
-    
-  if (!isDraggable.value) return;  
-    
-  event.preventDefault();  
-  event.stopPropagation();  
-    
-  const draggedData = event.dataTransfer?.getData('text/plain');  
-/*   console.log('📦 Datos recibidos:', draggedData);   */
-    
-  if (draggedData?.startsWith('block-type:')) {  
-/*     console.log('✅ Bloque nuevo desde sidebar');   */
+function handleDrop(event: DragEvent) {    
+  if (!isDraggable.value) return;    
       
-    // 🔧 CLAVE: Verificar si el target es un AddBlockButton  
-    const target = event.target as HTMLElement;  
-    const isAddBlockButton = target.closest('.add-block-button') ||   
-                             target.closest('[class*="add-block"]');  
+  event.preventDefault();    
+  event.stopPropagation();    
       
-    if (isAddBlockButton) {  
-/*       console.log('🔄 Reemplazando AddBlockButton');  */ 
-      // Emitir evento replace para que EditorChildrenIds lo maneje  
+  const draggedData = event.dataTransfer?.getData('text/plain');    
+  const target = event.target as HTMLElement;    
+  const isAddBlockButton = target.closest('.add-block-button') ||   
+                           target.closest('[class*="add-block"]') ||  
+                           target.closest('[data-add-block]'); 
+                           
+                           
+      
+  // ✅ Si el target es AddBlockButton, SIEMPRE reemplazar  
+  if (isAddBlockButton) {  
+    console.log('🔄 Reemplazando AddBlockButton con:', draggedData);  
+      
+    let blockToInsert: TEditorBlock | null = null;  
+      
+    if (draggedData?.startsWith('block-type:')) {  
+      // Bloque nuevo desde sidebar  
       const blockType = draggedData.replace('block-type:', '');  
-      const newBlock = dragAndDrop.createBlockFromType(blockType);  
+      blockToInsert = dragAndDrop.createBlockFromType(blockType);  
+    } else if (draggedData && inspectorDrawer.document[draggedData]) {  
+      // Bloque existente - usar el bloque directamente  
+      blockToInsert = inspectorDrawer.document[draggedData];  
         
-      if (newBlock) {  
-        // Buscar el AddBlockButton padre y emitir replace  
-        const addButton = target.closest('[class*="add-block"]') as HTMLElement;  
-        const addButtonComponent = (addButton as any).__vueParentComponent;  
-        addButtonComponent?.emit('replace', newBlock);  
-      }  
-    } else {  
-/*       console.log('➕ Insertando en bloque existente');   */
-      // Insertar antes/después del bloque actual  
-      const blockType = draggedData.replace('block-type:', '');  
-      const newBlock = dragAndDrop.createBlockFromType(blockType);  
-        
-      if (newBlock) {  
-        insertBlockAtCurrentPosition(newBlock);  
-      }  
+      // Remover de su posición original  
+      const nDocument = { ...inspectorDrawer.document };  
+      dragAndDrop.removeBlockFromParent(nDocument, draggedData);  
+      inspectorDrawer.setDocument(nDocument);  
+    }  
+      
+    if (blockToInsert) {  
+      // Emitir evento replace para AddBlockButton  
+      let addButton = target.closest('.add-block-button') as HTMLElement ||  
+                            target.closest('[class*="add-block"]') as HTMLElement ||  
+                            target.closest('[data-add-block]') as HTMLElement; 
+                            
+      if (addButton){
+        const addButtonComponent = ( addButton as any).__vueParentComponent;  
+        addButtonComponent?.emit('replace', blockToInsert);  
+      }
+      
     }  
       
     return;  
   }  
-    
-  // Para bloques existentes, usar lógica normal  
-  dragAndDrop.handleDrop(event);  
+      
+  // Para otros targets, usar lógica normal  
+  if (draggedData?.startsWith('block-type:')) {  
+    // Bloques nuevos del sidebar  
+    const blockType = draggedData.replace('block-type:', '');  
+    const newBlock = dragAndDrop.createBlockFromType(blockType);  
+      
+    if (newBlock) {  
+      insertBlockAtCurrentPosition(newBlock);  
+    }  
+  } else if (draggedData && inspectorDrawer.document[draggedData]) {  
+    // Bloques existentes  
+    const targetId = currentBlockId;  
+      
+    if (draggedData === targetId) {  
+      console.log('❌ No se puede soltar sobre sí mismo');  
+      return;  
+    }  
+      
+    if (dragAndDrop.isDescendant(targetId, draggedData, inspectorDrawer.document)) {  
+      console.log('❌ Es un descendiente, no permitido');  
+      return;  
+    }  
+      
+    console.log('✅ Ejecutando moveBlock');  
+    dragAndDrop.moveBlock(draggedData, targetId, dragAndDrop.dropPosition.value);  
+  }  
+}
+
+function handleMouseLeave() {  
+  mouseInside.value = false;  
+  isNearDragEdge.value = false;  
 }
 
 function insertBlockAtCurrentPosition(newBlock: TEditorBlock) {  
@@ -168,33 +262,35 @@ function insertBlockAtCurrentPosition(newBlock: TEditorBlock) {
 }
 
 function handleDragOver(event: DragEvent) {  
-/*   console.log('🎯 EditorBlockWrapper handleDragOver llamado');   */
-    
-/*   if (!event.dataTransfer) {  
-    console.error('❌ dataTransfer no disponible');  
-    return;  
-  }   */
-    
-  // ✅ CLAVE: preventDefault() PRIMERO  
   event.preventDefault();  
     
   if (event.dataTransfer) {  
     event.dataTransfer.dropEffect = 'copy';  
   }  
     
-  // ✅ AHORA obtener datos  
   const draggedData = event.dataTransfer?.getData('text/plain');  
-/*   console.log('📦 Datos recibidos en EditorBlockWrapper:', draggedData);   */
+    
+  // ✅ Detección mejorada de anidamiento  
+  const target = event.target as HTMLElement;  
+  const currentWrapper = event.currentTarget as HTMLElement;  
+    
+  // Encontrar si hay un wrapper hijo más específico  
+  const childWrapper = target.closest('.editor-block-wrapper');  
+    
+  // Si hay un wrapper hijo y no es el actual, dejar que el hijo maneje el evento  
+  if (childWrapper && childWrapper !== currentWrapper) {  
+    showDropIndicator.value = false;  
+    return;  
+  }  
     
   if (draggedData?.startsWith('block-type:')) {  
-/*     console.log('✅ Es un bloque nuevo desde sidebar');   */
     showDropIndicator.value = true;  
     return;  
   }  
     
-  // Para bloques existentes, usar lógica normal  
   dragAndDrop.handleDragOver(event);  
-}    
+} 
+
 
 function handleClick() {  
   inspectorDrawer.setSelectedBlockId(currentBlockId);  
@@ -254,6 +350,74 @@ function getBlockTransform() {
   // Si el indicador está después, no desplazar este bloque  
   return 'translateY(0)';  
 }
+
+/* function getBlockTransform() {    
+  if (!dragAndDrop.showDropIndicator.value) return 'translateY(0)';    
+      
+  // ✅ Calcular dinámicamente según el tamaño del bloque  
+  const currentBlock = inspectorDrawer.document[currentBlockId];  
+  const blockHeight = currentBlock ? calculateBlockHeight(currentBlock) : 20;  
+    
+  if (dragAndDrop.dropPosition.value === 'before') {    
+    return `translateY(${Math.min(blockHeight, 40)}px)`;    
+  }    
+      
+  return 'translateY(0)';    
+}   */
+  
+function calculateBlockHeight(block: TEditorBlock): number {  
+  // Lógica para calcular altura real según tipo de bloque  
+  const heights: Record<string, number> = {  
+    'Heading': 40,  
+    'Text': 30,  
+    'Button': 35,  
+    'Image': 50,  
+    'Container': 60,  
+    'ColumnsContainer': 80  
+  };  
+    
+  return heights[block.type] || 20;  
+} 
+  
+// Computed para el cursor preciso  
+const getCursorStyle = () => {  
+  const currentBlock = inspectorDrawer.document[currentBlockId];  
+  const isTextBlock = currentBlock?.type === 'Text';  
+  const isHeadingBlock = currentBlock?.type === "Heading";
+    
+  if ((isTextBlock || isHeadingBlock) && isNearDragEdge.value) {  
+    return 'grab';  
+  }  
+    
+  // Para bloques de texto, usar cursor de texto por defecto  
+  if (isTextBlock || isHeadingBlock) {  
+    return 'text';  
+  }  
+    
+  return 'grab';  
+};  
+
+function handleMouseMove(event: MouseEvent) {  
+  const currentBlock = inspectorDrawer.document[currentBlockId];  
+  const isTextBlock = currentBlock?.type === 'Text';  
+  const isHeadingBlock = currentBlock?.type === "Heading";
+  
+  if (isTextBlock || isHeadingBlock) {  
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();  
+    const x = event.clientX - rect.left;  
+    const y = event.clientY - rect.top;  
+    const edgeThreshold = edgeThresholdPixel;  
+      
+    const nearEdge = x <= edgeThreshold ||   
+                    x >= rect.width - edgeThreshold ||   
+                    y <= edgeThreshold ||   
+                    y >= rect.height - edgeThreshold;  
+      
+    isNearDragEdge.value = nearEdge;  
+  } else {  
+    isNearDragEdge.value = false;  
+  }  
+}
   
 defineOptions({  
   inheritAttrs: false,  
@@ -285,4 +449,5 @@ defineOptions({
 .draggable-block.drag-over-after {  
   transform: translateY(-30px);  
 }  
+
 </style>

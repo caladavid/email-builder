@@ -12,7 +12,11 @@ export function useDragAndDrop(getCurrentBlockId: () => string) {
   const dropPosition = ref<'before' | 'after'>('after');  
   const draggedBlockId = ref<string | null>(null);  
   const validationCache = new Map<string, boolean>();  
+  const activeWrapperId = ref<string | null>(null);
+  const wrapperDepth = ref<number>(0);
+  const activeDropTarget = ref<string | null>(null);
   let cleanupTimer: NodeJS.Timeout | null = null;
+
       
 const dropIndicatorStyle = computed(() => ({    
   position: 'absolute' as const,    
@@ -138,6 +142,8 @@ const dropIndicatorStyle = computed(() => ({
 
     if (!currentTarget.contains(relatedTarget)){
       showDropIndicator.value = false;
+      activeWrapperId.value = null;
+      wrapperDepth.value = 0;
     }
   }
     
@@ -399,6 +405,7 @@ const dropIndicatorStyle = computed(() => ({
     targetId: string,  
     position: 'before' | 'after'  
   ): void {  
+    console.log('🔄 moveBlock llamado:', { draggedId, targetId, position });
     inspectorDrawer.debouncedSaveToHistory();
 
     const nDocument = { ...inspectorDrawer.document };  
@@ -545,17 +552,27 @@ const dropIndicatorStyle = computed(() => ({
       
   function handleDragOver(event: DragEvent): void {  
     event.preventDefault();  
-        
+      
     if (event.dataTransfer) {  
       event.dataTransfer.dropEffect = 'move';  
     }  
-        
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();  
+      
+    // ✅ NUEVO: Detectar si el cursor está sobre contenido hijo  
+    const target = event.target as HTMLElement;  
+    const currentElement = event.currentTarget as HTMLElement;  
+    const isOverChildContent = target.closest('[draggable="true"]') !== currentElement;  
+      
+    // Si está sobre contenido hijo, no mostrar preview en este nivel  
+    if (isOverChildContent) {  
+      showDropIndicator.value = false;  
+      return;  
+    }  
+      
+    const rect = currentElement.getBoundingClientRect();  
     const midpoint = rect.top + rect.height / 2;  
     dropPosition.value = event.clientY < midpoint ? 'before' : 'after';  
-    /* showDropIndicator.value = true;  */ 
-    showDropIndicatorTemporarily();
-  }  
+    showDropIndicatorTemporarily();  
+  }
       
   function handleDrop(event: DragEvent): void {  
     event.preventDefault();  
@@ -582,6 +599,8 @@ const dropIndicatorStyle = computed(() => ({
     showDropIndicator.value = false;  
     draggedBlockId.value = null;  
     dropPosition.value = 'after';
+    activeWrapperId.value = null;  
+    wrapperDepth.value = 0;  
   }  
 
 function createBlockFromType(blockType: string): TEditorBlock | null {  
@@ -598,6 +617,37 @@ function createBlockFromType(blockType: string): TEditorBlock | null {
   const block = blockConfig.block();  
 /*   console.log('✅ Bloque creado:', block);   */
   return block;  
+}
+
+function calculateWrapperDepth(blockId: string): number {  
+  let depth = 0;  
+  let currentId = blockId;  
+    
+  while (currentId) {  
+    const parent = findParentContainer(inspectorDrawer.document, currentId);  
+    if (!parent.parentId) break;  
+      
+    depth++;  
+    currentId = parent.parentId;  
+  }  
+    
+  return depth;  
+}  
+
+// Función para solicitar mostrar preview  
+function requestDropIndicator(blockId: string): boolean {  
+  if (!activeDropTarget.value) {  
+    activeDropTarget.value = blockId;  
+    return true;  
+  }  
+  return false;  
+}  
+  
+// Función para liberar preview  
+function releaseDropIndicator(blockId: string): void {  
+  if (activeDropTarget.value === blockId) {  
+    activeDropTarget.value = null;  
+  }  
 }
       
   return {  
@@ -618,6 +668,10 @@ function createBlockFromType(blockType: string): TEditorBlock | null {
     appendBlockToContainer,  
     appendBlockToColumn,  
     isDescendant,
-    createBlockFromType
+    createBlockFromType,
+    moveBlock,
+    activeWrapperId,
+    requestDropIndicator,
+    releaseDropIndicator
   };  
 }
