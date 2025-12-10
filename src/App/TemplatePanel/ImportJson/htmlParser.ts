@@ -70,7 +70,7 @@ export class HTMLToBlockParser {
 
         let htmlFile: JSZipObject | null = null;
         contents.forEach((_rel, file) => {
-            if (!file.dir && file.name.toLowerCase().endsWith("index.html")) htmlFile = file;
+            if (!file.dir && file.name.toLowerCase().endsWith(".html")) htmlFile = file;
         });
         if (!htmlFile) throw new Error("No se encontró archivo HTML en el ZIP");
 
