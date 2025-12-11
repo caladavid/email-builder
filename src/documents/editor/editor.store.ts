@@ -114,11 +114,14 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     saveVariablesToStorage(variables)
   }
 
-  function setSelectedBlockId(blockId: TValue['selectedBlockId']) {
+  function setSelectedBlockId(blockId: TValue['selectedBlockId'], openDrawer = true) {
     const tab = blockId === null ? 'styles' : 'block-configuration'
-    if (blockId !== null) {
+/*     if (blockId !== null) {
       inspectorDrawerOpen.value = true
-    }
+    } */
+    if (blockId !== null && openDrawer) {  
+      inspectorDrawerOpen.value = true  
+    }  
     selectedBlockId.value = blockId
     selectedSidebarTab.value = tab
   }
