@@ -346,6 +346,11 @@ function getBlockTransform() {
   if (dragAndDrop.dropPosition.value === 'before') {  
     return 'translateY(20px)';  
   }  
+
+  // Si el indicador está en centro, no desplazar (es para agregar al contenedor)  
+  if (dragAndDrop.dropPosition.value === 'center') {  
+    return 'translateY(0)';  
+  } 
     
   // Si el indicador está después, no desplazar este bloque  
   return 'translateY(0)';  

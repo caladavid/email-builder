@@ -9,16 +9,83 @@ export function useDragAndDrop(getCurrentBlockId: () => string) {
     
   const isDragging = ref(false);  
   const showDropIndicator = ref(false);  
-  const dropPosition = ref<'before' | 'after'>('after');  
+  const dropPosition = ref<'before' | 'after' | 'center'>('after');  
   const draggedBlockId = ref<string | null>(null);  
   const validationCache = new Map<string, boolean>();  
   const activeWrapperId = ref<string | null>(null);
   const wrapperDepth = ref<number>(0);
   const activeDropTarget = ref<string | null>(null);
+  const targetColumnIndex = ref<number>(0);
   let cleanupTimer: NodeJS.Timeout | null = null;
 
       
-const dropIndicatorStyle = computed(() => ({    
+const dropIndicatorStyle = computed(() => {  
+  const baseStyle = {  
+    position: 'absolute' as const,  
+    left: 0,  
+    right: 0,  
+    height: '60px',  
+    backgroundColor: 'rgba(0, 51, 160, 0.1)',  
+    border: '2px dashed rgba(0, 121, 204, 0.5)',  
+    borderRadius: '8px',  
+    zIndex: 10,  
+    display: 'flex',  
+    alignItems: 'center',  
+    justifyContent: 'center',  
+    fontSize: '12px',  
+    color: 'rgba(0, 121, 204, 0.8)',  
+    fontFamily: 'monospace',  
+    transition: 'all 0.2s ease'  
+  };  
+
+    // Verificar si el bloque actual es contenedor antes de aplicar estilo center  
+  const currentBlockId = getCurrentBlockId();  
+  const currentBlock = inspectorDrawer.document[currentBlockId];  
+
+  if (dropPosition.value === 'center' &&   
+      currentBlock?.type === 'ColumnsContainer') {  
+    const columnCount = currentBlock.data.props?.columns?.length || 3;  
+    const columnWidth = 100 / columnCount;  
+    const columnLeft = columnWidth * targetColumnIndex.value;  
+      
+    return {  
+      ...baseStyle,  
+      top: '50%',  
+      transform: 'translateY(-50%)',  
+      width: `${columnWidth * 0.8}%`,  
+      left: `${columnLeft + columnWidth * 0.1}%`,  
+      right: 'auto',  
+      backgroundColor: 'rgba(0, 51, 160, 0.15)', 
+      height: '46px', 
+      border: '2px dashed rgba(0, 121, 204, 0.7)'  
+    };  
+  }  
+    
+  // Para otros contenedores en centro  
+  if (dropPosition.value === 'center' &&   
+      currentBlock && (currentBlock.type === 'Container' || currentBlock.type === 'EmailLayout')) {  
+    return {  
+      ...baseStyle,  
+      top: '50%',  
+      transform: 'translateY(-50%)',  
+      width: '92%',  
+      left: '4%',  
+      right: '10%',  
+      height: '46px', 
+      backgroundColor: 'rgba(0, 51, 160, 0.15)',  
+      border: '2px dashed rgba(0, 121, 204, 0.7)'  
+    };  
+  }  
+    
+  return {  
+    ...baseStyle,  
+    [dropPosition.value === 'before' ? 'top' : 'bottom']: '-30px',  
+    transform: 'translateY(0)'  
+  };  
+});
+
+
+/* const dropIndicatorStyle = computed(() => ({    
   position: 'absolute' as const,    
   left: 0,    
   right: 0,  
@@ -36,7 +103,7 @@ const dropIndicatorStyle = computed(() => ({
   [dropPosition.value === 'before' ? 'top' : 'bottom']: '-30px', // ✅ Desplazar más  
   transform: 'translateY(0)', // ✅ Sin transformación adicional  
   transition: 'all 0.2s ease' // ✅ Transición suave  
-}));
+})); */
       
   function findParentContainer(  
     document: TEditorConfiguration,  
@@ -253,9 +320,59 @@ const dropIndicatorStyle = computed(() => ({
     document: TEditorConfiguration,  
     blockId: string,  
     targetId: string,  
-    position: 'before' | 'after'  
+    position: 'before' | 'after' | 'center'  
   ): boolean {  
     inspectorDrawer.debouncedSaveToHistory();
+
+  if (position === 'center') {  
+    const targetBlock = document[targetId];  
+    if (!targetBlock || !isContainerBlock(targetBlock)) return false;  
+      
+    // Verificar si target puede contener hijos  
+    if (targetBlock.type === 'Container') {  
+      const currentChildrenIds = targetBlock.data.props?.childrenIds || [];  
+      document[targetId] = {  
+        ...targetBlock,  
+        data: {  
+          ...targetBlock.data,  
+          props: {  
+            ...targetBlock.data.props,  
+            childrenIds: [...currentChildrenIds, blockId]  
+          }  
+        }  
+      };  
+      return true;  
+    }  
+      
+    // Para ColumnsContainer, agregar a la primera columna por defecto  
+/*     if (targetBlock.type === 'ColumnsContainer') {  
+      const columns = targetBlock.data.props?.columns || [];  
+      if (columns.length > 0) {  
+        const newColumns = [...columns];  
+        newColumns[0] = {  
+          childrenIds: [...(newColumns[0].childrenIds || []), blockId]  
+        };  
+        document[targetId] = {  
+          ...targetBlock,  
+          data: {  
+            ...targetBlock.data,  
+            props: {  
+              ...targetBlock.data.props,  
+              columns: newColumns  
+            }  
+          }  
+        };  
+        return true;  
+      }  
+    }  */ 
+      
+if (targetBlock.type === 'ColumnsContainer') {  
+      // Usar el índice de columna guardado  
+      return appendBlockToColumn(document, blockId, targetId, targetColumnIndex.value);  
+    }  
+
+    return false;  
+  } 
     const targetParentInfo = findParentContainer(document, targetId);  
         
     if (!targetParentInfo.parentId || !targetParentInfo.parentBlock) {  
@@ -403,7 +520,7 @@ const dropIndicatorStyle = computed(() => ({
   function moveBlock(  
     draggedId: string,  
     targetId: string,  
-    position: 'before' | 'after'  
+    position: 'before' | 'after' | 'center'  
   ): void {  
     console.log('🔄 moveBlock llamado:', { draggedId, targetId, position });
     inspectorDrawer.debouncedSaveToHistory();
@@ -549,6 +666,11 @@ const dropIndicatorStyle = computed(() => ({
       cleanupTimer = null
     }, 500)
   }
+
+  function isContainerBlock(block: TEditorBlock): boolean {  
+  return block.type === 'Container' ||   
+         block.type === 'ColumnsContainer';  
+  } 
       
   function handleDragOver(event: DragEvent): void {  
     event.preventDefault();  
@@ -570,6 +692,45 @@ const dropIndicatorStyle = computed(() => ({
       
     const rect = currentElement.getBoundingClientRect();  
     const midpoint = rect.top + rect.height / 2;  
+    
+    const currentBlockId = getCurrentBlockId();
+    const currentBlock = inspectorDrawer.document[currentBlockId];
+
+    if (currentBlock && currentBlock.type === 'ColumnsContainer') {  
+    const thirdHeight = rect.height / 3;  
+      
+    // Detectar si está en el tercio central (zona centro de alguna columna)  
+    if (event.clientY >= rect.top + thirdHeight &&   
+        event.clientY <= rect.bottom - thirdHeight) {  
+        
+      // Calcular qué columna basado en la posición X  
+      const columnCount = currentBlock.data.props?.columns?.length || 3;  
+      const columnWidth = rect.width / (currentBlock.data.props?.columns?.length || 1);  
+      const relativeX = event.clientX - rect.left;  
+      const columnIndex = Math.floor(relativeX / columnWidth);  
+        
+      // Guardar información de la columna para el drop  
+      dropPosition.value = 'center';  
+      // Necesitarás agregar un ref para guardar el columnIndex
+      targetColumnIndex.value = Math.min(columnIndex, columnCount - 1);    
+      showDropIndicatorTemporarily();  
+      return;  
+    }  
+  } 
+
+      
+    if (currentBlock && isContainerBlock(currentBlock)){
+      const thirdHeight = rect.height / 3;
+
+      if (event.clientY >= rect.top + thirdHeight &&
+          event.clientY <= rect.bottom - thirdHeight) {
+        dropPosition.value = 'center';
+        showDropIndicatorTemporarily();
+        return;
+      }
+    }
+
+    
     dropPosition.value = event.clientY < midpoint ? 'before' : 'after';  
     showDropIndicatorTemporarily();  
   }
@@ -672,6 +833,6 @@ function releaseDropIndicator(blockId: string): void {
     moveBlock,
     activeWrapperId,
     requestDropIndicator,
-    releaseDropIndicator
+    releaseDropIndicator,
   };  
 }
