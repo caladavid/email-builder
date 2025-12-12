@@ -119,6 +119,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
       window.parent.postMessage(data, '*');
     }
   }
+  
 
   function setGlobalVariables(variables: Record<string, string>) {
     globalVariables.value = variables
@@ -326,6 +327,12 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   function canRedo(){
       return historyIndex.value < history.value.length - 1;
   }
+
+  if (typeof window !== 'undefined') {  
+    window.addEventListener('resize', () => {  
+      viewportWidth.value = window.innerWidth  
+    })  
+  }  
 
   return {
     document,

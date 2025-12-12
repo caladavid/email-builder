@@ -10,6 +10,7 @@
   >
     <template #body>
       <UTabs
+        ref="samplerRef"
         v-model="activeTab"
         :items="tabs"
         :style="{
@@ -50,10 +51,12 @@ const tabs = [
 
 const inspectorDrawer = useInspectorDrawer()
 const activeTab = ref<string>('0')
+const samplerRef = ref<HTMLElement | null>(null);
 
 /** Watch */
 
 watch(() => inspectorDrawer.selectedSidebarTab, (value) => {
   activeTab.value = value === 'styles' ? '0' : '1'
 })
+
 </script>
