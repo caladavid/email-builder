@@ -7,6 +7,10 @@
   }
 }
 
+@theme{
+  --breakpoint-celcomflex: 840px;
+}
+
 :root {
   --ui-primary: #ff9900;
   --ui-bg: #0033a0;

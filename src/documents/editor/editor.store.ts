@@ -2,7 +2,7 @@ import getConfiguration from "../../getConfiguration";
 import { isOriginAllowed } from "../../utils/allowedOrigins";
 import type { TEditorConfiguration } from "./core";
 import { defineStore } from "pinia";
-import { nextTick, ref, render } from "vue";
+import { computed, nextTick, ref, render } from "vue";
 
 // Nuevos tipos para los mensajes recibidos
 type TReceivedMessage = {
@@ -56,10 +56,21 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   const selectedMainTab = ref<TValue['selectedMainTab']>('editor')
   const selectedScreenSize = ref<TValue['selectedScreenSize']>('desktop')
   const inspectorDrawerOpen = ref<TValue['inspectorDrawerOpen']>(false)
-  const INSPECTOR_DRAWER_WIDTH = 335
-  const SAMPLES_DRAWER_WIDTH = 240
+  const INSPECTOR_DRAWER_WIDTH = computed(() => {  
+    if (viewportWidth.value < 840) {  // breakpoint md de Tailwind  
+      return 220  // w-32  
+    }  
+    return 300   // w-60  
+  })
+  const SAMPLES_DRAWER_WIDTH = computed(() => {  
+    if (viewportWidth.value < 840) {  // breakpoint md de Tailwind  
+      return 160  // w-32  
+    }  
+    return 240   // w-60  
+  })
   const receivedVariables = ref<{ [key: string]: any } | null>(null); // Variable para guardar los datos
   const samplesDrawerOpen = ref<boolean>(true);
+  const viewportWidth = ref(window.innerWidth)  
   const history = ref<TEditorConfiguration[]>([]);
   const historyIndex = ref<number>(-1);
   const maxHistorySize = ref<number>(50);

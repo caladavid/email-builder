@@ -1,9 +1,10 @@
 <template>  
   <div  
+    ref="drawerRef"
     v-if="editorStore.samplesDrawerOpen"  
-    class="fixed left-0 top-0 h-full border-r 0 "  
+    class="fixed left-0 top-0 h-full border-r 0 w-32 md:w-60 overflow-y-auto celcomflex:overflow-hidden"  
     :style="{ 
-        width: `${SAMPLES_DRAWER_WIDTH}px`,
+        width: `${editorStore.SAMPLES_DRAWER_WIDTH}px`,
         backgroundColor: 'var(--ui-bg)',
         color: 'var(--ui-text)',
         borderColor: 'var(--ui-border)',
@@ -14,10 +15,10 @@
         </h1> 
 
       <div>
-        <h2 class="text-lg font-semibold px-3" :style="{color: 'var(--ui-text)'}">
+        <h2 class="text-lg text-center font-semibold px-3" :style="{color: 'var(--ui-text)'}">
           Bloques
         </h2>
-        <div class="grid grid-cols-2 gap-4 p-4">
+        <div class="grid celcomflex:grid-cols-2 gap-4 p-4">
 <!--           <BlockItem type="Encabezado" displayName="Título" icon="H1" />    
           <BlockItem type="Texto" displayName="Texto" icon="T" />    
           <BlockItem type="Botón" displayName="Botón" icon="Btn" />    
@@ -78,7 +79,7 @@
 </template>    
   
 <script setup lang="ts">  
-import { computed, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useInspectorDrawer } from '../../../documents/editor/editor.store';
 import SidebarButton from './SidebarButton.vue';  
 import { SAMPLES_DRAWER_WIDTH } from './constants';
@@ -87,14 +88,23 @@ import { BUTTONS } from '../../../documents/blocks/helpers/buttons';
   
 const editorStore = useInspectorDrawer();  
 const showTemplates = ref(false);
-SAMPLES_DRAWER_WIDTH
+const drawerRef = ref<HTMLElement | null>(null);
+/* SAMPLES_DRAWER_WIDTH */
 
-const isOpen = computed({
-    get: () => editorStore.samplesDrawerOpen,
-    set: (value: boolean) => {
-        if (value !== editorStore.samplesDrawerOpen) {
-            editorStore.toggleSamplesDrawerOpen();
-        }
+function handleResize(){
+  if (window.innerHeight >= editorStore.SAMPLES_DRAWER_WIDTH){
+    if(drawerRef.value){
+      drawerRef.value.scrollTop = 0; 
     }
+  } 
+}
+
+onMounted(() => {
+  window.addEventListener('resize', handleResize);
+  handleResize();
 })
+
+onUnmounted(() => {
+  window.removeEventListener("resize", handleResize);
+});
 </script>

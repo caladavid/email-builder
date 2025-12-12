@@ -13,7 +13,7 @@
         v-model="activeTab"
         :items="tabs"
         :style="{
-          '--drawer-width': `${INSPECTOR_DRAWER_WIDTH}px`,
+          '--drawer-width': `${inspectorDrawer.INSPECTOR_DRAWER_WIDTH}px`,
         }"
         class="w-[var(--drawer-width)]">
         <template #styles>
@@ -33,7 +33,7 @@ import { ref, watch } from 'vue';
 import StylesPanel from './StylesPanel.vue';
 import ConfigurationPanel from './ConfigurationPanel/index.vue';
 
-const INSPECTOR_DRAWER_WIDTH = 300
+/* const INSPECTOR_DRAWER_WIDTH = 300 */
 
 const tabs = [
   {
