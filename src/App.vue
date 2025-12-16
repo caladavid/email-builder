@@ -63,7 +63,7 @@ onMounted(() => {
 
     const data = event.data;
 
-    if (!data.type || !['updateVariables', 'addVariable', 'requestHtml', 'loadTemplate', "requestJson", "requestHtmlAndJson", "clearTemplate"].includes(data.type)) {    
+    if (!data.type || !['updateVariables', 'addVariable', 'requestHtml', 'loadTemplate', "requestJson", "requestHtmlAndJson", "clearTemplate", "setToken"].includes(data.type)) {    
       return;  
     } 
 
@@ -90,6 +90,9 @@ onMounted(() => {
         break; 
       case 'clearTemplate':  
         editorStore.resetDocument(getConfiguration(''));  
+        break; 
+      case 'setToken':  
+        editorStore.setAuthToken(data.token);  
         break; 
       default:  
         console.log('Mensaje no reconocido:', data); 

@@ -28,6 +28,7 @@ type TValue = {
   history: TEditorConfiguration[]; // Array de estados anteriores  
   historyIndex: number; // Posición actual en el historial 
   maxHistorySize: number;  // Límite de tamaño del historial
+  authToken: string | null;
 };
 
 const STORAGE_KEY = 'email-builder-variables'
@@ -74,6 +75,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   const history = ref<TEditorConfiguration[]>([]);
   const historyIndex = ref<number>(-1);
   const maxHistorySize = ref<number>(50);
+  const authToken = ref<string | null>(null);
   let debounceTimer: NodeJS.Timeout | null = null;
 
   /* const globalVariables = ref<TValue['globalVariables']>(loadVariablesFromStorage()); */
@@ -274,6 +276,11 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
 
   }
 
+  function setAuthToken(token: string){
+    authToken.value = token;
+    console.log('Token guardado en store:', token);  
+  }
+
   
   function saveToHistory(){
       // Clonar el estado actual del documento  
@@ -369,5 +376,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     redo,  
     canUndo,  
     canRedo,  
+    authToken,
+    setAuthToken
   }
 });
