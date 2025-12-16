@@ -58,13 +58,13 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   const selectedScreenSize = ref<TValue['selectedScreenSize']>('desktop')
   const inspectorDrawerOpen = ref<TValue['inspectorDrawerOpen']>(false)
   const INSPECTOR_DRAWER_WIDTH = computed(() => {  
-    if (viewportWidth.value < 840) {  // breakpoint md de Tailwind  
+    if (viewportWidth.value < 1270) {  // breakpoint md de Tailwind  
       return 220  // w-32  
     }  
     return 300   // w-60  
   })
   const SAMPLES_DRAWER_WIDTH = computed(() => {  
-    if (viewportWidth.value < 840) {  // breakpoint md de Tailwind  
+    if (viewportWidth.value < 1270) {  // breakpoint md de Tailwind  
       return 160  // w-32  
     }  
     return 240   // w-60  
