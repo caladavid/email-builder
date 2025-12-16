@@ -335,7 +335,7 @@ function toggleBold() {
     const blockId = inspectorDrawer.selectedBlockId;
     if (blockId) {
       const currentBlock = inspectorDrawer.document[blockId];
-      if (currentBlock?.type === 'Text') {
+      if (currentBlock?.type === 'Text' || currentBlock?.type === 'Heading' || currentBlock?.type === 'Button') {
         inspectorDrawer.setDocument({
           [blockId]: {
             ...currentBlock,
@@ -374,7 +374,7 @@ function toggleItalic() {
     const blockId = inspectorDrawer.selectedBlockId;
     if (blockId) {
       const currentBlock = inspectorDrawer.document[blockId];
-      if (currentBlock?.type === 'Text') {
+      if (currentBlock?.type === 'Text' || currentBlock?.type === 'Heading' || currentBlock?.type === 'Button') {
         inspectorDrawer.setDocument({
           [blockId]: {
             ...currentBlock,
@@ -412,7 +412,7 @@ function handleContentChange() {
   const blockId = inspectorDrawer.selectedBlockId;
   if (blockId) {
       const currentBlock = inspectorDrawer.document[blockId];
-      if (currentBlock?.type === 'Text') {
+      if (currentBlock?.type === 'Text' || currentBlock?.type === 'Heading' || currentBlock?.type === 'Button') {
         // Verificar si realmente hay cambios para evitar loops
         const currentText = currentBlock.data?.props?.text || '';
         const currentFormats = currentBlock.data?.props?.formats || [];

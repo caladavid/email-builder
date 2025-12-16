@@ -50,6 +50,7 @@ const toolbarRef = ref();
 const isInternalUpdate = ref(false);
 const isActivelyEditing = ref(false);
 const lastCursorPosition = ref(0);
+let animationFrameId: number | null = null;
 
 // ============================================  
 // PROPS & EMITS  
@@ -647,7 +648,7 @@ saveCursorPosition();
 // WATCHERS  
 // ============================================  
 
-watch(blockProps, (newProps, oldProps) => {
+/* watch(blockProps, (newProps, oldProps) => {
     if (!editableDiv.value || isInternalUpdate.value  || isActivelyEditing.value || !newProps)  return;
 
     // Evitar actualizaciones innecesarias
@@ -673,6 +674,42 @@ watch(blockProps, (newProps, oldProps) => {
         }
     }
 }, { deep: true, immediate: true })
+ */
+
+ watch(blockProps, (newProps, oldProps) => {  
+    if (!editableDiv.value || isInternalUpdate.value || isActivelyEditing.value || !newProps) return;  
+  
+    // Evitar actualizaciones innecesarias  
+    const oldText = oldProps?.text || '';  
+    const oldFormats = oldProps?.formats || [];  
+    const newText = newProps.text;  
+    const newFormats = newProps.formats || [];  
+      
+    if (oldText === newText && JSON.stringify(oldFormats) === JSON.stringify(newFormats)) {  
+        return;  
+    }  
+  
+    if (animationFrameId) {  
+        cancelAnimationFrame(animationFrameId);  
+    }  
+  
+    animationFrameId = requestAnimationFrame(() => {  
+        if (!editableDiv.value) return;  
+  
+        const htmlContent = textWithFormatsToHtml(newText, newFormats);  
+  
+        if (editableDiv.value.innerHTML !== htmlContent) {  
+            const wasFocused = document.activeElement === editableDiv.value;  
+            if (wasFocused) saveCursorPosition();  
+  
+            editableDiv.value.innerHTML = htmlContent;  
+  
+            if (wasFocused) {  
+                nextTick(() => restoreCursorPosition());  
+            }  
+        }  
+    });  
+  }, { deep: true, immediate: true });
 
 // ============================================  
 // LIFECYCLE  
