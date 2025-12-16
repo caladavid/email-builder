@@ -92,6 +92,8 @@ onMounted(() => {
         editorStore.resetDocument(getConfiguration(''));  
         break; 
       case 'setToken':  
+        console.log('🎯 Case setToken ejecutado');  
+        console.log('🔑 Token recibido:', data.token);  
         editorStore.setAuthToken(data.token);  
         break; 
       default:  

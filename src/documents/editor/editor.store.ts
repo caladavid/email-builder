@@ -277,8 +277,10 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   }
 
   function setAuthToken(token: string){
+    console.log('💾 setAuthToken llamado con:', token);  
     authToken.value = token;
-    console.log('Token guardado en store:', token);  
+    console.log('✅ Token guardado en store:', token);  
+    console.log('📊 Valor actual de authToken:', authToken.value);  
   }
 
   
