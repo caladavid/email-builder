@@ -28,8 +28,6 @@
                   class="text-blue-500 hover:underline"  
                 >ejemplo</a>).  
               </p>  
-
-              <p>{{ editorStore.authToken || 'No hay token' }}</p>
   
               <UAlert v-if="error" variant="subtle" color="error" :title="error" />  
   
@@ -73,11 +71,9 @@
                   label="Seleccionar archivo ZIP"  
                   variant="outline"  
                 />  
-                
                 <p class="mt-2 text-sm text-gray-500">  
                   El ZIP debe contener un archivo index.html y una carpeta de imágenes  
                 </p>  
-                <p>Test</p>
               </div>  
                 
               <div v-if="zipProcessing" class="text-center">  
@@ -111,7 +107,6 @@ import JSZip from 'jszip';
 import { HTMLToBlockParser } from './htmlParser'; 
 
 const inspectorDrawer = useInspectorDrawer()
-const editorStore = useInspectorDrawer();
 
 /** Refs */
 
@@ -169,7 +164,8 @@ function handleCancel() {
 
 async function handleZipUpload(event: Event) {    
   const file = (event.target as HTMLInputElement).files?.[0];    
-  if (!file) return;    
+  if (!file) return;  
+  await inspectorDrawer.sendZip(file);    
     
   zipProcessing.value = true;    
   zipError.value = null;    
