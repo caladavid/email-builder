@@ -277,9 +277,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   }
 
   function setAuthToken(token: string){
-    console.log('💾 setAuthToken llamado con:', token);  
     authToken.value = token;
-    console.log('✅ Token guardado en store:', token);  
     console.log('📊 Valor actual de authToken:', authToken.value);  
   }
 
@@ -337,6 +335,43 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
       return historyIndex.value < history.value.length - 1;
   }
 
+  async function sendZip(file: File) {
+    try {
+      const token = authToken.value
+      
+      if (!token){
+        console.error('❌ No hay token disponible');  
+        return;  
+      }
+
+      const formData = new FormData()
+      formData.append('TOKEN', token)
+      formData.append('file', file);
+
+      const response = await fetch("https://services.celcom.cl/rest/protected/flex_email/addFileZip", {
+        method: "POST",
+        body: formData
+      });
+
+      if (!response.ok){
+        throw new Error(`Error HTTP: ${response.status}`);  
+      }
+
+      const result = await response.json();
+
+      if (result.response === "200") {  
+        // Cargar el template procesado en el editor  
+        loadTemplateFromParent(result.data);  
+        console.log('✅ ZIP procesado y cargado exitosamente');  
+      } else {  
+        console.error('❌ Error procesando ZIP:', result);  
+      }  
+
+    } catch (error) {
+      console.error('❌ Error en sendZip:', error);  
+    }
+  }
+
   if (typeof window !== 'undefined') {  
     window.addEventListener('resize', () => {  
       viewportWidth.value = window.innerWidth  
@@ -379,6 +414,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     canUndo,  
     canRedo,  
     authToken,
-    setAuthToken
+    setAuthToken,
+    sendZip
   }
 });
