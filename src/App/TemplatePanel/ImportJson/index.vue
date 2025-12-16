@@ -28,6 +28,8 @@
                   class="text-blue-500 hover:underline"  
                 >ejemplo</a>).  
               </p>  
+
+              <p>{{ editorStore.authToken || 'No hay token' }}</p>
   
               <UAlert v-if="error" variant="subtle" color="error" :title="error" />  
   
@@ -71,9 +73,11 @@
                   label="Seleccionar archivo ZIP"  
                   variant="outline"  
                 />  
+                
                 <p class="mt-2 text-sm text-gray-500">  
                   El ZIP debe contener un archivo index.html y una carpeta de imágenes  
                 </p>  
+                <p>Test</p>
               </div>  
                 
               <div v-if="zipProcessing" class="text-center">  
@@ -107,6 +111,7 @@ import JSZip from 'jszip';
 import { HTMLToBlockParser } from './htmlParser'; 
 
 const inspectorDrawer = useInspectorDrawer()
+const editorStore = useInspectorDrawer();
 
 /** Refs */
 
@@ -162,39 +167,55 @@ function handleCancel() {
   activeTab.value = 'json';  
 }
 
-async function handleZipUpload(event: Event) {  
-  const file = (event.target as HTMLInputElement).files?.[0];  
-  if (!file) return;  
-  
-  zipProcessing.value = true;  
-  zipError.value = null;  
-  zipSuccess.value = null;  
-  
-  try {  
-    console.log('🔄 Iniciando procesamiento ZIP...');  
+async function handleZipUpload(event: Event) {    
+  const file = (event.target as HTMLInputElement).files?.[0];    
+  if (!file) return;    
+    
+  zipProcessing.value = true;    
+  zipError.value = null;    
+  zipSuccess.value = null;    
+    
+  try {    
+    const parser = new HTMLToBlockParser();    
+    const result = await parser.parseZipToBlocks(file);  
       
-    // OPCIÓN 1: Dejar que HTMLToBlockParser maneje todo  
-    const parser = new HTMLToBlockParser();  
-    const editorConfiguration = await parser.parseZipToBlocks(file);  
+    // Separar errores críticos de advertencias  
+    const criticalErrors = result.errors.filter(e => !e.recoverable);  
+    const warnings = result.errors.filter(e => e.recoverable);  
       
-    console.log('✅ Configuración generada:', editorConfiguration);  
+    if (criticalErrors.length > 0) {  
+      // Mostrar solo errores críticos  
+      const errorMessage = criticalErrors  
+        .map(e => `${e.type}: ${e.message}`)  
+        .join('\n');  
+      zipError.value = errorMessage;  
+      return;  
+    }  
       
-    // Importar directamente  
-    inspectorDrawer.resetDocument(editorConfiguration);  
+    // Mostrar advertencias informativas si existen  
+    if (warnings.length > 0) {  
+      console.warn('Advertencias durante la importación:', warnings);  
+      // Opcional: mostrar advertencias al usuario  
+      // zipWarning.value = warnings.map(w => w.message).join('\n');  
+    }  
       
-    zipSuccess.value = 'ZIP importado exitosamente';  
+    // Continuar con la importación si no hay errores críticos  
+    if (result.configuration) {  
+      inspectorDrawer.resetDocument(result.configuration);  
+      zipSuccess.value = 'ZIP importado exitosamente';  
+        
+      setTimeout(() => {    
+        handleCancel();    
+      }, 1500);  
+    }  
       
-    setTimeout(() => {  
-      handleCancel();  
-    }, 1500);  
-  
-  } catch (error) {  
-    console.error('❌ Error processing ZIP:', error);  
-    zipError.value = 'Error al procesar el archivo ZIP';  
-  } finally {  
-    zipProcessing.value = false;  
-  }  
-}  
+  } catch (error) {    
+    console.error('❌ Error processing ZIP:', error);    
+    zipError.value = 'Error al procesar el archivo ZIP';    
+  } finally {    
+    zipProcessing.value = false;    
+  }    
+}
 
 function isImageFile(filename: string): boolean {  
   const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];  
