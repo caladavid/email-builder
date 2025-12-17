@@ -1429,37 +1429,53 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
         /* const base = (src.split("/").pop() || src).toLowerCase();
         if (/^blanco\.(png|gif|jpg|jpeg)$/.test(base)) return null; */
 
-         // Extraer nombre de archivo limpio
-        const fileName = src.split("/").pop() || src;
-        const baseName = fileName.toLowerCase().split('?')[0]; // Quitar query strings
 
-        // Buscar en imageMap de múltiples formas
         let dataUrl: string | undefined;
+        let fileName: string;
 
-        /* const dataUrl =
-            this.imageMap.get(src.split("/").pop() || src) || this.imageMap.get(base); */
-        dataUrl = this.imageMap.get(fileName);  
-        
-        if (!dataUrl) {
-            // Intentar con minúsculas 
-            dataUrl = this.imageMap.get(baseName);
-            console.log('🔍 Búsqueda 1 (minúsculas):', baseName, '→', dataUrl ? 'encontrado' : 'NO encontrado');
-        };
-        
-        // 3. Buscar coincidencia parcial (útil para nombres con versiones o hashes)
-        if (!dataUrl) {
-            const nameWithoutExt = baseName.replace(/\.[^/.]+$/, "");
-            const matchingKey = Array.from(this.imageMap.keys()).find(key => 
-                key.toLowerCase().includes(nameWithoutExt)
-            );
-            if (matchingKey) {
-                dataUrl = this.imageMap.get(matchingKey);
+        // CASO 1: URL absoluta (https://services.celcom.cl/...)
+        if (src.startsWith("http")){
+            try {
+                const url = new URL(src);
+                fileName = url.pathname.split("/").pop() || "";
+            } catch (error) {
+                fileName = src.split("/").pop() || ""; 
             }
-        }  
+            // Extraer nombre de archivo limpio
+            const baseName = fileName.toLowerCase().split('?')[0]; // Quitar query strings
             
+            // Buscar en imageMap de múltiples formas
+            dataUrl = this.imageMap.get(baseName);  
+
+            if (!dataUrl) {
+                // Intentar con minúsculas 
+                console.log("⚠️ Imagen no encontrada en imageMap, usando URL original");
+                dataUrl = src;
+            };
+        }
+        // CASO 2: Ruta local (archivo en ZIP)
+        else {
+            fileName = src.split("/").pop() || src;
+            const baseName = fileName.toLowerCase().split('?')[0];
+
+            // Buscar en imageMap de múltiples formas
+            dataUrl = this.imageMap.get(baseName);  
+
+            // 3. Buscar coincidencia parcial (útil para nombres con versiones o hashes)
+            if (!dataUrl) {
+                const nameWithoutExt = baseName.replace(/\.[^/.]+$/, "");
+                const matchingKey = Array.from(this.imageMap.keys()).find(key => 
+                    key.toLowerCase().includes(nameWithoutExt)
+                );
+                if (matchingKey) {
+                    dataUrl = this.imageMap.get(matchingKey);
+                }
+            } 
+        }
+
         if (!dataUrl) {  
-            console.log('❌ Imagen no encontrada en imageMap');  
-            console.log('📋 imageMap keys disponibles:', Array.from(this.imageMap.keys()));  
+            console.log("❌ No se pudo obtener dataUrl para:", src); 
+            console.log("📊 imageMap keys:", Array.from(this.imageMap.keys()));  
             return null;  
         }  
 
@@ -1468,7 +1484,9 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
         this.blocks[id] = {
             type: "Image",
             data: {
-                style: { ...styles, padding: { top: 16, bottom: 16, left: 24, right: 24 } },
+                style: { 
+                    ...styles, 
+                    padding: { top: 16, bottom: 16, left: 24, right: 24 } },
                 props: {
                     url: dataUrl,
                     alt: element.getAttribute("alt") || "",
