@@ -13,7 +13,7 @@
     </template> 
 
     <template #list-trailing class="bg-red-300">
-      <div class="flex w-full justify-end gap-x-2">
+      <div :class="['flex w-full justify-end md:gap-x-2', inspectorDrawer.inspectorDrawerOpen ? 'mr-6' : '']">
         <UTooltip text="Deshacer">
           <UButton   
             icon="material-symbols:undo"  
@@ -65,7 +65,7 @@
           variant="ghost"
           color="neutral"
           @click="inspectorDrawer.inspectorDrawerOpen = !inspectorDrawer.inspectorDrawerOpen"
-          class="cursor-pointer w-10 justify-center"
+          class="cursor-pointer w-10"
         />
       </div>
     </template>

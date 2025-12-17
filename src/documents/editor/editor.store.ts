@@ -1,3 +1,4 @@
+import { HTMLToBlockParser } from "../../App/TemplatePanel/ImportJson/htmlParser";
 import getConfiguration from "../../getConfiguration";
 import { isOriginAllowed } from "../../utils/allowedOrigins";
 import type { TEditorConfiguration } from "./core";
@@ -361,7 +362,27 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
 
       if (result.response === "200") {  
         // Cargar el template procesado en el editor  
-        loadTemplateFromParent(result.data);  
+        const htmlContent = result.data;
+        
+        const parser = new HTMLToBlockParser();
+        const parseResult = await parser.parseHtmlStringToBlocks(htmlContent);  
+        
+        console.log(parseResult);
+
+      // Manejar errores críticos  
+      const criticalErrors = parseResult.errors.filter(e => !e.recoverable);  
+      if (criticalErrors.length > 0) {  
+        console.error('❌ Errores críticos:', criticalErrors);  
+        return;  
+      }  
+        
+      // Cargar configuración en el editor  
+      if (parseResult.configuration) {  
+        resetDocument(parseResult.configuration);  
+        console.log('✅ Plantilla importada y lista para editar');  
+      } 
+
+        /* loadTemplateFromParent(result.data);  */ 
         console.log('✅ ZIP procesado y cargado exitosamente');  
       } else {  
         console.error('❌ Error procesando ZIP:', result);  

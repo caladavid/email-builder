@@ -165,6 +165,31 @@ function handleCancel() {
 async function handleZipUpload(event: Event) {    
   const file = (event.target as HTMLInputElement).files?.[0];    
   if (!file) return;  
+ 
+    
+  zipProcessing.value = true;    
+  zipError.value = null;    
+  zipSuccess.value = null;    
+    
+  try {    
+    await inspectorDrawer.sendZip(file);        
+    zipSuccess.value = 'Plantilla importada exitosamente';     
+      
+    setTimeout(() => {      
+      handleCancel();      
+    }, 1500);
+      
+  } catch (error) {    
+    console.error('❌ Error processing ZIP:', error);    
+    zipError.value = 'Error al procesar el archivo ZIP';    
+  } finally {    
+    zipProcessing.value = false;    
+  }    
+}
+
+/* async function handleZipUpload(event: Event) {    
+  const file = (event.target as HTMLInputElement).files?.[0];    
+  if (!file) return;  
   await inspectorDrawer.sendZip(file);    
     
   zipProcessing.value = true;    
@@ -211,7 +236,7 @@ async function handleZipUpload(event: Event) {
   } finally {    
     zipProcessing.value = false;    
   }    
-}
+} */
 
 function isImageFile(filename: string): boolean {  
   const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];  

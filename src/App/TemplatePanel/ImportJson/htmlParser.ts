@@ -531,6 +531,14 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
         }  
     }  
 
+    async parseHtmlStringToBlocks(htmlContent: string): Promise<{  
+        configuration?: TEditorConfiguration,  
+        errors: ParseError[],  
+        warnings: ParseError[]  
+    }> {  
+        return this.parseHtmlToBlocksWithErrors(htmlContent);  
+    }
+
 /*     private validateHtmlStructure(doc: Document): ParseError[] {  
         const errors: ParseError[] = [];  
         
@@ -740,102 +748,111 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
             case "div":
             case "span":
             case "td": {
+                console.log("📋 Procesando TD:", element);
                 const hasChildren = element.children.length > 0;
+                const textContent = element.textContent?.trim() || "";
                 
-                // Detectar si es un TD de iconos (múltiples <a> con imágenes)
-                const allAnchors = Array.from(element.querySelectorAll("a"));
-                const allImages = Array.from(element.querySelectorAll("img"));
-
-                if (allAnchors.length > 0 && allImages.length === allAnchors.length){
-                    
-                }
-
-
-                // CASO ESPECIAL 1: <td> con EXACTAMENTE un <a> que contiene EXACTAMENTE una <img> (BANNER)  
-                if (element.children.length === 1) {  
-                    const firstChild = element.children[0];  
-                    if (firstChild.tagName.toLowerCase() === 'a') {  
-                        const anchor = firstChild as HTMLAnchorElement;  
-                        const imgs = anchor.querySelectorAll("img");  
-                        
-                        if (imgs.length === 1 && anchor.children.length === 1 &&   
-                            anchor.children[0].tagName.toLowerCase() === 'img') {  
-                            
-                            console.log("🎯 TD con único enlace que contiene única imagen (BANNER)");  
-                            const img = imgs[0];  
-                            const blockId = this.createImageBlock(img, anchor.getAttribute("href") || "#");  
-                            if (blockId) {  
-                                console.log("✅ Banner procesado como imagen con enlace, ID:", blockId);  
-                                return blockId;  
-                            }  
-                        }  
-                    }  
-                }  
-
-                // CASO ESPECIAL 2: <td> con MÚLTIPLES <a> que contienen imágenes (ICONOS REDES SOCIALES)  
-                const anchorsWithImg = element.querySelectorAll("a img");  
-                if (anchorsWithImg.length > 1) {  
-                    console.log("🔗 TD con múltiples enlaces con imágenes (ICONOS)");  
-                    
-                    // Verificar si el TD contiene principalmente estos iconos  
-                    const tdContent = element.textContent?.trim() || "";  
-                    const hasOnlyIcons = Array.from(element.children).every(  
-                        child => child.tagName.toLowerCase() === 'a' && child.querySelector('img')  
-                    );  
-                    
-                    if (hasOnlyIcons && tdContent.length === 0) {  
-                        console.log("✅ Creando contenedor para iconos de redes sociales");  
-                        const imageIds: string[] = [];  
-                        anchorsWithImg.forEach((anchor) => {  
-                            const img = anchor.querySelector("img") as HTMLImageElement;  
-                            const link = anchor as HTMLAnchorElement;  
-                            if (img && link) {  
-                                const imgId = this.createImageBlock(img, link.getAttribute("href") || "#");  
-                                if (imgId) imageIds.push(imgId);  
-                            }  
-                        });  
-                        
-                        if (imageIds.length > 0) {  
-                            return this.createContainerBlock(imageIds, {  
-                                textAlign: "center",  
-                                padding: { top: 16, bottom: 16, left: 24, right: 24 }  
-                            });  
-                        }  
-                    }  
-                }  
-
-                // (A) <p> completamente inline → Text
+                // PRIMERO: Verificar casos de texto (A, B, C, D)
+                // (A) <p> completamente inline → Text (aunque esto es para case "p", lo mantenemos)
                 if (tagName === "p" && this.isInlineOnly(element)) {
                     const { text, formats } = this.processInlineContent(element, currentStyles);
                     if (text.length) return this.createTextBlock(text, formats, currentStyles);
                 }
 
-                // (B) td/div/span con un único <p> inline → Text
-                if ((tagName === "td" || tagName === "div" || tagName === "span") && this.hasSingleInlineP(element)) {
+                // (B) td con un único <p> inline → Text
+                if (this.hasSingleInlineP(element)) {
                     const pEl = element.children[0] as Element;
                     const { text, formats } = this.processInlineContent(pEl, currentStyles);
                     if (text.length) return this.createTextBlock(text, formats, currentStyles);
                 }
 
-                // (C) td/div/span completamente inline → Text
-                if (
-                    (tagName === "td" || tagName === "div" || tagName === "span") &&
-                    this.isInlineOnly(element) &&
-                    !this.elementContainsOtherBlockTypes(element)
-                ) {
+                // (C) td completamente inline → Text
+                if (this.isInlineOnly(element) && !this.elementContainsOtherBlockTypes(element)) {
                     const { text, formats } = this.processInlineContent(element, currentStyles);
                     if (text.length) return this.createTextBlock(text, formats, currentStyles);
                 }
 
                 // (D) Texto directo sin otros bloques → Text
-                const textContent = this.getDirectTextContent(element);
                 if (textContent.length > 0 && !this.elementContainsOtherBlockTypes(element)) {
                     const { text, formats } = this.processInlineContent(element, currentStyles);
                     return this.createTextBlock(text, formats, currentStyles);
                 }
-
-                // (E) TD con “botón” (fondo + <a><img/>) → solo la imagen, envuelta a la izquierda
-                if (tagName === "td" && this.isButtonLikeCell(element) && element.querySelector("a img")) {
+                
+                // SEGUNDO: Si NO hay texto o el texto es mínimo, verificar casos especiales de imágenes
+                
+                // CASO 1: <td> con un solo <a> que contiene una imagen (BANNER)
+                if (element.children.length === 1) {
+                    const firstChild = element.children[0];
+                    if (firstChild.tagName.toLowerCase() === 'a') {
+                        const anchor = firstChild as HTMLAnchorElement;
+                        const imgs = anchor.querySelectorAll("img");
+                        
+                        if (imgs.length === 1 && anchor.children.length === 1 && 
+                            anchor.children[0].tagName.toLowerCase() === 'img') {
+                            
+                            console.log("🎯 TD con único enlace que contiene única imagen (BANNER)");
+                            const img = imgs[0];
+                            const blockId = this.createImageBlock(img, anchor.getAttribute("href") || "#");
+                            if (blockId) {
+                                console.log("✅ Banner procesado, ID:", blockId);
+                                return blockId;
+                            }
+                        }
+                    }
+                }
+                
+                // CASO 2: <td> con múltiples <a> que contienen imágenes (ICONOS)
+                const allAnchors = Array.from(element.querySelectorAll("a"));
+                const allImages = Array.from(element.querySelectorAll("img"));
+                
+                if (allAnchors.length > 1 && allImages.length === allAnchors.length) {
+                    console.log(`🔗 TD con ${allAnchors.length} enlaces e imágenes (probablemente iconos)`);
+                    
+                    // Verificar si cada <a> contiene exactamente una <img> y no tiene texto
+                    const isValidIconStructure = allAnchors.every(anchor => {
+                        const anchorText = anchor.textContent?.trim() || "";
+                        const anchorImgs = anchor.querySelectorAll("img");
+                        return anchorImgs.length === 1 && 
+                            anchor.children.length === 1 && 
+                            anchorText.length === 0;
+                    });
+                    
+                    // También verificar que el TD no tenga texto propio
+                    const tdHasText = textContent.length > 0;
+                    
+                    if (isValidIconStructure && !tdHasText) {
+                        console.log("✅ Estructura de iconos válida, procesando...");
+                        const iconBlocks: string[] = [];
+                        
+                        allAnchors.forEach((anchor, index) => {
+                            const img = anchor.querySelector("img");
+                            if (img) {
+                                const blockId = this.createImageBlock(img, anchor.getAttribute("href") || "#");
+                                if (blockId) {
+                                    iconBlocks.push(blockId);
+                                    console.log(`   [${index}] Icono procesado: ${blockId}`);
+                                }
+                            }
+                        });
+                        
+                        if (iconBlocks.length > 0) {
+                            return this.createContainerBlock(iconBlocks, {
+                                display: "flex",
+                                flexDirection: "row",
+                                justifyContent: "center",
+                                alignItems: "center",
+                                gap: "20px",
+                                textAlign: "center",
+                                padding: { top: 0, right: 0, bottom: 0, left: 0 }
+                            });
+                        }
+                    }
+                }
+                
+                // TERCERO: Casos especiales que no encajan en los anteriores
+                
+                // (E) TD con "botón" (fondo + <a><img/>)
+                if (this.isButtonLikeCell(element) && element.querySelector("a img")) {
                     const img = element.querySelector("a img") as HTMLImageElement;
                     if (img) {
                         const imgId = this.createImageBlock(
@@ -849,16 +866,16 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
                             });
                         }
                     }
-                }
+                        }
 
-                // (F) Contenedor genérico
-                if (hasChildren) {
-                    const childrenIds: string[] = [];
-                    this.processChildren(element, childrenIds, currentStyles);
-                    if (childrenIds.length > 0) return this.createContainerBlock(childrenIds, currentStyles);
-                }
-                break;
-            }
+                        // (F) Contenedor genérico (último recurso)
+                        if (hasChildren) {
+                            const childrenIds: string[] = [];
+                            this.processChildren(element, childrenIds, currentStyles);
+                            if (childrenIds.length > 0) return this.createContainerBlock(childrenIds, currentStyles);
+                        }
+                        break;
+                    }
         }
 
         // 4) <a> sin imagen: solo convertir a Button si DE VERDAD luce como botón
@@ -1409,31 +1426,36 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
         const src = element.getAttribute("src") || "";
         if (!src || src.startsWith("data:")) return null;
 
-        const base = (src.split("/").pop() || src).toLowerCase();
-        if (/^blanco\.(png|gif|jpg|jpeg)$/.test(base)) return null;
+        /* const base = (src.split("/").pop() || src).toLowerCase();
+        if (/^blanco\.(png|gif|jpg|jpeg)$/.test(base)) return null; */
+
+         // Extraer nombre de archivo limpio
+        const fileName = src.split("/").pop() || src;
+        const baseName = fileName.toLowerCase().split('?')[0]; // Quitar query strings
+
+        // Buscar en imageMap de múltiples formas
+        let dataUrl: string | undefined;
 
         /* const dataUrl =
             this.imageMap.get(src.split("/").pop() || src) || this.imageMap.get(base); */
-        let dataUrl = this.imageMap.get(src.split("/").pop() || src);  
+        dataUrl = this.imageMap.get(fileName);  
         
         if (!dataUrl) {
             // Intentar con minúsculas 
-            dataUrl = this.imageMap.get(base);
-            console.log('🔍 Búsqueda 1 (minúsculas):', base, '→', dataUrl ? 'encontrado' : 'NO encontrado');
+            dataUrl = this.imageMap.get(baseName);
+            console.log('🔍 Búsqueda 1 (minúsculas):', baseName, '→', dataUrl ? 'encontrado' : 'NO encontrado');
         };
         
-        if (!dataUrl) {  
-                // Intentar búsqueda parcial (sin extensión)  
-                const nameWithoutExt = base.replace(/\.(png|gif|jpg|jpeg|svg|webp|bmp)$/i, "");  
-                for (const [key, value] of this.imageMap.entries()) {  
-                    const keyWithoutExt = key.replace(/\.(png|gif|jpg|jpeg|svg|webp|bmp)$/i, "");  
-                    if (keyWithoutExt === nameWithoutExt) {  
-                        dataUrl = value;  
-                        console.log('🔍 Búsqueda 2 (parcial):', nameWithoutExt, '→', 'encontrado');  
-                        break;  
-                    }  
-                }  
-            }  
+        // 3. Buscar coincidencia parcial (útil para nombres con versiones o hashes)
+        if (!dataUrl) {
+            const nameWithoutExt = baseName.replace(/\.[^/.]+$/, "");
+            const matchingKey = Array.from(this.imageMap.keys()).find(key => 
+                key.toLowerCase().includes(nameWithoutExt)
+            );
+            if (matchingKey) {
+                dataUrl = this.imageMap.get(matchingKey);
+            }
+        }  
             
         if (!dataUrl) {  
             console.log('❌ Imagen no encontrada en imageMap');  
@@ -1450,9 +1472,11 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
                 props: {
                     url: dataUrl,
                     alt: element.getAttribute("alt") || "",
-                    linkHref,
-                    width: element.getAttribute("width") ? parseInt(element.getAttribute("width")!) : undefined,
-                    height: element.getAttribute("height") ? parseInt(element.getAttribute("height")!) : undefined,
+                    linkHref: linkHref || undefined,
+                    width: element.getAttribute("width") ? 
+                        parseInt(element.getAttribute("width")!) : undefined,
+                    height: element.getAttribute("height") ? 
+                        parseInt(element.getAttribute("height")!) : undefined,
                     contentAlignment: "middle"
                 }
             }
