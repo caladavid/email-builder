@@ -97,7 +97,7 @@ onMounted(() => {
         editorStore.setAuthToken(data.token);  
         break; 
       default:  
-        console.log('Mensaje no reconocido:', data); 
+        /* console.log('Mensaje no reconocido:', data); */ 
      }
   });
 

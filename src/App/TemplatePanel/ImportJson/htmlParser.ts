@@ -463,7 +463,7 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
     }  
       
     return { errors, warnings };  
-``}
+}
 
     /* ---------------- HTML → Blocks ---------------- */
     private async parseHtmlToBlocks(htmlContent: string): Promise<TEditorConfiguration> {
@@ -640,7 +640,7 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
                                         !/^\s*$/.test(textContent.replace(img.alt || "", ""));
                 
                 if (!hasSignificantText) {
-                    console.log("✅ <a> con única imagen (sin texto) - BANNER/ICONO");
+                    /* console.log("✅ <a> con única imagen (sin texto) - BANNER/ICONO"); */
                     const blockId = this.createImageBlock(img, element.getAttribute("href") || "#");
                     if (blockId) return blockId;
                 }
@@ -677,7 +677,7 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
             
             // CASO 3: <a> con MÚLTIPLES imágenes y sin texto → Contenedor de imágenes
             if (imgs.length > 1 && textContent.length === 0) {
-                console.log(`🖼️ <a> con ${imgs.length} imágenes (sin texto) - ICONOS`);
+                /* console.log(`🖼️ <a> con ${imgs.length} imágenes (sin texto) - ICONOS`); */
                 const imageIds: string[] = [];
                 
                 imgs.forEach(img => {
@@ -748,7 +748,7 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
             case "div":
             case "span":
             case "td": {
-                console.log("📋 Procesando TD:", element);
+                /* console.log("📋 Procesando TD:", element); */
                 const hasChildren = element.children.length > 0;
                 const textContent = element.textContent?.trim() || "";
                 
@@ -760,11 +760,74 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
                 }
 
                 // (B) td con un único <p> inline → Text
-                if (this.hasSingleInlineP(element)) {
-                    const pEl = element.children[0] as Element;
-                    const { text, formats } = this.processInlineContent(pEl, currentStyles);
-                    if (text.length) return this.createTextBlock(text, formats, currentStyles);
+        if ((tagName === "td" || tagName === "div" || tagName === "span") && this.hasSingleInlineP(element)) {
+                
+                const pEl = element.children[0] as Element;
+                
+                // 1. Extraer estilos (Ya comprobamos que esto funciona)
+                const pStyles = this.extractStyles(pEl, currentStyles);
+
+                // Corrección de tipos para fontSize
+                if (pStyles.fontSize) {
+                    if (typeof pStyles.fontSize === 'string') {
+                        pStyles.fontSize = parseInt(pStyles.fontSize) || 16;
+                    }
+                } else if (currentStyles.fontSize) {
+                    const parentSize = String(currentStyles.fontSize);
+                    pStyles.fontSize = parseInt(parentSize) || 16;
                 }
+
+                // Heredar estilos faltantes del padre
+                if (!pStyles.fontFamily && currentStyles.fontFamily) pStyles.fontFamily = currentStyles.fontFamily;
+                if (!pStyles.fontStyle && currentStyles.fontStyle) pStyles.fontStyle = currentStyles.fontStyle;
+                if (!pStyles.fontWeight && currentStyles.fontWeight) pStyles.fontWeight = currentStyles.fontWeight;
+                if (!pStyles.color && currentStyles.color) pStyles.color = currentStyles.color;
+
+                // 2. Procesar contenido
+                const { text, formats } = this.processInlineContent(pEl, pStyles);
+                
+if (text.length) {
+                        // 👇👇👇 INICIO DEL CAMBIO 👇👇👇
+                        
+                        // 1. Definir un formato que cubra TODO el texto
+                        const globalFormat: any = { start: 0, end: text.length };
+                        let hasGlobal = false;
+
+                        // 2. Revisar si el contenedor (pStyles) tiene estilos que deben ser formatos
+                        
+                        // Detectar ITALIC (El que te faltaba)
+                        const fs = String(pStyles.fontStyle || "").toLowerCase();
+                        if (fs.includes('italic') || fs.includes('oblique')) {
+                            globalFormat.italic = true;
+                            hasGlobal = true;
+                        }
+
+                        // Detectar BOLD (El contenedor es bold, aunque haya bolds parciales adentro)
+                        const fw = String(pStyles.fontWeight || "").toLowerCase();
+                        if (fw === 'bold' || (!isNaN(parseInt(fw)) && parseInt(fw) >= 600)) {
+                            globalFormat.bold = true;
+                            hasGlobal = true;
+                        }
+
+                        // Detectar COLOR (Opcional, si tu editor soporta colores inline)
+                        if (pStyles.color && pStyles.color !== '#000000' && pStyles.color !== 'inherit') {
+                            // globalFormat.color = pStyles.color; 
+                            // hasGlobal = true; // Descomenta si usas colores inline
+                        }
+
+                        // 3. Si encontramos estilos globales, los agregamos al array existente
+                        if (hasGlobal) {
+                            // Lo agregamos al principio o al final, el editor debería fusionarlos
+                            formats.push(globalFormat);
+                            
+                            console.log('✅ [Fix] Inyectado formato global:', globalFormat);
+                        }
+
+                        // 👆👆👆 FIN DEL CAMBIO 👆👆👆
+
+                        return this.createTextBlock(text, formats, pStyles);
+                    }
+            }
 
                 // (C) td completamente inline → Text
                 if (this.isInlineOnly(element) && !this.elementContainsOtherBlockTypes(element)) {
@@ -790,11 +853,11 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
                         if (imgs.length === 1 && anchor.children.length === 1 && 
                             anchor.children[0].tagName.toLowerCase() === 'img') {
                             
-                            console.log("🎯 TD con único enlace que contiene única imagen (BANNER)");
+                            /* console.log("🎯 TD con único enlace que contiene única imagen (BANNER)"); */
                             const img = imgs[0];
                             const blockId = this.createImageBlock(img, anchor.getAttribute("href") || "#");
                             if (blockId) {
-                                console.log("✅ Banner procesado, ID:", blockId);
+                                /* console.log("✅ Banner procesado, ID:", blockId); */
                                 return blockId;
                             }
                         }
@@ -802,7 +865,7 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
                 }
                 
                 // CASO 2: <td> con múltiples <a> que contienen imágenes (ICONOS)
-                const allAnchors = Array.from(element.querySelectorAll("a"));
+                /* const allAnchors = Array.from(element.querySelectorAll("a"));
                 const allImages = Array.from(element.querySelectorAll("img"));
                 
                 if (allAnchors.length > 1 && allImages.length === allAnchors.length) {
@@ -836,46 +899,53 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
                         });
                         
                         if (iconBlocks.length > 0) {
+                            const tdStyles = this.extractStyles(element, currentStyles);
+
                             return this.createContainerBlock(iconBlocks, {
+                                ...tdStyles,
+
                                 display: "flex",
                                 flexDirection: "row",
                                 justifyContent: "center",
                                 alignItems: "center",
+                                flexWrap: "nowrap",
                                 gap: "20px",
                                 textAlign: "center",
-                                padding: { top: 0, right: 0, bottom: 0, left: 0 }
+                                width: "100%",
+                                maxWidth: "100%",
+                                padding: tdStyles.padding || { top: 0, right: 0, bottom: 0, left: 0 }
                             });
                         }
                     }
-                }
+                } */
                 
-                // TERCERO: Casos especiales que no encajan en los anteriores
-                
-                // (E) TD con "botón" (fondo + <a><img/>)
-                if (this.isButtonLikeCell(element) && element.querySelector("a img")) {
-                    const img = element.querySelector("a img") as HTMLImageElement;
-                    if (img) {
-                        const imgId = this.createImageBlock(
-                            img,
-                            (element.querySelector("a") as HTMLAnchorElement)?.href || ""
-                        );
-                        if (imgId) {
-                            return this.createContainerBlock([imgId], {
-                                textAlign: "left",
-                                padding: { top: 0, right: 0, bottom: 0, left: 0 }
-                            });
+                    // TERCERO: Casos especiales que no encajan en los anteriores
+                    
+                    // (E) TD con "botón" (fondo + <a><img/>)
+                    if (this.isButtonLikeCell(element) && element.querySelector("a img")) {
+                        const img = element.querySelector("a img") as HTMLImageElement;
+                        if (img) {
+                            const imgId = this.createImageBlock(
+                                img,
+                                (element.querySelector("a") as HTMLAnchorElement)?.href || ""
+                            );
+                            if (imgId) {
+                                return this.createContainerBlock([imgId], {
+                                    textAlign: "left",
+                                    padding: { top: 0, right: 0, bottom: 0, left: 0 }
+                                });
+                            }
                         }
                     }
-                        }
 
-                        // (F) Contenedor genérico (último recurso)
-                        if (hasChildren) {
-                            const childrenIds: string[] = [];
-                            this.processChildren(element, childrenIds, currentStyles);
-                            if (childrenIds.length > 0) return this.createContainerBlock(childrenIds, currentStyles);
-                        }
-                        break;
+                    // (F) Contenedor genérico (último recurso)
+                    if (hasChildren) {
+                        const childrenIds: string[] = [];
+                        this.processChildren(element, childrenIds, currentStyles);
+                        if (childrenIds.length > 0) return this.createContainerBlock(childrenIds, currentStyles);
                     }
+                    break;
+                }
         }
 
         // 4) <a> sin imagen: solo convertir a Button si DE VERDAD luce como botón
@@ -917,7 +987,7 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
     /* =========================================================
    Inline text processor (NEGRITAS + SALTOS DE LÍNEA)
    ========================================================= */
-    private processInlineContent(
+private processInlineContent(
         element: Element,
         inheritedStyles: Record<string, any>
     ): { text: string; formats: any[] } {
@@ -934,11 +1004,13 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
         const inlineTags = new Set(["strong", "b", "em", "i", "u", "a", "span", "small", "sup", "sub", "br"]);
 
         Array.from(element.childNodes).forEach((node) => {
+            // 1. Nodos de Texto
             if (node.nodeType === Node.TEXT_NODE) {
                 append((node.textContent || "").replace(/\s+/g, " "));
                 return;
             }
 
+            // 2. Elementos (Tags)
             if (node.nodeType === Node.ELEMENT_NODE) {
                 const el = node as HTMLElement;
                 const tag = el.tagName.toLowerCase();
@@ -950,7 +1022,7 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
                     return;
                 }
 
-                // Procesar enlaces dentro de elementos strong/b  
+                // Enlaces dentro de negritas
                 if ((tag === "strong" || tag === "b") && el.querySelector("a")) {
                     const link = el.querySelector("a");
                     if (link) {
@@ -963,7 +1035,7 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
                     }
                 }
 
-                // Procesar enlaces simples  
+                // Enlaces simples
                 if (tag === "a") {
                     const href = el.getAttribute("href") || "";
                     const linkText = el.textContent?.trim() || "";
@@ -973,6 +1045,7 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
                     }
                 }
 
+                // --- PROCESAMIENTO RECURSIVO ---
                 const childStyles = this.extractStyles(el, inheritedStyles);
                 const childRes = this.processInlineContent(el, childStyles);
 
@@ -980,36 +1053,62 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
                     const start = pos;
                     append(childRes.text);
 
+                    // Propagar formatos hijos y ajustar offset
+                    const childFormats = childRes.formats.map(fmt => ({
+                        ...fmt,
+                        start: fmt.start + start,
+                        end: fmt.end + start
+                    }));
+
+                    // --- DETECCIÓN ROBUSTA (Igual que en el Editor) ---
                     const fmt: any = { start, end: start + childRes.text.length };
+                    let hasFormat = false;
 
-                    // Bold detection  
+                    // 1. Obtener estilos crudos para Regex
+                    const styleAttr = el.getAttribute('style') || '';
                     const fw = String(childStyles.fontWeight ?? "").toLowerCase();
+                    const fs = String(childStyles.fontStyle ?? "").toLowerCase();
+                    
+                    // 2. BOLD
                     const isBoldTag = tag === "strong" || tag === "b";
+                    // Regex busca 'bold', 'bolder' o números 600-900 en el style string
+                    const isBoldRegex = /font-weight\s*:\s*(bold|bolder|[6-9]\d{2})/i.test(styleAttr);
                     const isBoldStyle = fw === "bold" || (!isNaN(parseInt(fw)) && parseInt(fw) >= 600);
-                    if (isBoldTag || isBoldStyle) fmt.bold = true;
+                    
+                    if (isBoldTag || isBoldStyle || isBoldRegex) {
+                        fmt.bold = true;
+                        hasFormat = true;
+                    }
 
-                    // ✅ AGREGAR: Italic detection  
-                    const fs = String(childStyles.fontStyle ?? "").toLowerCase();  
-                    const isItalicTag = tag === "em" || tag === "i";  
-                    const isItalicStyle = fs === "italic";  
-                    if (isItalicTag || isItalicStyle) fmt.italic = true;
+                    // 3. ITALIC
+                    const isItalicTag = tag === "em" || tag === "i";
+                    const isItalicRegex = /font-style\s*:\s*italic/i.test(styleAttr);
+                    const isItalicStyle = fs === "italic";
 
-                    formats.push(fmt);
+                    if (isItalicTag || isItalicStyle || isItalicRegex) {
+                        fmt.italic = true;
+                        hasFormat = true;
+                    }
+
+                    // Fusionar formatos
+                    formats.push(...childFormats);
+                    
+                    if (hasFormat) {
+                        formats.push(fmt);
+                    }
                 }
             }
         });
 
         text = text.replace(/[ \t]+\n/g, "\n").trimEnd();
 
-        const validFormats = formats.filter(fmt => {  
-            // Clampear rangos a los límites del texto  
-            if (fmt.start < 0) fmt.start = 0;  
-            if (fmt.end > text.length) fmt.end = text.length;  
-            
-            // Eliminar formatos inválidos donde start >= end  
-            return fmt.start < fmt.end;  
-        }); 
-        
+        // Limpieza y validación de rangos
+        const validFormats = formats.filter(fmt => {
+            if (fmt.start < 0) fmt.start = 0;
+            if (fmt.end > text.length) fmt.end = text.length;
+            return fmt.start < fmt.end;
+        });
+
         return { text: text.trim(), formats: validFormats };
     }
 
@@ -1035,9 +1134,9 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
     }
 
     private processChildren(parentElement: Element, targetArray: string[], inheritedStyles: Record<string, string>): void {
-        console.log('Procesando hijos de:', parentElement.tagName, parentElement.children.length);  
+        /* console.log('Procesando hijos de:', parentElement.tagName, parentElement.children.length);   */
         Array.from(parentElement.children).forEach((child) => {
-            console.log('  - Procesando:', child.tagName, child); 
+            /* console.log('  - Procesando:', child.tagName, child);  */
             const id = this.processElement(child as Element, inheritedStyles);
             if (id) targetArray.push(id);
         });
@@ -1050,15 +1149,35 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
 
         const hasMultiCellRow = rows.some((r) => r.querySelectorAll(":scope > td").length > 1);
 
-        const hasInlineBlockLayout = rows.some((r) => {  
+/*         const hasInlineBlockLayout = rows.some((r) => {  
             const tds = Array.from(r.querySelectorAll(":scope > td"));  
             return tds.length >= 2 && tds.some(td => {  
                 const styles = this.extractStyles(td, {});  
                 return styles.display === 'inline-block';  
             });  
-        }); 
+        });  */
 
-        const hasBarRow = rows.some((r) => {
+        const hasHybridColumns = rows.some((r) => {
+            const tds = Array.from(r.querySelectorAll(":scope > td"));
+            // A veces hay 1 sola celda wrapper, pero si tiene inline-block + width, es sospechosa de ser columna
+            if (tds.length === 0) return false; 
+            
+            
+            // Verificamos si al menos una celda tiene inline-block o float
+            return tds.some(td => {
+                const style = td.getAttribute("style") || "";
+                // Hybrid coding suele usar width + inline-block/float
+                const hasWidth = /width\s*:/i.test(style) || td.getAttribute("width");
+                const isInline = /display\s*:\s*inline-block/i.test(style);
+                const isFloat = /float\s*:\s*(left|right)/i.test(style);
+                
+                return (isInline || isFloat) && !!hasWidth;
+            });
+        });
+
+        const isWrapperTable = rows.length === 1 && rows[0].children.length >= 2;
+
+/*         const hasBarRow = rows.some((r) => {
             const tds = Array.from(r.querySelectorAll(":scope > td"));
             if (tds.length !== 1) return false;
             const td = tds[0];
@@ -1066,9 +1185,9 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
             const st = this.extractStyles(td, {});
             const bg = (st?.backgroundColor || "").toString();
             return textLen === 0 && !!bg; // barra de color
-        });
+        }); */
 
-        return hasMultiCellRow || hasBarRow || hasInlineBlockLayout || rows.length > 1;
+        return hasMultiCellRow  || hasHybridColumns || isWrapperTable || rows.length > 1;
     }
 
     /** Tabla compacta “inline” (iconos/acciones) — genérica */
@@ -1299,66 +1418,141 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
 
     /** Tablas por filas (también maneja filas 1x1 para barras de color) */
     private createColumnsContainer(tableElement: Element, styles: any): string | null {
-        const rows = Array.from(tableElement.querySelectorAll(":scope > tbody > tr, :scope > tr"));
+        // Navegación segura para obtener filas (evita problemas con tbody implícito)
+        let rows: Element[] = [];
+        const tbody = Array.from(tableElement.children).find(c => c.tagName.toLowerCase() === 'tbody');
+        const container = tbody ? tbody : tableElement;
+        rows = Array.from(container.children).filter(c => c.tagName.toLowerCase() === 'tr');
+
         const rowBlocks: string[] = [];
 
         for (const row of rows) {
-            const cells = Array.from(row.querySelectorAll(":scope > td"));
+            const cells = Array.from(row.children).filter(c => c.tagName.toLowerCase() === 'td');
             if (cells.length === 0) continue;
 
-            const produced: Array<{ id: string; cell: Element }> = [];
+            // --- Lógica de Barras de Color ---
+            // Mantiene compatibilidad con emails antiguos que usan filas vacías de color como separadores
+            const barColor = this.pickFirstBgColor(cells);
+            const rowText = cells.map(c => c.textContent || "").join("").trim();
+            const hasImages = cells.some(c => c.querySelector('img'));
+            
+            if (barColor && rowText.length === 0 && !hasImages && cells.length === 1) {
+                const height = this.pickRowHeight(cells);
+                rowBlocks.push(this.createBarBlock(barColor, height));
+                continue; 
+            }
+
+            const producedColumns: Array<{ childrenIds: string[], width?: string, style?: any }> = [];
+            
             for (const cell of cells) {
-                const id = this.processElement(cell, styles);
-                if (id) produced.push({ id, cell });
+                const cellElement = cell as HTMLElement;
+                const cellStyles = this.extractStyles(cellElement, styles);
+                const contentId = this.processElement(cellElement, styles);
+                
+                if (contentId) {
+                    // --- CÁLCULO INTELIGENTE DE ANCHO (Hybrid Coding Fix) ---
+                    let finalWidth = "auto";
+                    let flexBasis = "auto";
+                    
+                    // 1. Prioridad: max-width en estilos (común en emails responsive)
+                    const styleMaxWidth = cellStyles.maxWidth; 
+                    const attrWidth = cellElement.getAttribute("width");
+                    
+                    if (styleMaxWidth && String(styleMaxWidth).includes('px')) {
+                        finalWidth = styleMaxWidth;
+                        flexBasis = styleMaxWidth;
+                    } 
+                    // 2. Fallback: atributo width si es numérico
+                    else if (attrWidth && !isNaN(parseInt(attrWidth))) {
+                        finalWidth = `${parseInt(attrWidth)}px`;
+                        flexBasis = `${parseInt(attrWidth)}px`;
+                    }
+                    // 3. Fallback: estilo width si es pixel (ignoramos %)
+                    else if (cellStyles.width && String(cellStyles.width).includes('px')) {
+                        finalWidth = cellStyles.width;
+                        flexBasis = cellStyles.width;
+                    }
+
+                    // --- LIMPIEZA DE ESTILOS DEL HIJO ---
+                    // Eliminamos 'width: 100%' del bloque hijo para evitar que rompa la fila flex
+                    if (this.blocks[contentId]?.data?.style) {
+                        const childStyle = this.blocks[contentId].data.style;
+                        
+                        if (childStyle.width === '100%' || childStyle.width === '100.0%') {
+                            delete childStyle.width; 
+                        }
+                        
+                        // Aseguramos comportamiento fluido
+                        childStyle.maxWidth = '100%'; 
+                        
+                        if (this.blocks[contentId].type === 'Image') {
+                            childStyle.height = 'auto';
+                            childStyle.display = 'block'; 
+                        }
+                    }
+
+                    producedColumns.push({ 
+                        childrenIds: [contentId],
+                        width: finalWidth,
+                        // Estilos específicos para el wrapper de la columna en el editor
+                        style: {
+                            flexBasis: flexBasis,
+                            flexGrow: 1, 
+                            flexShrink: 1, 
+                            minWidth: '200px', // Evita colapso en móviles muy pequeños
+                            maxWidth: '100%' 
+                        }
+                    });
+                }
             }
 
-            if (!produced.length) {
-                // No se produjo nada → ¿fila de color?
-                const color = this.pickFirstBgColor(cells);
-                if (color) {
-                    const height = this.pickRowHeight(cells) || this.pickRowHeight([row as any]);
-                    rowBlocks.push(this.createBarBlock(color, height));
-                }
+            if (producedColumns.length === 0) continue;
+
+            // Si es una sola columna real, devolvemos el bloque directo sin contenedor extra
+            if (producedColumns.length === 1) {
+                rowBlocks.push(producedColumns[0].childrenIds[0]);
                 continue;
             }
 
-            if (produced.length === 1) {
-                const only = produced[0];
-                // Caso “botón en TD con fondo” → envolver para alinear a la izquierda SIN fondo ancho
-                if (this.isButtonLikeCell(only.cell)) {
-                    rowBlocks.push(
-                        this.createContainerBlock([only.id], {
-                            textAlign: "left",
-                            padding: { top: 0, right: 0, bottom: 0, left: 0 }
-                        })!
-                    );
-                } else {
-                    rowBlocks.push(only.id);
-                }
-                continue;
-            }
-
-            // Varias celdas con contenido → ColumnsContainer
-            const cols = produced.map(({ id }) => ({ childrenIds: [id] }));
-            const rowStyle = this.extractStyles(row, styles);
+            // --- CREAR CONTENEDOR DE COLUMNAS ---
             const ccId = uuidv4();
+            const rowNativeStyle = this.extractStyles(row as Element, {});
+            
+            // Usar color de fondo de la fila, o heredar de la tabla si es transparente
+            const bg = rowNativeStyle.backgroundColor || styles.backgroundColor;
+
             this.blocks[ccId] = {
                 type: "ColumnsContainer",
                 data: {
                     style: {
-                        ...styles,
                         padding: { top: 0, bottom: 0, left: 0, right: 0 },
-                        ...(rowStyle.backgroundColor ? { backgroundColor: rowStyle.backgroundColor } : {})
+                        backgroundColor: bg !== "#FFFFFF" ? bg : undefined, // Sin color de debug
+                        
+                        // Configuración Flexbox para alinear columnas
+                        display: 'flex',
+                        flexWrap: 'wrap', 
+                        justifyContent: 'center',
+                        gap: '0px'
                     },
-                    props: { columnsCount: cols.length, columns: cols }
+                    props: {
+                        columnsCount: producedColumns.length,
+                        columns: producedColumns
+                    }
                 }
             };
             rowBlocks.push(ccId);
         }
 
         if (rowBlocks.length === 0) return null;
+        
+        // Si la tabla generó un solo bloque (ej: una sola fila de columnas), lo retornamos directo
         if (rowBlocks.length === 1) return rowBlocks[0];
-        return this.createContainerBlock(rowBlocks, styles);
+        
+        // Si generó múltiples filas, las envolvemos en un contenedor padre
+        return this.createContainerBlock(rowBlocks, {
+            ...styles,
+            padding: { top: 0, bottom: 0, left: 0, right: 0 }
+        });
     }
 
     private pickFirstBgColor(cells: Element[]): string | null {
@@ -1397,25 +1591,53 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
         return id;
     }
 
-    private createTextBlock(text: string, formats: any[], styles: any): string | null {
+    private createTextBlock(text: string, formats: any[], styles: any): string | null {        
         if (!text) return null;
-        const id = uuidv4();
+        const id = uuidv4(); 
+
+        let finalStyles = { ...styles };  
+        let finalFormats = [...formats];  
+        let finalText = text;  
+        
+        const fullLength = finalText.length;  
+        const globalFormats = finalFormats.filter(f => f.start === 0 && f.end === fullLength); 
+      
+    
+        // Opción 1: Mover ambos al estilo del bloque  
+        globalFormats.forEach(fmt => {  
+            if (fmt.bold) finalStyles.fontWeight = "bold";  
+            if (fmt.italic) finalStyles.fontStyle = "italic";  
+            if (fmt.color) finalStyles.color = fmt.color;  
+            if (fmt.fontFamily && fmt.fontFamily !== "MODERN_SANS") finalStyles.fontFamily = fmt.fontFamily;  
+            if (fmt.fontSize) finalStyles.fontSize = fmt.fontSize;  
+        });  
+    
+        // Mantener solo formatos parciales (no globales)  
+        finalFormats = finalFormats.filter(f => {  
+            if (f.start !== 0 || f.end !== fullLength) return true;  
+            // No mantener formatos globales que ya se movieron al estilo  
+            return false;  
+        });  
+    
+        finalStyles.textAlign = this.normalizeTextAlign(finalStyles?.textAlign);   
 
         // Detectar si el texto contiene enlaces markdown  
-        const hasMarkdownLinks = /\[([^\]]+)\]\(([^)]+)\)/.test(text);
+        /* const hasMarkdownLinks = /\[([^\]]+)\]\(([^)]+)\)/.test(text); */
+        const hasMarkdownLinks = /\[([^\]]+)\]\(([^)]+)\)/.test(finalText);  
+        const hasRemainingFormats = finalFormats.length > 0;  
+    
 
         this.blocks[id] = {
             type: "Text",
             data: {
                 style: {
-                    ...styles,
-                    textAlign: this.normalizeTextAlign(styles?.textAlign),
+                    ...finalStyles,
                     padding: { top: 16, bottom: 16, left: 24, right: 24 }
                 },
                 props: {
-                    text,
-                    formats,
-                    markdown: hasMarkdownLinks // Activar markdown si hay enlaces  
+                    text: finalText,  
+                    formats: finalFormats,  
+                    markdown: hasMarkdownLinks || hasRemainingFormats  
                 }
             }
         };
@@ -1426,8 +1648,8 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
         const src = element.getAttribute("src") || "";
         if (!src || src.startsWith("data:")) return null;
 
-        /* const base = (src.split("/").pop() || src).toLowerCase();
-        if (/^blanco\.(png|gif|jpg|jpeg)$/.test(base)) return null; */
+        const base = (src.split("/").pop() || src).toLowerCase();
+        if (/^blanco\.(png|gif|jpg|jpeg)$/.test(base)) return null;
 
 
         let dataUrl: string | undefined;
@@ -1474,28 +1696,43 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
         }
 
         if (!dataUrl) {  
-            console.log("❌ No se pudo obtener dataUrl para:", src); 
-            console.log("📊 imageMap keys:", Array.from(this.imageMap.keys()));  
+            /* console.log("❌ No se pudo obtener dataUrl para:", src);  */
+            /* console.log("📊 imageMap keys:", Array.from(this.imageMap.keys())); */  
             return null;  
         }  
 
         const id = uuidv4();
         const styles = this.extractStyles(element, {});
+
+        const width = element.getAttribute("width");
+        const isSmallIcon = width && parseInt(width) <= 50;
+
+        let blockStyle: any = {
+            ...styles, 
+            padding: { top: 0, bottom: 0, left: 0, right: 0 },
+            textAlign: "center",
+        }
+
+        if (isSmallIcon){
+            blockStyle.display = "inline-block"; 
+            if (!blockStyle.margin) {
+                blockStyle.margin = { top: 0, right: 0, bottom: 0, left: 0 };
+            }
+        }
+
         this.blocks[id] = {
             type: "Image",
             data: {
-                style: { 
-                    ...styles, 
-                    padding: { top: 16, bottom: 16, left: 24, right: 24 } },
+                style: blockStyle,
                 props: {
                     url: dataUrl,
                     alt: element.getAttribute("alt") || "",
                     linkHref: linkHref || undefined,
-                    width: element.getAttribute("width") ? 
-                        parseInt(element.getAttribute("width")!) : undefined,
+                    width: width ? parseInt(width) : undefined,
                     height: element.getAttribute("height") ? 
                         parseInt(element.getAttribute("height")!) : undefined,
-                    contentAlignment: "middle"
+                    contentAlignment: "middle",
+                    
                 }
             }
         };
@@ -1536,12 +1773,49 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
     private createContainerBlock(childrenIds: string[], styles?: any): string | null {
         if (!childrenIds.length) return null;
         const id = uuidv4();
-        const safePadding = styles?.padding ?? { top: 0, right: 0, bottom: 0, left: 0 };
-        const styleToApply: any = { padding: safePadding };
+/*         const defaultStyles = {
+            display: "block",
+            padding: { top: 0, right: 0, bottom: 0, left: 0 },
+            textAlign: "left"
+        } */
 
+        const safePadding = styles?.padding ?? { top: 0, right: 0, bottom: 0, left: 0 };
+        const styleToApply: any = { 
+            padding: safePadding,
+            textAlign: styles?.textAlign || "left"
+         };
+        
+        
+        
         if (styles?.backgroundColor) styleToApply.backgroundColor = styles.backgroundColor;
         if (styles?.margin) styleToApply.margin = styles.margin;
         if (styles?.textAlign) styleToApply.textAlign = styles.textAlign;
+        
+        /* const styleToApply = { ...defaultStyles, ...styles }; */
+
+        if (styleToApply.padding && typeof styleToApply.padding === 'object') {
+            styleToApply.padding = {
+                top: styleToApply.padding.top || 0,
+                right: styleToApply.padding.right || 0,
+                bottom: styleToApply.padding.bottom || 0,
+                left: styleToApply.padding.left || 0
+            };
+        } else {
+            styleToApply.padding = { top: 0, right: 0, bottom: 0, left: 0 };
+        }
+        
+        // Si se especifica display flex, asegurar propiedades flex básicas
+        if (styleToApply.display === "flex") {
+            styleToApply.flexDirection = styleToApply.flexDirection || "row";
+            styleToApply.justifyContent = styleToApply.justifyContent || "flex-start";
+            styleToApply.alignItems = styleToApply.alignItems || "stretch";
+            styleToApply.flexWrap = styleToApply.flexWrap || "nowrap";
+            
+            // Para contenedores de iconos, asegurar centrado
+            if (childrenIds.length > 1 && styleToApply.justifyContent === "center") {
+                styleToApply.alignItems = "center";
+            }
+        }
 
         this.blocks[id] = {
             type: "Container",
@@ -1577,7 +1851,7 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
                     flexDirection: styles.flexDirection || 'row',  
                     justifyContent: styles.justifyContent || 'flex-start',  
                     alignItems: styles.alignItems || 'stretch',  
-                    padding: { top: 16, bottom: 16, left: 24, right: 24 }  
+                    padding: { top: 0, bottom: 0, left: 0, right: 0 }  
                 },  
                 childrenIds  
             }  
@@ -1682,7 +1956,7 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
                     display: 'grid',  
                     gridTemplateColumns: styles.gridTemplateColumns || 'repeat(auto-fit, minmax(200px, 1fr))',  
                     gap: styles.gap || '16px',  
-                    padding: { top: 16, bottom: 16, left: 24, right: 24 }  
+                    padding: { top: 0, bottom: 0, left: 0, right: 0 }  
                 },  
                 childrenIds  
             }  
@@ -1744,7 +2018,7 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
             .replace(/\s+/g, " ");
     }
 
-    private extractStyles(element: Element, inheritedStyles: Record<string, any> = {}): any {  
+     private extractStyles(element: Element, inheritedStyles: Record<string, any> = {}): any {  
         const styles: any = { ...inheritedStyles };  
         const htmlElement = element as HTMLElement;  
     
@@ -1756,7 +2030,12 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
     
         // 2. Obtener estilos inline  
         const inline = htmlElement.getAttribute("style");  
-        if (inline) Object.assign(styles, this.parseInlineStyles(inline));  
+        if (inline) {
+            const parsedInline = this.parseInlineStyles(inline);
+            // [DEBUG] Ver qué hay inline
+            // console.log(`[DEBUG extractStyles] <${tagName}> Inline raw: "${inline}" -> Parsed:`, parsedInline);
+            Object.assign(styles, parsedInline);
+        } 
     
         // 3. Obtener atributos HTML legacy  
         const bgAttr = htmlElement.getAttribute("bgcolor");  
@@ -1791,9 +2070,6 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
             case "background":  
                 final.backgroundColor = this.normalizeColor(value);  
                 break;  
-            case "border-color":  
-                final.borderColor = this.normalizeColor(value);  
-                break;  
   
             // Tipografía  
             case "font-size":  
@@ -1803,10 +2079,17 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
                 final.fontWeight = this.normalizeFontWeight(value);  
                 break;  
             case "font-family":  
-                final.fontFamily = this.normalizeFontFamily(value);  
+                if (inheritedStyles.fontFamily && !value) {  
+                    final.fontFamily = inheritedStyles.fontFamily;  
+                } else if (value) {  
+                    final.fontFamily = this.normalizeFontFamily(value);  
+                } else {  
+                    final.fontFamily = inheritedStyles.fontFamily || "MODERN_SANS";  
+                } 
                 break;  
             case "font-style":  
-                final.fontStyle = this.normalizeFontStyle(value);  
+                final.fontStyle = value; 
+                console.log(final);
                 break;  
             case "line-height":  
                 final.lineHeight = this.parseLineHeight(value);  
@@ -1846,10 +2129,14 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
             case "height":  
             case "min-width":  
             case "min-height":  
-            case "max-width":  
             case "max-height":  
                 final[prop] = this.parseDimension(value);  
                 break;  
+
+            case "max-width": // 👈 ESTE ES EL NUEVO CRÍTICO
+                final.maxWidth = this.parseDimension(value);
+                break; 
+            
   
             // Espaciado  
             case "padding":  
@@ -1943,10 +2230,25 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
         if (tag === "a") final.textDecoration = "underline";  
         if (tag === "strike" || tag === "s" || tag === "del") final.textDecoration = "line-through";  
     
-        const supportedProperties = [  
-            'color', 'backgroundColor', 'fontFamily', 'fontSize',   
-            'fontWeight', 'textAlign', 'padding'  
-        ];  
+        if (!final.fontFamily && inheritedStyles.fontFamily) {  
+            final.fontFamily = inheritedStyles.fontFamily;  
+        } 
+
+        const supportedProperties = [
+            'color', 
+            'backgroundColor', 
+            'fontFamily', 
+            'fontSize', 
+            'fontWeight', 
+            'textAlign', 
+            'padding',
+            'lineHeight',     
+            'fontStyle',        
+            'textDecoration',  
+            'textTransform',   
+        ]; 
+
+
         
         const filteredFinal: any = {};  
         supportedProperties.forEach(prop => {  
@@ -1955,9 +2257,15 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
             }  
         }); 
 
+        if (tag === "strong" || tag === "b") filteredFinal.fontWeight = "bold";
+        // Asegurar italic si viene de <i> o <em>
+        if (tag === "i" || tag === "em") filteredFinal.fontStyle = "italic";
+
         return filteredFinal;  
-    }
-/*     private extractStyles(element: Element, inheritedStyles: Record<string, any> = {}): any {
+    } 
+
+
+        /*     private extractStyles(element: Element, inheritedStyles: Record<string, any> = {}): any {
         const styles: any = { ...inheritedStyles };
         const htmlElement = element as HTMLElement;
 

@@ -172,12 +172,51 @@ async function handleZipUpload(event: Event) {
   zipSuccess.value = null;    
     
   try {    
-    await inspectorDrawer.sendZip(file);        
-    zipSuccess.value = 'Plantilla importada exitosamente';     
-      
-    setTimeout(() => {      
-      handleCancel();      
-    }, 1500);
+    const currentOrigin = window.location.origin;
+
+    if (currentOrigin.includes('localhost:3000') || currentOrigin.includes('localhost:5173')) {
+
+      const parser = new HTMLToBlockParser();    
+      const result = await parser.parseZipToBlocks(file);  
+        
+      // Separar errores críticos de advertencias  
+      const criticalErrors = result.errors.filter(e => !e.recoverable);  
+      const warnings = result.errors.filter(e => e.recoverable);  
+        
+      if (criticalErrors.length > 0) {  
+        // Mostrar solo errores críticos  
+        const errorMessage = criticalErrors  
+          .map(e => `${e.type}: ${e.message}`)  
+          .join('\n');  
+        zipError.value = errorMessage;  
+        return;  
+      }  
+        
+      // Mostrar advertencias informativas si existen  
+      if (warnings.length > 0) {  
+        console.warn('Advertencias durante la importación:', warnings);  
+        // Opcional: mostrar advertencias al usuario  
+        // zipWarning.value = warnings.map(w => w.message).join('\n');  
+      }  
+        
+      // Continuar con la importación si no hay errores críticos  
+      if (result.configuration) {  
+        inspectorDrawer.resetDocument(result.configuration);  
+        zipSuccess.value = 'ZIP importado exitosamente';  
+          
+        setTimeout(() => {    
+          handleCancel();    
+        }, 1500);  
+      }  
+
+    } else {
+      await inspectorDrawer.sendZip(file);        
+      zipSuccess.value = 'Plantilla importada exitosamente';     
+        
+      setTimeout(() => {      
+        handleCancel();      
+      }, 1500);
+    }
       
   } catch (error) {    
     console.error('❌ Error processing ZIP:', error);    

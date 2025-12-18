@@ -96,25 +96,8 @@ const showToolBar = computed(() => {
 });  
   
 const computedStyles = computed(() => {  
-/*   const fontFamilyMap: Record<string, string> = {  
-    'MODERN_SANS': 'Helvetica, Arial, sans-serif',  
-    'BOOK_SANS': 'Arial, Helvetica, sans-serifserif',  
-    'ORGANIC_SANS': 'Optima, Segoe UI, sans-serif',  
-    'GEOMETRIC_SANS': 'Futura, sans-serif',  
-    'HEAVY_SANS': 'Impact, Arial Black, Gadget, sans-serifserif',  
-    'ROUNDED_SANS': '"Arial Rounded MT Bold",, Helvetica, sans-serif',  
-    'MODERN_SERIF': 'Times New Roman, serif',  
-    'BOOK_SERIF': 'Georgia, serif',  
-    'MONOSPACE': '"Courier New", Courier, monospace',  
-    'BOOK_ANTIQUA': 'Georgia, "Times New Roman", serif',  
-    'inherit': 'inherit'  
-  };   */
-  
   const rawFontFamily = props.style?.fontFamily;  
-/*   const mappedFontFamily = rawFontFamily && fontFamilyMap[rawFontFamily]  
-    ? fontFamilyMap[rawFontFamily]  
-    : rawFontFamily || 'inherit';   */
-    const mappedFontFamily = getFontFamily(rawFontFamily) || 'inherit';  
+  const mappedFontFamily = getFontFamily(rawFontFamily) || 'inherit';  
   
   return {  
     padding: props.style?.padding  
@@ -125,7 +108,7 @@ const computedStyles = computed(() => {
     fontWeight: props.style?.fontWeight || 'normal',  
     textAlign: props.style?.textAlign || 'left',  
     color: props.style?.color || 'inherit',  
-    backgroundColor: props.style?.backgroundColor || 'transparent'  
+    backgroundColor: props.style?.backgroundColor || 'transparent'  ,
   };  
 });  
 
@@ -220,68 +203,100 @@ function restoreCursorPosition() {
 // FORMAT PROCESSING  
 // ============================================  
   
-function processInlineContent(element: HTMLElement): { text: string; formats: TextFormat[] } {  
-  let text = "";  
-  const formats: TextFormat[] = [];  
-  let pos = 0;  
+function processInlineContent(
+  element: HTMLElement, 
+  initialInherited: { bold?: boolean; italic?: boolean } = {} 
+): { text: string; formats: TextFormat[] } {
   
-  const append = (t: string) => {  
-    if (!t) return;  
-    text += t;  
-    pos += t.length;  
-  };  
-  
-  const processNode = (node: Node, inheritedFormats: { bold?: boolean; italic?: boolean } = {}) => {  
-    if (node.nodeType === Node.TEXT_NODE) {  
-      const content = (node.textContent || "").replace(/\s+/g, " ");  
-      if (content) {  
-        const start = pos;  
-        append(content);  
-        const end = pos;  
-  
-        // Si hay formatos heredados, crear un formato para este texto  
-        if (inheritedFormats.bold || inheritedFormats.italic) {  
-          formats.push({  
-            start,  
-            end,  
-            ...inheritedFormats  
-          });  
-        }  
-      }  
-      return;  
-    }  
-  
-    if (node.nodeType === Node.ELEMENT_NODE) {  
-      const el = node as HTMLElement;  
-      const tag = el.tagName.toLowerCase();  
-  
-      // Detectar formatos del elemento actual  
-      const computedStyle = window.getComputedStyle(el);  
-      const fw = computedStyle.fontWeight;  
-      const isBoldTag = tag === "strong" || tag === "b";  
-      const isBoldStyle = fw === "bold" || (!isNaN(parseInt(fw)) && parseInt(fw) >= 600);  
-      const isItalicTag = tag === "em" || tag === "i";  
-      const isItalicStyle = computedStyle.fontStyle === "italic";  
-  
-      // Combinar formatos heredados con los del elemento actual  
-      const currentFormats = { ...inheritedFormats };  
-      if (isBoldTag || isBoldStyle) currentFormats.bold = true;  
-      if (isItalicTag || isItalicStyle) currentFormats.italic = true;  
-  
-      // Procesar hijos con los formatos actuales  
-      Array.from(el.childNodes).forEach(child => {  
-        processNode(child, currentFormats);  
-      });  
-    }  
-  };  
-  
-  Array.from(element.childNodes).forEach(node => {  
-    processNode(node);  
-  });  
-  
-  text = text.replace(/[ \t]+\n/g, "\n").trimEnd();  
-  return { text: text.trim(), formats };  
-}  
+  let text = "";
+  const formats: TextFormat[] = [];
+  let pos = 0;
+
+  const append = (t: string) => {
+    if (!t) return;
+    text += t;
+    pos += t.length;
+  };
+
+  const processNode = (node: Node, inheritedFormats: { bold?: boolean; italic?: boolean } = {}) => {
+    // --- 1. PROCESAR TEXTO ---
+    if (node.nodeType === Node.TEXT_NODE) {
+      const content = (node.textContent || "").replace(/\s+/g, " ");
+      if (content) {
+        const start = pos;
+        append(content);
+        const end = pos;
+
+        // Guardamos formato si viene heredado o del nodo actual
+        if (inheritedFormats.bold || inheritedFormats.italic) {
+          formats.push({
+            start,
+            end,
+            ...inheritedFormats
+          });
+        }
+      }
+      return;
+    }
+
+    // --- 2. PROCESAR ELEMENTOS ---
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const el = node as HTMLElement;
+      const tag = el.tagName.toLowerCase();
+
+      // Enlaces Markdown
+      if (tag === "a") {
+        const href = el.getAttribute("href") || "";
+        const linkText = el.textContent?.trim() || "";
+        if (href && linkText) {
+          append(`[${linkText}](${href})`);
+          return;
+        }
+      }
+
+      // --- DETECCIÓN DE FORMATOS ROBUSTA ---
+      const currentFormats = { ...inheritedFormats };
+      
+      const computedStyle = window.getComputedStyle(el);
+      const styleAttr = el.getAttribute('style') || '';
+      
+      // BOLD (Tags + Computed + Regex + Clases)
+      const fw = computedStyle.fontWeight;
+      const isBoldTag = tag === "strong" || tag === "b";
+      const isBoldComputed = fw === "bold" || fw === "bolder" || (!isNaN(parseInt(fw)) && parseInt(fw) >= 600);
+      const isBoldRegex = /font-weight\s*:\s*(bold|bolder|[6-9]\d{2})/i.test(styleAttr);
+      const hasBoldClass = el.classList.contains("bold") || el.classList.contains("font-bold") || el.classList.contains("fw-bold");
+
+      if (isBoldTag || isBoldComputed || isBoldRegex || hasBoldClass) {
+        currentFormats.bold = true;
+      }
+
+      // ITALIC
+      const fs = computedStyle.fontStyle;
+      const isItalicTag = tag === "em" || tag === "i";
+      const isItalicComputed = fs === "italic";
+      const isItalicRegex = /font-style\s*:\s*italic/i.test(styleAttr);
+      const hasItalicClass = el.classList.contains("italic") || el.classList.contains("font-italic");
+
+      if (isItalicTag || isItalicComputed || isItalicRegex || hasItalicClass) {
+        currentFormats.italic = true;
+      }
+
+      // Recursión
+      Array.from(el.childNodes).forEach(child => {
+        processNode(child, currentFormats);
+      });
+    }
+  };
+
+  // --- INICIO: Pasamos los estilos iniciales a los hijos ---
+  Array.from(element.childNodes).forEach(node => {
+    processNode(node, initialInherited); 
+  });
+
+  text = text.replace(/[ \t]+\n/g, "\n").trimEnd();
+  return { text: text.trim(), formats };
+}
   
 function htmlToTextAndFormats(htmlContent: string): { text: string; formats: TextFormat[] } {  
   const tempDiv = document.createElement('div');  
@@ -470,39 +485,35 @@ function toggleItalic() {
 function handleInput() {
   if (!editableDiv.value || isInternalUpdate.value || !blockId) return;
 
-  /* console.log('🟢 InlineTextEditor - handleInput disparado'); */
-
   isInternalUpdate.value = true;
   saveCursorPosition();
 
+  // --- 1. DETECCIÓN DEL ESTILO RAÍZ (Corrección Full Bold) ---
+  const rootEl = editableDiv.value;
+  const rootStyle = window.getComputedStyle(rootEl);
+  const rootStyleAttr = rootEl.getAttribute('style') || '';
+
+  // Verificar Bold en el contenedor padre
+  const rootFw = rootStyle.fontWeight;
+  const isRootBold = 
+    rootFw === "bold" || 
+    rootFw === "bolder" || 
+    (!isNaN(parseInt(rootFw)) && parseInt(rootFw) >= 600) ||
+    /font-weight\s*:\s*(bold|bolder|[6-9]\d{2})/i.test(rootStyleAttr);
+
+  // Verificar Italic en el contenedor padre
+  const isRootItalic = 
+    rootStyle.fontStyle === "italic" || 
+    /font-style\s*:\s*italic/i.test(rootStyleAttr);
+
+  // --- 2. PROCESAMIENTO CON HERENCIA ---
+  // Pasamos { bold: true/false } como estado inicial
+  const { text, formats } = processInlineContent(rootEl, { 
+    bold: isRootBold, 
+    italic: isRootItalic 
+  });
   
-  /* const htmlContent = editableDiv.value.innerHTML;
-  console.log('📄 HTML Content:', htmlContent);
-  const { text, formats } = htmlToTextAndFormats(htmlContent); */
-  const { text, formats } = processInlineContent(editableDiv.value);
   const hasMarkdownLinks = /\[([^\]]+)\]\(([^)]+)\)/.test(text); 
-
-/*   console.log('📝 Texto extraído:', text);
-  console.log('🎨 Formatos detectados:', formats);
-  console.log('🔍 Número de formatos:', formats.length); */
-
-  // Actualizar store
-  /* const currentBlock = editorStore.document[blockId];
-  if (currentBlock?.type === 'Text') {
-    editorStore.setDocument({
-      [blockId]: {
-        ...currentBlock,
-        data: {
-          ...currentBlock.data,
-          props: {
-            ...currentBlock.data.props,
-            text: text,
-            formats: formats
-          }
-        }
-      }
-    });
-  } */
 
   updateBlockInStore(text, formats, hasMarkdownLinks);
 

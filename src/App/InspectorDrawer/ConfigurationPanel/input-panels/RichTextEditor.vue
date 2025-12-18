@@ -243,79 +243,107 @@ function getCurrentSelection(): string {
   return selection ? selection.toString() : '';  
 }  
 
-function htmlToTextAndFormats(htmlContent: string): { text: string; formats: TextFormat[] } {  
-  const tempDiv = document.createElement('div');  
-  tempDiv.innerHTML = htmlContent;  
-    
-  let text = "";  
-  const formats: TextFormat[] = [];  
-  let post = 0;
-  
-  function processNode(
-    node: Node, 
-    currentFormats: { bold?: boolean; italic?: boolean } = {}, 
-    depth: number = 0
-  ) {  
-    if (node.nodeType === Node.TEXT_NODE) {  
-      const content = node.textContent || "";  
-      if (content) {  
-        const start = text.length;  
-        post = start;  
-        text += content;  
-        const end = text.length;  
-        
-        // Solo crear formato si hay algún estilo activo
-        if (currentFormats.bold || currentFormats.italic) {  
-          formats.push({  
-            start,  
-            end,  
-            ...(currentFormats.bold && { bold: true }),  
-            ...(currentFormats.italic && { italic: true })  
-          });  
-        }  
-      }  
-      return;  
-    }  
-      
-    if (node.nodeType === Node.ELEMENT_NODE) {  
-      const el = node as HTMLElement;  
-      const tag = el.tagName.toLowerCase();  
+function htmlToTextAndFormats(htmlContent: string): { text: string; formats: TextFormat[] } {
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = htmlContent;
 
-      if (tag === "a") {  
-        const href = el.getAttribute("href") || "";  
-        const linkText = el.textContent?.trim() || "";  
-        if (href && linkText) {  
-          const markdownLink = `[${linkText}](${href})`;  
-          text += markdownLink;  
-          post += markdownLink.length;  
-          return; // No procesar hijos  
-        }  
-      } 
-        
-      // Crear una copia de los formatos actuales para no mutar el objeto padre
-      const newFormats = { ...currentFormats };  
-      
-      // Manejar etiquetas de formato
-      if (tag === "b" || tag === "strong") {
+  let text = "";
+  const formats: TextFormat[] = [];
+  // Variable para rastrear la posición actual en el texto plano
+  let post = 0; 
+
+  function processNode(
+    node: Node,
+    currentFormats: { bold?: boolean; italic?: boolean } = {},
+    depth: number = 0
+  ) {
+    // --- 1. PROCESAR TEXTO ---
+    if (node.nodeType === Node.TEXT_NODE) {
+      const content = node.textContent || "";
+      if (content) {
+        const start = text.length;
+        text += content;
+        const end = text.length;
+        post = end; // Actualizar cursor global
+
+        // Solo guardar formato si hay alguno activo
+        if (currentFormats.bold || currentFormats.italic) {
+          formats.push({
+            start,
+            end,
+            ...(currentFormats.bold && { bold: true }),
+            ...(currentFormats.italic && { italic: true })
+          });
+        }
+      }
+      return;
+    }
+
+    // --- 2. PROCESAR ELEMENTOS ---
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const el = node as HTMLElement;
+      const tag = el.tagName.toLowerCase();
+
+      // Caso especial: Enlaces Markdown
+      if (tag === "a") {
+        const href = el.getAttribute("href") || "";
+        const linkText = el.textContent?.trim() || "";
+        if (href && linkText) {
+          const markdownLink = `[${linkText}](${href})`;
+          text += markdownLink;
+          post += markdownLink.length;
+          return; // No procesar hijos del link
+        }
+      }
+
+      // --- DETECCIÓN DE FORMATOS (MEJORADA) ---
+      const newFormats = { ...currentFormats };
+
+      // A. Leer estilos en línea manualmente (porque computedStyle falla en elementos no adjuntos)
+      const inlineStyle = el.getAttribute('style')?.toLowerCase() || '';
+      const inlineWeight = el.style.fontWeight || '';
+      const inlineStyleProp = el.style.fontStyle || '';
+
+      // B. Detectar Negrita (Bold)
+      const isBoldTag = tag === "b" || tag === "strong";
+      // Detectar "font-weight: bold" o "700" en el atributo style
+      const isBoldStyle = inlineStyle.includes('font-weight: bold') || 
+                          inlineWeight === 'bold' || 
+                          (!isNaN(parseInt(inlineWeight)) && parseInt(inlineWeight) >= 600);
+      // Detectar clases comunes (Tailwind, Bootstrap, utilitarios)
+      const hasBoldClass = el.classList.contains("bold") || 
+                           el.classList.contains("font-bold") || 
+                           el.classList.contains("fw-bold");
+
+      if (isBoldTag || isBoldStyle || hasBoldClass) {
         newFormats.bold = true;
-      } else if (tag === "i" || tag === "em") {
+      }
+
+      // C. Detectar Cursiva (Italic)
+      const isItalicTag = tag === "i" || tag === "em";
+      const isItalicStyle = inlineStyle.includes('font-style: italic') || 
+                            inlineStyleProp === 'italic';
+      const hasItalicClass = el.classList.contains("italic") || 
+                             el.classList.contains("font-italic") || 
+                             el.classList.contains("fst-italic");
+
+      if (isItalicTag || isItalicStyle || hasItalicClass) {
         newFormats.italic = true;
       }
-      // Ignorar otras etiquetas como div, span, etc. a menos que tengan estilos específicos
-        
-      // Procesar hijos recursivamente
-      Array.from(el.childNodes).forEach(child => {  
-        processNode(child, newFormats, depth + 1);  
-      });  
-    }  
-  }  
-    
-  // Procesar todos los nodos hijos del div temporal
-  Array.from(tempDiv.childNodes).forEach(node => {  
-    processNode(node);  
-  });  
-    
-  return { text, formats };  
+
+      // --- RECURSIVIDAD ---
+      Array.from(el.childNodes).forEach(child => {
+        processNode(child, newFormats, depth + 1);
+      });
+    }
+  }
+
+  // Iniciar proceso
+  Array.from(tempDiv.childNodes).forEach(node => {
+    processNode(node);
+  });
+
+  return { text, formats };
 }
 
 
@@ -777,6 +805,29 @@ watch(blockProps, (newProps) => {
   })
 }, { deep: true, immediate: true });
 
+watch(() => inspectorDrawer.document, (newDocument) => {  
+  const blockId = inspectorDrawer.selectedBlockId;  
+  if (!blockId || !newDocument[blockId] || isInternalUpdate.value || isActivelyEditing.value) return;  
+    
+  console.log('🔵 RichTextEditor - Cambio detectado en store');  
+    
+  const block = newDocument[blockId];  
+  if (block?.type === 'Text') {  
+    const { text, formats } = block.data.props;  
+      
+    console.log('📥 Texto recibido:', text);  
+    console.log('🎨 Formatos recibidos:', formats);  
+    console.log('🔍 Formatos BOLD en store:', formats.filter(f => f.bold));  
+    console.log('🔍 Formatos ITALIC en store:', formats.filter(f => f.italic));  
+      
+    const htmlContent = textWithFormatsToHtml(text, formats);  
+      
+    if (editableDiv.value.innerHTML !== htmlContent) {  
+      console.log('✅ Actualizando DOM con nuevos formatos');  
+      editableDiv.value.innerHTML = htmlContent;  
+    }  
+  }  
+}, { deep: true });
 
 defineExpose({    
   getCurrentSelection,    
