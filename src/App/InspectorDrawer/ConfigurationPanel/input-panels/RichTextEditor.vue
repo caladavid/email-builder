@@ -805,29 +805,6 @@ watch(blockProps, (newProps) => {
   })
 }, { deep: true, immediate: true });
 
-watch(() => inspectorDrawer.document, (newDocument) => {  
-  const blockId = inspectorDrawer.selectedBlockId;  
-  if (!blockId || !newDocument[blockId] || isInternalUpdate.value || isActivelyEditing.value) return;  
-    
-  console.log('🔵 RichTextEditor - Cambio detectado en store');  
-    
-  const block = newDocument[blockId];  
-  if (block?.type === 'Text') {  
-    const { text, formats } = block.data.props;  
-      
-    console.log('📥 Texto recibido:', text);  
-    console.log('🎨 Formatos recibidos:', formats);  
-    console.log('🔍 Formatos BOLD en store:', formats.filter(f => f.bold));  
-    console.log('🔍 Formatos ITALIC en store:', formats.filter(f => f.italic));  
-      
-    const htmlContent = textWithFormatsToHtml(text, formats);  
-      
-    if (editableDiv.value.innerHTML !== htmlContent) {  
-      console.log('✅ Actualizando DOM con nuevos formatos');  
-      editableDiv.value.innerHTML = htmlContent;  
-    }  
-  }  
-}, { deep: true });
 
 defineExpose({    
   getCurrentSelection,    

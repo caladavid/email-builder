@@ -200,7 +200,7 @@ async function handleZipUpload(event: Event) {
       }  
         
       // Continuar con la importación si no hay errores críticos  
-      if (result.configuration) {  
+      if (result.configuration) { 
         inspectorDrawer.resetDocument(result.configuration);  
         zipSuccess.value = 'ZIP importado exitosamente';  
           

@@ -738,6 +738,30 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
             case "hr":
                 return this.createDividerBlock();
 
+            case "table": {
+                // Opción A: Intentar procesar como columnas aunque no cumpla todos los requisitos estrictos
+                // Esto suele funcionar bien para tablas de layout
+                const colContainerId = this.createColumnsContainer(element, currentStyles);
+                if (colContainerId) return colContainerId;
+
+                // Opción B: Si falla, procesar como contenedor genérico de sus celdas
+                const childrenIds: string[] = [];
+                // Buscamos todos los TDs directos o indirectos significativos
+                const cells = Array.from(element.querySelectorAll("td"));
+                cells.forEach(cell => {
+                    // Procesamos cada celda como un elemento independiente
+                    // Nota: Esto "aplana" la tabla visualmente, lo cual suele ser aceptable para emails responsive
+                    // si la estructura de columnas falló.
+                    const id = this.processElement(cell, currentStyles);
+                    if (id) childrenIds.push(id);
+                });
+                
+                if (childrenIds.length > 0) {
+                    return this.createContainerBlock(childrenIds, currentStyles);
+                }
+                break;
+            }
+
             case "img":
                 if (!element.parentElement || element.parentElement.tagName.toLowerCase() !== "a") {
                     return this.createImageBlock(element);
@@ -760,74 +784,74 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
                 }
 
                 // (B) td con un único <p> inline → Text
-        if ((tagName === "td" || tagName === "div" || tagName === "span") && this.hasSingleInlineP(element)) {
-                
-                const pEl = element.children[0] as Element;
-                
-                // 1. Extraer estilos (Ya comprobamos que esto funciona)
-                const pStyles = this.extractStyles(pEl, currentStyles);
+                if ((tagName === "td" || tagName === "div" || tagName === "span") && this.hasSingleInlineP(element)) {
+                        
+                        const pEl = element.children[0] as Element;
+                        
+                        // 1. Extraer estilos (Ya comprobamos que esto funciona)
+                        const pStyles = this.extractStyles(pEl, currentStyles);
 
-                // Corrección de tipos para fontSize
-                if (pStyles.fontSize) {
-                    if (typeof pStyles.fontSize === 'string') {
-                        pStyles.fontSize = parseInt(pStyles.fontSize) || 16;
-                    }
-                } else if (currentStyles.fontSize) {
-                    const parentSize = String(currentStyles.fontSize);
-                    pStyles.fontSize = parseInt(parentSize) || 16;
+                        // Corrección de tipos para fontSize
+                        if (pStyles.fontSize) {
+                            if (typeof pStyles.fontSize === 'string') {
+                                pStyles.fontSize = parseInt(pStyles.fontSize) || 16;
+                            }
+                        } else if (currentStyles.fontSize) {
+                            const parentSize = String(currentStyles.fontSize);
+                            pStyles.fontSize = parseInt(parentSize) || 16;
+                        }
+
+                        // Heredar estilos faltantes del padre
+                        if (!pStyles.fontFamily && currentStyles.fontFamily) pStyles.fontFamily = currentStyles.fontFamily;
+                        if (!pStyles.fontStyle && currentStyles.fontStyle) pStyles.fontStyle = currentStyles.fontStyle;
+                        if (!pStyles.fontWeight && currentStyles.fontWeight) pStyles.fontWeight = currentStyles.fontWeight;
+                        if (!pStyles.color && currentStyles.color) pStyles.color = currentStyles.color;
+
+                        // 2. Procesar contenido
+                        const { text, formats } = this.processInlineContent(pEl, pStyles);
+                        
+                            if (text.length) {
+                                // 👇👇👇 INICIO DEL CAMBIO 👇👇👇
+                                
+                                // 1. Definir un formato que cubra TODO el texto
+                                const globalFormat: any = { start: 0, end: text.length };
+                                let hasGlobal = false;
+
+                                // 2. Revisar si el contenedor (pStyles) tiene estilos que deben ser formatos
+                                
+                                // Detectar ITALIC (El que te faltaba)
+                                const fs = String(pStyles.fontStyle || "").toLowerCase();
+                                if (fs.includes('italic') || fs.includes('oblique')) {
+                                    globalFormat.italic = true;
+                                    hasGlobal = true;
+                                }
+
+                                // Detectar BOLD (El contenedor es bold, aunque haya bolds parciales adentro)
+                                const fw = String(pStyles.fontWeight || "").toLowerCase();
+                                if (fw === 'bold' || (!isNaN(parseInt(fw)) && parseInt(fw) >= 600)) {
+                                    globalFormat.bold = true;
+                                    hasGlobal = true;
+                                }
+
+                                // Detectar COLOR (Opcional, si tu editor soporta colores inline)
+                                if (pStyles.color && pStyles.color !== '#000000' && pStyles.color !== 'inherit') {
+                                    // globalFormat.color = pStyles.color; 
+                                    // hasGlobal = true; // Descomenta si usas colores inline
+                                }
+
+                                // 3. Si encontramos estilos globales, los agregamos al array existente
+                                if (hasGlobal) {
+                                    // Lo agregamos al principio o al final, el editor debería fusionarlos
+                                    formats.push(globalFormat);
+                                    
+                                    console.log('✅ [Fix] Inyectado formato global:', globalFormat);
+                                }
+
+                                // 👆👆👆 FIN DEL CAMBIO 👆👆👆
+
+                                return this.createTextBlock(text, formats, pStyles);
+                            }
                 }
-
-                // Heredar estilos faltantes del padre
-                if (!pStyles.fontFamily && currentStyles.fontFamily) pStyles.fontFamily = currentStyles.fontFamily;
-                if (!pStyles.fontStyle && currentStyles.fontStyle) pStyles.fontStyle = currentStyles.fontStyle;
-                if (!pStyles.fontWeight && currentStyles.fontWeight) pStyles.fontWeight = currentStyles.fontWeight;
-                if (!pStyles.color && currentStyles.color) pStyles.color = currentStyles.color;
-
-                // 2. Procesar contenido
-                const { text, formats } = this.processInlineContent(pEl, pStyles);
-                
-if (text.length) {
-                        // 👇👇👇 INICIO DEL CAMBIO 👇👇👇
-                        
-                        // 1. Definir un formato que cubra TODO el texto
-                        const globalFormat: any = { start: 0, end: text.length };
-                        let hasGlobal = false;
-
-                        // 2. Revisar si el contenedor (pStyles) tiene estilos que deben ser formatos
-                        
-                        // Detectar ITALIC (El que te faltaba)
-                        const fs = String(pStyles.fontStyle || "").toLowerCase();
-                        if (fs.includes('italic') || fs.includes('oblique')) {
-                            globalFormat.italic = true;
-                            hasGlobal = true;
-                        }
-
-                        // Detectar BOLD (El contenedor es bold, aunque haya bolds parciales adentro)
-                        const fw = String(pStyles.fontWeight || "").toLowerCase();
-                        if (fw === 'bold' || (!isNaN(parseInt(fw)) && parseInt(fw) >= 600)) {
-                            globalFormat.bold = true;
-                            hasGlobal = true;
-                        }
-
-                        // Detectar COLOR (Opcional, si tu editor soporta colores inline)
-                        if (pStyles.color && pStyles.color !== '#000000' && pStyles.color !== 'inherit') {
-                            // globalFormat.color = pStyles.color; 
-                            // hasGlobal = true; // Descomenta si usas colores inline
-                        }
-
-                        // 3. Si encontramos estilos globales, los agregamos al array existente
-                        if (hasGlobal) {
-                            // Lo agregamos al principio o al final, el editor debería fusionarlos
-                            formats.push(globalFormat);
-                            
-                            console.log('✅ [Fix] Inyectado formato global:', globalFormat);
-                        }
-
-                        // 👆👆👆 FIN DEL CAMBIO 👆👆👆
-
-                        return this.createTextBlock(text, formats, pStyles);
-                    }
-            }
 
                 // (C) td completamente inline → Text
                 if (this.isInlineOnly(element) && !this.elementContainsOtherBlockTypes(element)) {
@@ -864,60 +888,6 @@ if (text.length) {
                     }
                 }
                 
-                // CASO 2: <td> con múltiples <a> que contienen imágenes (ICONOS)
-                /* const allAnchors = Array.from(element.querySelectorAll("a"));
-                const allImages = Array.from(element.querySelectorAll("img"));
-                
-                if (allAnchors.length > 1 && allImages.length === allAnchors.length) {
-                    console.log(`🔗 TD con ${allAnchors.length} enlaces e imágenes (probablemente iconos)`);
-                    
-                    // Verificar si cada <a> contiene exactamente una <img> y no tiene texto
-                    const isValidIconStructure = allAnchors.every(anchor => {
-                        const anchorText = anchor.textContent?.trim() || "";
-                        const anchorImgs = anchor.querySelectorAll("img");
-                        return anchorImgs.length === 1 && 
-                            anchor.children.length === 1 && 
-                            anchorText.length === 0;
-                    });
-                    
-                    // También verificar que el TD no tenga texto propio
-                    const tdHasText = textContent.length > 0;
-                    
-                    if (isValidIconStructure && !tdHasText) {
-                        console.log("✅ Estructura de iconos válida, procesando...");
-                        const iconBlocks: string[] = [];
-                        
-                        allAnchors.forEach((anchor, index) => {
-                            const img = anchor.querySelector("img");
-                            if (img) {
-                                const blockId = this.createImageBlock(img, anchor.getAttribute("href") || "#");
-                                if (blockId) {
-                                    iconBlocks.push(blockId);
-                                    console.log(`   [${index}] Icono procesado: ${blockId}`);
-                                }
-                            }
-                        });
-                        
-                        if (iconBlocks.length > 0) {
-                            const tdStyles = this.extractStyles(element, currentStyles);
-
-                            return this.createContainerBlock(iconBlocks, {
-                                ...tdStyles,
-
-                                display: "flex",
-                                flexDirection: "row",
-                                justifyContent: "center",
-                                alignItems: "center",
-                                flexWrap: "nowrap",
-                                gap: "20px",
-                                textAlign: "center",
-                                width: "100%",
-                                maxWidth: "100%",
-                                padding: tdStyles.padding || { top: 0, right: 0, bottom: 0, left: 0 }
-                            });
-                        }
-                    }
-                } */
                 
                     // TERCERO: Casos especiales que no encajan en los anteriores
                     
@@ -987,26 +957,39 @@ if (text.length) {
     /* =========================================================
    Inline text processor (NEGRITAS + SALTOS DE LÍNEA)
    ========================================================= */
-private processInlineContent(
+    private processInlineContent(
         element: Element,
         inheritedStyles: Record<string, any>
     ): { text: string; formats: any[] } {
         let text = "";
         const formats: any[] = [];
-        let pos = 0;
 
         const append = (t: string) => {
             if (!t) return;
             text += t;
-            pos += t.length;
         };
 
-        const inlineTags = new Set(["strong", "b", "em", "i", "u", "a", "span", "small", "sup", "sub", "br"]);
+        // Tags permitidos
+        const inlineTags = new Set(["strong", "b", "em", "i", "u", "a", "span", "small", "sup", "sub", "br", "img"]);
 
         Array.from(element.childNodes).forEach((node) => {
             // 1. Nodos de Texto
             if (node.nodeType === Node.TEXT_NODE) {
-                append((node.textContent || "").replace(/\s+/g, " "));
+                let content = node.textContent || "";
+                
+                // LIMPIEZA AGRESIVA: 
+                // 1. Reemplazar saltos de línea y tabs por espacio
+                content = content.replace(/[\n\r\t]/g, " ");
+                
+                // 2. Colapsar múltiples espacios en uno solo (comportamiento HTML estándar)
+                content = content.replace(/\s{2,}/g, " ");
+
+                // 3. (Opcional pero recomendado) Si es el inicio absoluto del bloque, quitar espacio inicial
+                if (text.length === 0) {
+                    content = content.trimStart();
+                }
+
+                append(content);
                 return;
             }
 
@@ -1022,20 +1005,17 @@ private processInlineContent(
                     return;
                 }
 
-                // Enlaces dentro de negritas
+                if (tag === "img") return; // Ignorar imágenes en flujo de texto
+
+                // Enlaces Markdown
                 if ((tag === "strong" || tag === "b") && el.querySelector("a")) {
                     const link = el.querySelector("a");
-                    if (link) {
-                        const href = link.getAttribute("href") || "";
-                        const linkText = link.textContent?.trim() || "";
-                        if (href && linkText) {
-                            append(`**[${linkText}](${href})**`);
-                            return;
-                        }
+                    if (link && link.getAttribute("href") && link.textContent?.trim()) {
+                        const md = `**[${link.textContent.trim()}](${link.getAttribute("href")})**`;
+                        append(md);
+                        return;
                     }
                 }
-
-                // Enlaces simples
                 if (tag === "a") {
                     const href = el.getAttribute("href") || "";
                     const linkText = el.textContent?.trim() || "";
@@ -1045,33 +1025,41 @@ private processInlineContent(
                     }
                 }
 
-                // --- PROCESAMIENTO RECURSIVO ---
+                // Recursión
                 const childStyles = this.extractStyles(el, inheritedStyles);
                 const childRes = this.processInlineContent(el, childStyles);
 
                 if (childRes.text.length) {
-                    const start = pos;
+                    // 🔥 LÓGICA DE ÍNDICES CORREGIDA 🔥
+                    
+                    // 1. Capturamos dónde empieza este hijo en el texto acumulado
+                    const start = text.length;
+                    
+                    // 2. Agregamos el texto del hijo
                     append(childRes.text);
+                    
+                    // 3. Calculamos dónde termina
+                    const end = text.length;
 
-                    // Propagar formatos hijos y ajustar offset
-                    const childFormats = childRes.formats.map(fmt => ({
-                        ...fmt,
-                        start: fmt.start + start,
-                        end: fmt.end + start
-                    }));
+                    // 4. Mapeamos los formatos hijos al nuevo sistema de coordenadas
+                    childRes.formats.forEach(fmt => {
+                        formats.push({
+                            ...fmt,
+                            start: fmt.start + start, 
+                            end: fmt.end + start      
+                        });
+                    });
 
-                    // --- DETECCIÓN ROBUSTA (Igual que en el Editor) ---
-                    const fmt: any = { start, end: start + childRes.text.length };
+                    // 5. Aplicar formato del nodo actual (ej: <strong>)
+                    const fmt: any = { start, end };
                     let hasFormat = false;
 
-                    // 1. Obtener estilos crudos para Regex
                     const styleAttr = el.getAttribute('style') || '';
                     const fw = String(childStyles.fontWeight ?? "").toLowerCase();
                     const fs = String(childStyles.fontStyle ?? "").toLowerCase();
                     
-                    // 2. BOLD
+                    // Bold
                     const isBoldTag = tag === "strong" || tag === "b";
-                    // Regex busca 'bold', 'bolder' o números 600-900 en el style string
                     const isBoldRegex = /font-weight\s*:\s*(bold|bolder|[6-9]\d{2})/i.test(styleAttr);
                     const isBoldStyle = fw === "bold" || (!isNaN(parseInt(fw)) && parseInt(fw) >= 600);
                     
@@ -1080,18 +1068,15 @@ private processInlineContent(
                         hasFormat = true;
                     }
 
-                    // 3. ITALIC
+                    // Italic
                     const isItalicTag = tag === "em" || tag === "i";
-                    const isItalicRegex = /font-style\s*:\s*italic/i.test(styleAttr);
-                    const isItalicStyle = fs === "italic";
+                    const isItalicRegex = /font-style\s*:\s*(italic|oblique)/i.test(styleAttr);
+                    const isItalicStyle = fs.includes("italic") || fs.includes("oblique");
 
                     if (isItalicTag || isItalicStyle || isItalicRegex) {
                         fmt.italic = true;
                         hasFormat = true;
                     }
-
-                    // Fusionar formatos
-                    formats.push(...childFormats);
                     
                     if (hasFormat) {
                         formats.push(fmt);
@@ -1100,16 +1085,11 @@ private processInlineContent(
             }
         });
 
-        text = text.replace(/[ \t]+\n/g, "\n").trimEnd();
+        // Limpieza final global
+        // Elimina espacios al final del bloque completo, pero mantiene los saltos de línea intencionales
+        // text = text.trimEnd(); // Cuidado con esto si hay spans consecutivos
 
-        // Limpieza y validación de rangos
-        const validFormats = formats.filter(fmt => {
-            if (fmt.start < 0) fmt.start = 0;
-            if (fmt.end > text.length) fmt.end = text.length;
-            return fmt.start < fmt.end;
-        });
-
-        return { text: text.trim(), formats: validFormats };
+        return { text, formats };
     }
 
 
@@ -1632,7 +1612,7 @@ private processInlineContent(
             data: {
                 style: {
                     ...finalStyles,
-                    padding: { top: 16, bottom: 16, left: 24, right: 24 }
+                    padding: finalStyles.padding
                 },
                 props: {
                     text: finalText,  
@@ -1645,15 +1625,17 @@ private processInlineContent(
     }
 
     private createImageBlock(element: Element, linkHref?: string): string | null {
-        const src = element.getAttribute("src") || "";
-        if (!src || src.startsWith("data:")) return null;
+        const PLACEHOLDER_IMG = 'https://placehold.net/default.png';
+        let src = element.getAttribute("src") || "";
+        if (!src) src = PLACEHOLDER_IMG;
+        /* if (!src || src.startsWith("data:")) return null; */
 
         const base = (src.split("/").pop() || src).toLowerCase();
         if (/^blanco\.(png|gif|jpg|jpeg)$/.test(base)) return null;
 
 
         let dataUrl: string | undefined;
-        let fileName: string;
+        let fileName: string;  
 
         // CASO 1: URL absoluta (https://services.celcom.cl/...)
         if (src.startsWith("http")){
@@ -1696,9 +1678,7 @@ private processInlineContent(
         }
 
         if (!dataUrl) {  
-            /* console.log("❌ No se pudo obtener dataUrl para:", src);  */
-            /* console.log("📊 imageMap keys:", Array.from(this.imageMap.keys())); */  
-            return null;  
+            dataUrl = PLACEHOLDER_IMG;
         }  
 
         const id = uuidv4();
@@ -1709,8 +1689,8 @@ private processInlineContent(
 
         let blockStyle: any = {
             ...styles, 
-            padding: { top: 0, bottom: 0, left: 0, right: 0 },
-            textAlign: "center",
+            padding: styles.padding || { top: 0, right: 0, bottom: 0, left: 0 },
+            textAlign: styles.textAlign || "center",
         }
 
         if (isSmallIcon){
@@ -1726,7 +1706,7 @@ private processInlineContent(
                 style: blockStyle,
                 props: {
                     url: dataUrl,
-                    alt: element.getAttribute("alt") || "",
+                    alt: element.getAttribute("alt") || "Imagen",
                     linkHref: linkHref || undefined,
                     width: width ? parseInt(width) : undefined,
                     height: element.getAttribute("height") ? 

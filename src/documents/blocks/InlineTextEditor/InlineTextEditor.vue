@@ -108,7 +108,8 @@ const computedStyles = computed(() => {
     fontWeight: props.style?.fontWeight || 'normal',  
     textAlign: props.style?.textAlign || 'left',  
     color: props.style?.color || 'inherit',  
-    backgroundColor: props.style?.backgroundColor || 'transparent'  ,
+    backgroundColor: props.style?.backgroundColor || 'transparent',
+    fontStyle: props.style?.fontStyle || 'inherit',
   };  
 });  
 
@@ -373,63 +374,79 @@ function htmlToTextAndFormats(htmlContent: string): { text: string; formats: Tex
   return { text, formats };  
 }
 
-function textWithFormatsToHtml(text: string, formats: TextFormat[]): string {  
-  if (!formats || formats.length === 0) return text;  
-  
-  const events: Array<{ position: number; type: 'start' | 'end'; format: Partial<TextFormat> }> = [];
-  formats.forEach(format => {
-    if (format.bold) {
-      events.push({ position: format.start, type: 'start', format: { bold: true } });
-      events.push({ position: format.end, type: 'end', format: { bold: true } });
-    }
-    if (format.italic) {
-      events.push({ position: format.start, type: 'start', format: { italic: true } });
-      events.push({ position: format.end, type: 'end', format: { italic: true } });
-    }
-  });
-  
-  events.sort((a, b) => {
-    if (a.position !== b.position) return a.position - b.position;
-    return a.type === 'end' ? -1 : 1; 
-  });
-  
-  let result = '';
-  let currentPosition = 0;
-  let boldCount = 0;
-  let italicCount = 0;
-  
-  events.forEach(event => {
-    if (event.position > currentPosition) {
-      result += text.substring(currentPosition, event.position);
-    }
-    currentPosition = event.position;
-    
-    if (event.type === 'start') {
-      if (event.format.bold) {
-        if (boldCount === 0) result += '<b>'; 
-        boldCount++;
-      }
-      if (event.format.italic) {
-        if (italicCount === 0) result += '<i>'; 
-        italicCount++;
-      }
-    } else { // event.type === 'end'
-      if (event.format.italic) {
-        italicCount--;
-        if (italicCount === 0) result += '</i>'; 
-      }
-      if (event.format.bold) {
-        boldCount--;
-        if (boldCount === 0) result += '</b>'; 
-      }
-    }
-  });
-  
-  if (currentPosition < text.length) {
-    result += text.substring(currentPosition);
-  }
-  
-  return result;
+function textWithFormatsToHtml(text: string, formats: TextFormat[]): string {
+  if (!formats || formats.length === 0) return text;
+
+  const events: any[] = [];
+
+  // 1. Generación de eventos (Tu formato)
+  formats.forEach(format => {
+    if (format.bold) {
+      // Prioridad 1 (Más externo)
+      events.push({ position: format.start, type: 'start', format: { bold: true }, priority: 1 });
+      events.push({ position: format.end, type: 'end', format: { bold: true }, priority: 1 });
+    }
+    if (format.italic) {
+      // Prioridad 2 (Más interno)
+      events.push({ position: format.start, type: 'start', format: { italic: true }, priority: 2 });
+      events.push({ position: format.end, type: 'end', format: { italic: true }, priority: 2 });
+    }
+    if (format.underline) {
+       // Prioridad 3
+       events.push({ position: format.start, type: 'start', format: { underline: true }, priority: 3 });
+       events.push({ position: format.end, type: 'end', format: { underline: true }, priority: 3 });
+    }
+  });
+
+  // 2. Ordenamiento (CRÍTICO para que Bold e Italic funcionen juntos)
+  events.sort((a, b) => {
+    // A. Primero por posición en el texto
+    if (a.position !== b.position) return a.position - b.position;
+
+    // B. En la misma posición: Cerrar etiquetas ('end') antes de abrir nuevas ('start')
+    if (a.type !== b.type) return a.type === 'end' ? -1 : 1;
+
+    // C. Jerarquía para evitar cruces (LIFO: Last In, First Out)
+    // - Al abrir: Bold(1) -> Italic(2)
+    // - Al cerrar: Italic(2) -> Bold(1)
+    if (a.type === 'start') {
+        return a.priority - b.priority;
+    } else {
+        return b.priority - a.priority;
+    }
+  });
+
+  // 3. Construcción del HTML
+  let result = '';
+  let cursor = 0;
+
+  events.forEach(evt => {
+    // Agregar texto plano que haya antes de este evento
+    if (evt.position > cursor) {
+      result += text.substring(cursor, evt.position);
+      cursor = evt.position;
+    }
+
+    // Determinar qué etiqueta es
+    let tag = '';
+    if (evt.format.bold) tag = 'b';
+    else if (evt.format.italic) tag = 'i';
+    else if (evt.format.underline) tag = 'u';
+
+    // Agregar etiqueta de apertura o cierre
+    if (evt.type === 'start') {
+      result += `<${tag}>`;
+    } else {
+      result += `</${tag}>`;
+    }
+  });
+
+  // Agregar cualquier texto restante al final
+  if (cursor < text.length) {
+    result += text.substring(cursor);
+  }
+
+  return result;
 }
 
 // ============================================================================  
@@ -782,7 +799,15 @@ onMounted(() => {
   const blockData = block.data as { props?: TextBlockProps; style?: any };
 
   const text = (blockData.props as TextBlockProps)?.text || '';
-  const formats = (blockData.props as TextBlockProps)?.formats || [];  
+  let formats = (blockData.props as TextBlockProps)?.formats || [];
+  if (blockData.style?.fontStyle === 'italic' && !formats.some(f => f.italic)) {  
+    formats = [...formats, {  
+      start: 0,  
+      end: text.length,  
+      italic: true  
+    }];  
+    updateBlockInStore(text, formats);  
+  }    
   const htmlContent = textWithFormatsToHtml(text, formats);  
   
   /* console.log('🚀 InlineTextEditor - Montado con datos del store:', { text, formats }); */
