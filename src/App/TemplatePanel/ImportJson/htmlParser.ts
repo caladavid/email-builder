@@ -791,6 +791,10 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
                         // 1. Extraer estilos (Ya comprobamos que esto funciona)
                         const pStyles = this.extractStyles(pEl, currentStyles);
 
+                        if (!pStyles.padding && currentStyles.padding) {
+                            pStyles.padding = currentStyles.padding;
+                        }
+
                         // Corrección de tipos para fontSize
                         if (pStyles.fontSize) {
                             if (typeof pStyles.fontSize === 'string') {
@@ -844,7 +848,7 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
                                     // Lo agregamos al principio o al final, el editor debería fusionarlos
                                     formats.push(globalFormat);
                                     
-                                    console.log('✅ [Fix] Inyectado formato global:', globalFormat);
+                                    /* console.log('✅ [Fix] Inyectado formato global:', globalFormat); */
                                 }
 
                                 // 👆👆👆 FIN DEL CAMBIO 👆👆👆
@@ -910,8 +914,10 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
 
                     // (F) Contenedor genérico (último recurso)
                     if (hasChildren) {
+                        
                         const childrenIds: string[] = [];
-                        this.processChildren(element, childrenIds, currentStyles);
+                        const cleanedStyles = this.filterInheritableStyles(currentStyles)
+                        this.processChildren(element, childrenIds, cleanedStyles);
                         if (childrenIds.length > 0) return this.createContainerBlock(childrenIds, currentStyles);
                     }
                     break;
@@ -1129,18 +1135,12 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
 
         const hasMultiCellRow = rows.some((r) => r.querySelectorAll(":scope > td").length > 1);
 
-/*         const hasInlineBlockLayout = rows.some((r) => {  
-            const tds = Array.from(r.querySelectorAll(":scope > td"));  
-            return tds.length >= 2 && tds.some(td => {  
-                const styles = this.extractStyles(td, {});  
-                return styles.display === 'inline-block';  
-            });  
-        });  */
-
         const hasHybridColumns = rows.some((r) => {
             const tds = Array.from(r.querySelectorAll(":scope > td"));
             // A veces hay 1 sola celda wrapper, pero si tiene inline-block + width, es sospechosa de ser columna
             if (tds.length === 0) return false; 
+
+
             
             
             // Verificamos si al menos una celda tiene inline-block o float
@@ -1151,7 +1151,10 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
                 const isInline = /display\s*:\s*inline-block/i.test(style);
                 const isFloat = /float\s*:\s*(left|right)/i.test(style);
                 
-                return (isInline || isFloat) && !!hasWidth;
+                /* return (isInline || isFloat) && !!hasWidth; */
+                
+                // Si es inline-block y tiene ancho, es una columna
+                return isInline && hasWidth;
             });
         });
 
@@ -1167,7 +1170,8 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
             return textLen === 0 && !!bg; // barra de color
         }); */
 
-        return hasMultiCellRow  || hasHybridColumns || isWrapperTable || rows.length > 1;
+        /* return hasMultiCellRow  || hasHybridColumns || isWrapperTable || rows.length > 1; */
+        return hasMultiCellRow  || hasHybridColumns || isWrapperTable;
     }
 
     /** Tabla compacta “inline” (iconos/acciones) — genérica */
@@ -1406,6 +1410,12 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
 
         const rowBlocks: string[] = [];
 
+        // Filtramos para que hereden fuente/color, pero NO el padding del padre.
+        const stylesForChildren = this.filterInheritableStyles(styles);
+
+        // Aseguramos explícitamente que el estilo que baja no tenga padding
+        delete stylesForChildren.padding;
+
         for (const row of rows) {
             const cells = Array.from(row.children).filter(c => c.tagName.toLowerCase() === 'td');
             if (cells.length === 0) continue;
@@ -1426,8 +1436,8 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
             
             for (const cell of cells) {
                 const cellElement = cell as HTMLElement;
-                const cellStyles = this.extractStyles(cellElement, styles);
-                const contentId = this.processElement(cellElement, styles);
+                const cellStyles = this.extractStyles(cellElement, stylesForChildren);
+                const contentId = this.processElement(cellElement, stylesForChildren);
                 
                 if (contentId) {
                     // --- CÁLCULO INTELIGENTE DE ANCHO (Hybrid Coding Fix) ---
@@ -1526,12 +1536,12 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
         if (rowBlocks.length === 0) return null;
         
         // Si la tabla generó un solo bloque (ej: una sola fila de columnas), lo retornamos directo
-        if (rowBlocks.length === 1) return rowBlocks[0];
+        if (rowBlocks.length === 1 && !styles.padding && !styles.backgroundColor) return rowBlocks[0];
         
         // Si generó múltiples filas, las envolvemos en un contenedor padre
         return this.createContainerBlock(rowBlocks, {
             ...styles,
-            padding: { top: 0, bottom: 0, left: 0, right: 0 }
+            padding: styles.padding || { top: 0, bottom: 0, left: 0, right: 0 }
         });
     }
 
@@ -1723,10 +1733,16 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
         const id = uuidv4();
         const text = element.textContent?.trim() || "Button";
         const href = element.getAttribute("href") || "#";
+        const defaultPadding = { top: 16, bottom: 16, left: 24, right: 24 };
+        const finalPadding = styles.padding || defaultPadding;
+        
         this.blocks[id] = {
             type: "Button",
             data: {
-                style: { ...styles, padding: { top: 16, bottom: 16, left: 24, right: 24 } },
+                style: { 
+                    ...styles, 
+                    padding: finalPadding 
+                },
                 props: { text, url: href }
             }
         };
@@ -1998,7 +2014,23 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
             .replace(/\s+/g, " ");
     }
 
-     private extractStyles(element: Element, inheritedStyles: Record<string, any> = {}): any {  
+    private filterInheritableStyles(styles: Record<string, any>): Record<string, any> {
+        const inheritableProps = [
+            "color", "fontFamily", "fontSize", "fontWeight", 
+            "fontStyle", "letterSpacing", "lineHeight", 
+            "textAlign", "textTransform", "visibility", "wordSpacing"
+        ];
+        
+        const filtered: Record<string, any> = {};
+        inheritableProps.forEach(prop => {
+            if (styles[prop] !== undefined) {
+                filtered[prop] = styles[prop];
+            }
+        });
+        return filtered;
+    }
+
+    private extractStyles(element: Element, inheritedStyles: Record<string, any> = {}): any {  
         const styles: any = { ...inheritedStyles };  
         const htmlElement = element as HTMLElement;  
     
@@ -2069,7 +2101,7 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
                 break;  
             case "font-style":  
                 final.fontStyle = value; 
-                console.log(final);
+                /* console.log(final); */
                 break;  
             case "line-height":  
                 final.lineHeight = this.parseLineHeight(value);  
@@ -2888,9 +2920,14 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
         // Limpiar y validar todos los estilos antes de construir  
         Object.keys(this.blocks).forEach(blockId => {  
             const block = this.blocks[blockId];  
-            if (block.data?.style) {  
+            if (block.data && block.data?.style) {  
+
+                if (!block.data.style.padding) {
+                    block.data.style.padding = { top: 0, right: 0, bottom: 0, left: 0 };
+                }
 
                 const padding = block.data.style.padding;  
+
                 // Asegurar que todos los valores de padding sean números  
                 if (typeof padding.top === 'string') {  
                     padding.top = parseInt(padding.top) || 0;  
@@ -2959,6 +2996,7 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
     
         return config;  
     }
+
 /*     private buildConfiguration(): TEditorConfiguration {
         const rootId = "root";
 
