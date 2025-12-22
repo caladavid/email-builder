@@ -120,7 +120,15 @@ export class HTMLToBlockParser {
             const zip = new JSZip();
             const contents = await zip.loadAsync(zipFile);
 
-            const fileCount = Object.keys(contents.files).length;
+            const validFiles = Object.keys(contents.files).filter(path =>
+                    !path.includes('__MACOSX/') &&  
+                    !path.includes('.DS_Store') &&  
+                    !path.startsWith('.')
+            )
+
+
+            /* const fileCount = Object.keys(contents.files).length; */
+            const fileCount = validFiles.length;
             if (fileCount === 0) {
                 throw new ParseError(  
                     'El archivo ZIP está vacío',  
@@ -143,7 +151,11 @@ export class HTMLToBlockParser {
             await this.processAudio(contents);  
 
             const htmlFiles = Object.keys(contents.files).filter(name => 
-                !contents.files[name].dir && name.toLowerCase().endsWith(".html") 
+                !contents.files[name].dir && 
+                name.toLowerCase().endsWith(".html") &&
+                !name.includes('__MACOSX/') &&   
+                !name.includes('.DS_Store') &&   
+                !name.startsWith('.')  
             );
 
             if (htmlFiles.length === 0){
@@ -602,7 +614,7 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
     /* =========================================================
        PARSER PRINCIPAL
        ========================================================= */
-    private processElement(
+/*     private processElement(
         element: Element,
         inheritedStyles: Record<string, string>
     ): string | null {
@@ -610,7 +622,6 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
         this.processedElements.add(element);
 
         const tagName = element.tagName.toLowerCase();
-        /* console.log(`Procesando elemento: <${tagName}>`, element);  */
         const currentStyles = this.extractStyles(element, inheritedStyles);
 
         // 1) Tablas compactas “inline”
@@ -626,7 +637,6 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
 
         // 3) <a> que envuelve UNA imagen → Image con link
         if (tagName === "a") {
-            /* console.log("🔗 Procesando <a>:", element); */
             const imgs = element.querySelectorAll("img");
             const textContent = element.textContent?.trim() || "";
             const hasOnlyImage = element.children.length === 1 && 
@@ -640,7 +650,6 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
                                         !/^\s*$/.test(textContent.replace(img.alt || "", ""));
                 
                 if (!hasSignificantText) {
-                    /* console.log("✅ <a> con única imagen (sin texto) - BANNER/ICONO"); */
                     const blockId = this.createImageBlock(img, element.getAttribute("href") || "#");
                     if (blockId) return blockId;
                 }
@@ -648,7 +657,6 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
             
             // CASO 2: <a> con TEXTO (puede tener o no imágenes) → Procesar como texto con enlace
             if (textContent.length > 0) {
-                /* console.log("📝 <a> con texto - procesando como contenido inline"); */
                 
                 // Contexto inline (p/inline-only) → que lo absorba el padre como texto con enlace
                 if (this.isInlineContextForAnchor(element)) {
@@ -677,7 +685,6 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
             
             // CASO 3: <a> con MÚLTIPLES imágenes y sin texto → Contenedor de imágenes
             if (imgs.length > 1 && textContent.length === 0) {
-                /* console.log(`🖼️ <a> con ${imgs.length} imágenes (sin texto) - ICONOS`); */
                 const imageIds: string[] = [];
                 
                 imgs.forEach(img => {
@@ -701,12 +708,6 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
             // Si no se cumplió ninguna condición anterior
             return null;
         }
-/*         if (tagName === "a") {
-            const img = element.querySelector("img");
-            if (img && element.children.length === 1) {
-                return this.createImageBlock(img, element.getAttribute("href") || "#");
-            }
-        } */
 
         if (this.isFlexContainer(element)) {  
             return this.createFlexContainer(element, currentStyles);  
@@ -772,7 +773,6 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
             case "div":
             case "span":
             case "td": {
-                /* console.log("📋 Procesando TD:", element); */
                 const hasChildren = element.children.length > 0;
                 const textContent = element.textContent?.trim() || "";
                 
@@ -848,7 +848,6 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
                                     // Lo agregamos al principio o al final, el editor debería fusionarlos
                                     formats.push(globalFormat);
                                     
-                                    /* console.log('✅ [Fix] Inyectado formato global:', globalFormat); */
                                 }
 
                                 // 👆👆👆 FIN DEL CAMBIO 👆👆👆
@@ -881,11 +880,25 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
                         if (imgs.length === 1 && anchor.children.length === 1 && 
                             anchor.children[0].tagName.toLowerCase() === 'img') {
                             
-                            /* console.log("🎯 TD con único enlace que contiene única imagen (BANNER)"); */
                             const img = imgs[0];
                             const blockId = this.createImageBlock(img, anchor.getAttribute("href") || "#");
                             if (blockId) {
-                                /* console.log("✅ Banner procesado, ID:", blockId); */
+                                // Detectar si el TD padre tiene estilos estructurales (padding, bg, borde)
+                                // Si los tiene, NO podemos devolver la imagen suelta, debemos envolverla.
+                                const hasParentStyles = currentStyles.padding || 
+                                                        currentStyles.backgroundColor || 
+                                                        (currentStyles.border && currentStyles.border.width);
+
+                                if (hasParentStyles) {
+                                    // Devolvemos un Container con los estilos del TD y la imagen dentro
+                                    return this.createContainerBlock([blockId], {
+                                        ...currentStyles,
+                                        textAlign: currentStyles.textAlign, // Centrado por defecto para banners
+                                        width: currentStyles.width || undefined // Quitamos ancho fijo para que sea fluido
+                                    });
+                                }
+
+                                // Si el TD es "invisible" (solo estructura), devolvemos la imagen sola
                                 return blockId;
                             }
                         }
@@ -950,16 +963,190 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
 
         // 5) Fallback: procesar hijos
         const childrenIds: string[] = [];
-        this.processChildren(element, childrenIds, currentStyles);
-        if (childrenIds.length > 0) return this.createContainerBlock(childrenIds, currentStyles);
+        const cleanedStyles = this.filterInheritableStyles(currentStyles);
+        this.processChildren(element, childrenIds, cleanedStyles);
+        if (childrenIds.length > 0) {
+            return this.createContainerBlock(childrenIds, currentStyles);
+        }
+
+        // 6)  FALLBACK FINAL (HTML BLOCK) 
+        // Si llegamos aquí es porque el parser NO pudo convertir lo de adentro en bloques conocidos.
+        // Verificamos si realmente hay contenido que vale la pena salvar.
+        
+        const hasContent = (element.textContent?.trim().length || 0) > 0 || element.children.length > 0;
+        
+        // Evitamos guardar elementos vacíos o que solo son espaciadores
+        const isNotEmpty = hasContent && tagName !== 'br';
+
+        if (isNotEmpty) {
+            console.warn(`⚠️ Estructura compleja no parseada <${tagName}>. Guardando como HTML Block.`);
+            
+            const id = uuidv4();
+            this.blocks[id] = {
+                type: "Html", // Requiere soporte en tu Frontend (v-html)
+                data: {
+                    props: {
+                        // Guardamos el HTML original completo para que se vea perfecto
+                        content: element.outerHTML 
+                    },
+                    style: {
+                        // Reseteamos padding/margin del bloque para que el HTML interno mande
+                        padding: { top: 0, bottom: 0, left: 0, right: 0 },
+                        backgroundColor: "transparent"
+                    }
+                }
+            };
+            return id;
+        }
+
+        return null;
+    } */
+
+    private processElement(
+        element: Element,
+        inheritedStyles: Record<string, string>
+    ): string | null {
+        if (this.processedElements.has(element)) return null;
+        this.processedElements.add(element);
+
+        const tagName = element.tagName.toLowerCase();
+        const currentStyles = this.extractStyles(element, inheritedStyles);
+
+        // =========================================================
+        // NIVEL 1: ESTRUCTURA MACRO (Tablas y Grids)
+        // =========================================================
+
+        if (tagName === "table" && this.isColumnsTable(element)) {
+            return this.createColumnsContainer(element, currentStyles);
+        }
+        if (this.isFlexContainer(element)) return this.createFlexContainer(element, currentStyles);
+        if (this.isGridContainer(element)) return this.createGridContainer(element, currentStyles);
+
+
+        // =========================================================
+        // NIVEL 2: COMPONENTES ESPECÍFICOS (Tus bloques personalizados)
+        // =========================================================
+
+        // 1. AVATAR 👤
+        if (tagName === 'img' && this.isAvatar(element, currentStyles)) {
+            const imgId = this.createImageBlock(element as HTMLImageElement);
+            if (imgId && this.blocks[imgId]) {
+                this.blocks[imgId].type = 'Avatar'; // Forzamos el tipo Avatar
+                return imgId;
+            }
+        }
+
+        // 2. IMAGEN / BANNER 🖼️
+        // Caso especial: <a> que envuelve solo una imagen
+        if (tagName === "a") {
+            const imgs = element.querySelectorAll("img");
+            const text = element.textContent?.trim() || "";
+            // Si es solo una imagen sin texto
+            if (imgs.length === 1 && text === "") {
+                 const img = imgs[0];
+                 const id = this.createImageBlock(img, element.getAttribute("href") || "#");
+                 
+                 // Preservar contenedor si el <a> o su padre tenían estilos (bg/padding)
+                 const hasContainerStyles = currentStyles.padding || currentStyles.backgroundColor;
+                 if (id && hasContainerStyles) {
+                     return this.createContainerBlock([id], { ...currentStyles, width: currentStyles.width });
+                 }
+                 return id;
+            }
+        }
+        // Imagen suelta normal
+        if (tagName === "img") {
+            return this.createImageBlock(element as HTMLImageElement);
+        }
+
+        // 3. BOTÓN 🔘
+        if (this.isButton(element, currentStyles)) {
+            return this.createButtonBlock(element, currentStyles);
+        }
+        // Botón "Legacy" (celda que parece botón)
+        if (this.isButtonLikeCell(element)) {
+            const anchor = element.querySelector('a');
+            if (anchor) return this.createButtonBlock(anchor, currentStyles);
+        }
+
+        // 4. SEPARADOR ➖
+        if (this.isSeparator(element, currentStyles)) {
+            const id = uuidv4();
+            this.blocks[id] = { type: "Separator", data: { style: currentStyles } };
+            return id;
+        }
+
+        // 5. ESPACIADOR ⬜
+        if (this.isSpacer(element, currentStyles)) {
+            const id = uuidv4();
+            const height = parseInt(String(currentStyles.height)) || 20;
+            this.blocks[id] = { 
+                type: "Spacer", 
+                data: { style: {}, props: { height } } 
+            };
+            return id;
+        }
+
+        // 6. ENCABEZADO 🇭
+        if (/^h[1-6]$/.test(tagName)) {
+            return this.createHeadingBlock(element, currentStyles);
+        }
+
+        // 7. TEXTO 📝
+        // Si es P, SPAN o TD con solo texto directo
+        const isTextTag = ["p", "span", "div", "td", "li"].includes(tagName);
+        if (isTextTag) {
+            // Verificamos si tiene contenido de texto real
+            const { text, formats } = this.processInlineContent(element, currentStyles);
+            if (text.length > 0 && !this.elementContainsOtherBlockTypes(element)) {
+                return this.createTextBlock(text, formats, currentStyles);
+            }
+        }
+
+
+        // =========================================================
+        // NIVEL 3: CONTENEDORES GENÉRICOS
+        // =========================================================
+
+        const childrenIds: string[] = [];
+        // Limpiamos estilos para evitar herencia doble (el fix que hicimos antes)
+        const cleanStyles = this.filterInheritableStyles(currentStyles);
+        
+        this.processChildren(element, childrenIds, cleanStyles);
+
+        if (childrenIds.length > 0) {
+            // Optimización: Si es un div transparente con 1 solo hijo, devolvemos el hijo directo
+            const isTransparent = !currentStyles.backgroundColor && !currentStyles.border;
+            if (childrenIds.length === 1 && isTransparent && !currentStyles.padding) {
+                return childrenIds[0];
+            }
+            return this.createContainerBlock(childrenIds, currentStyles);
+        }
+
+
+        // =========================================================
+        // NIVEL 4: FALLBACK HTML (Red de seguridad)
+        // =========================================================
+        
+        const hasContent = (element.textContent?.trim().length || 0) > 0 || element.children.length > 0;
+        const ignoredTags = ['br', 'script', 'style', 'meta', 'title', 'link', 'tbody', 'tr']; // Ignoramos estructura muerta
+        
+        if (hasContent && !ignoredTags.includes(tagName)) {
+            /* console.warn(`⚠️ Fallback HTML para <${tagName}>`); */
+            const id = uuidv4();
+            this.blocks[id] = {
+                type: "Html",
+                data: {
+                    props: { content: element.outerHTML },
+                    style: { padding: { top:0, bottom:0, left:0, right:0 }, backgroundColor: "transparent" }
+                }
+            };
+            return id;
+        }
 
         return null;
     }
 
-
-    /* =========================================================
-       Inline text processor  (NEGRITAS + SALTOS DE LÍNEA)
-       ========================================================= */
     /* =========================================================
    Inline text processor (NEGRITAS + SALTOS DE LÍNEA)
    ========================================================= */
@@ -1298,6 +1485,41 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
                 }  
             })  
         );  
+    }
+
+    // Detecta si una imagen es redonda (border-radius >= 50%)
+    private isAvatar(element: Element, styles: any): boolean {
+        if (element.tagName.toLowerCase() !== 'img') return false;
+        const radius = styles.borderRadius;
+        return radius && (radius.includes('50%') || parseInt(radius) >= 50);
+    }
+
+    // Detecta elementos vacíos que solo aportan altura
+    private isSpacer(element: Element, styles: any): boolean {
+        // Si es un <br> repetido o un div vacío con altura
+        const isEmpty = !element.textContent?.trim() && element.children.length === 0;
+        const hasHeight = styles.height && parseInt(styles.height) > 0;
+        const isBr = element.tagName.toLowerCase() === 'br';
+        return (isEmpty && hasHeight) || (isBr && styles.display === 'block'); // A veces los BR se usan como espaciadores
+    }
+
+    // Detecta <hr> o divs que son solo una línea
+    private isSeparator(element: Element, styles: any): boolean {
+        if (element.tagName.toLowerCase() === 'hr') return true;
+        const isEmpty = !element.textContent?.trim() && element.children.length === 0;
+        const hasBorderTop = styles.borderTopWidth && parseInt(styles.borderTopWidth) > 0;
+        const hasBorderBottom = styles.borderBottomWidth && parseInt(styles.borderBottomWidth) > 0;
+        // Si está vacío, tiene poca altura y tiene borde
+        return isEmpty && (hasBorderTop || hasBorderBottom) && (!styles.height || parseInt(styles.height) < 5);
+    }
+
+    // Detecta <a> que parecen botones (padding + background)
+    private isButton(element: Element, styles: any): boolean {
+        if (element.tagName.toLowerCase() !== 'a') return false;
+        const hasBg = styles.backgroundColor && styles.backgroundColor !== 'transparent' && styles.backgroundColor !== '#ffffff';
+        const hasPadding = styles.padding && (styles.padding.top > 0 || styles.padding.left > 0);
+        const isBlock = styles.display === 'inline-block' || styles.display === 'block';
+        return hasBg && hasPadding && isBlock;
     }
 
     /* =========================================================
@@ -2002,6 +2224,8 @@ private async extractAndProcessStylesWithErrors(contents: JSZip): Promise<{
         };  
         return id;  
     }
+
+
 
     /* =========================================================
        Estilos / helpers
