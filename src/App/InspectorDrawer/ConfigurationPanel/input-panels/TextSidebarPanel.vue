@@ -22,11 +22,11 @@
       </UButton>
     </div> -->
 
-    <!-- <BooleanInput
+    <BooleanInput
       label="Formato Markdown"
       :model-value="Boolean(data.props?.markdown)"
       @update:model-value="handleUpdateData({ ...data, props: { ...data.props, markdown: $event } })"
-    /> -->
+    />
 
     <div class="mt-3">
       <UButton
@@ -91,6 +91,7 @@ import { TextPropsSchema } from '@flyhub/email-block-text';
 import { ref, watch } from 'vue';
 import { useInspectorDrawer } from '../../../../documents/editor/editor.store';
 import RichTextEditor from '../input-panels/RichTextEditor.vue';
+import BooleanInput from './helpers/inputs/BooleanInput.vue';
 
 type TextSidebarPanelProps = {
   data: TextProps

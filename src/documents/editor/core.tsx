@@ -26,6 +26,14 @@ import RichTextLinkEditor from '../blocks/RichTextLink/RichTextLinkEditor.vue';
 import InlineTextEditor from '../blocks/InlineTextEditor/InlineTextEditor.vue';
 import InlineHeadingEditor from '../blocks/InlineHeadingEditor/InlineHeadingEditor.vue';
 import InlineButtonEditor from '../blocks/InlineButtonEditor/InlineButtonEditor.vue';
+import { TablePropsSchema } from '../blocks/Table/TablePropsSchema';
+import TableEditor from '../blocks/Table/TableEditor.vue';
+import { TableRowPropsSchema } from '../blocks/TableRow/TableRowPropsSchema';
+import TableRowEditor from '../blocks/TableRow/TableRowEditor.vue';
+import { TableCellPropsSchema } from '../blocks/TableCell/TableCellPropsSchema';
+import TableCellEditor from '../blocks/TableCell/TableCellEditor.vue';
+import { TableSectionPropsSchema } from '../blocks/TableSection/TableSectionPropsSchema';
+import TableSectionEditor from '../blocks/TableSection/TableSectionEditor.vue';
 
 /* const globalVariables = ref<Record<string, string>>({
   // Variables de ejemplo  
@@ -33,6 +41,7 @@ import InlineButtonEditor from '../blocks/InlineButtonEditor/InlineButtonEditor.
   companyName: 'Acme Corp',
   currentDate: new Date().toLocaleDateString()
 }); */
+
 
 
 export const EDITOR_DICTIONARY = buildBlockConfigurationDictionary({
@@ -85,7 +94,6 @@ export const EDITOR_DICTIONARY = buildBlockConfigurationDictionary({
   },  
   Container: {
     schema: ContainerPropsSchema,
-    /* Component: (props) => <ContainerEditor {...props} />, */
     Component: (props) => (
       <EditorBlockWrapper>
         <ContainerEditor {...props} />
@@ -195,7 +203,40 @@ export const EDITOR_DICTIONARY = buildBlockConfigurationDictionary({
       </EditorBlockWrapper>
     ),
   },
+  Table: {  
+    schema: TablePropsSchema,  
+    Component: (props) => (  
+      <EditorBlockWrapper>  
+        <TableEditor {...props} />  
+      </EditorBlockWrapper>  
+    ),  
+  },
+  TableRow: {  
+    schema: TableRowPropsSchema,  
+    Component: (props) => (  
+      <EditorBlockWrapper>  
+        <TableRowEditor {...props} />  
+      </EditorBlockWrapper>  
+    ),  
+  },  
+  TableCell: {  
+    schema: TableCellPropsSchema,  
+    Component: (props) => (  
+      <EditorBlockWrapper>  
+        <TableCellEditor {...props} />  
+      </EditorBlockWrapper>  
+    ),  
+  },
+  TableSection: {
+    schema: TableSectionPropsSchema,
+    Component: (props) => (
+      <EditorBlockWrapper>
+        <TableSectionEditor {...props} />
+      </EditorBlockWrapper>
+    ),
+  },
 });
+
 
 export const EditorBlockSchema = buildBlockConfigurationSchema(EDITOR_DICTIONARY)
 export const EditorConfigurationSchema = z.record(EditorBlockSchema)

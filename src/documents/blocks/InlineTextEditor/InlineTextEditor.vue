@@ -110,6 +110,7 @@ const computedStyles = computed(() => {
     color: props.style?.color || 'inherit',  
     backgroundColor: props.style?.backgroundColor || 'transparent',
     fontStyle: props.style?.fontStyle || 'inherit',
+    whiteSpace: 'pre-wrap',       // Hace que los \n se vean como saltos de línea
   };  
 });  
 

@@ -139,5 +139,36 @@ export const BUTTONS: TButtonProps[] = [
       },
     }),
   },
+   /* {  
+    label: 'Table',  
+    icon: 'material-symbols:table',  
+    block: () => ({  
+      type: 'Table',  
+      data: {  
+        props: {  
+          rows: [  
+            {  
+              cells: [  
+                { text: 'Celda 1' },  
+                { text: 'Celda 2' }  
+              ]  
+            },  
+            {  
+              cells: [  
+                { text: 'Celda 3' },  
+                { text: 'Celda 4' }  
+              ]  
+            }  
+          ],  
+          borderWidth: 1,  
+          borderColor: '#cccccc',  
+          cellPadding: 8  
+        },  
+        style: {  
+          width: '100%'  
+        }  
+      }  
+    })  
+  }, */  
 ];
 

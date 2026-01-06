@@ -691,6 +691,7 @@ if (targetBlock.type === 'ColumnsContainer') {
     }  
       
     const rect = currentElement.getBoundingClientRect();  
+    
     const midpoint = rect.top + rect.height / 2;  
     
     const currentBlockId = getCurrentBlockId();
@@ -737,6 +738,14 @@ if (targetBlock.type === 'ColumnsContainer') {
       
   function handleDrop(event: DragEvent): void {  
     event.preventDefault();  
+
+    //  VALIDACIÓN: Bloquear si no hay preview  
+    if (!showDropIndicator.value) {  
+      console.log('❌ Drop bloqueado en useDragAndDrop - no hay preview');  
+      showDropIndicator.value = false;  
+      return;  
+    }
+
     showDropIndicator.value = false;  
         
     const draggedId = event.dataTransfer?.getData('text/plain');  

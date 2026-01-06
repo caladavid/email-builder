@@ -104,7 +104,8 @@ import { computed, ref } from 'vue';
 import { useInspectorDrawer } from '../../../documents/editor/editor.store';
 import validateJsonStringValue from './validateJsonStringValue';
 import JSZip from 'jszip';  
-import { HTMLToBlockParser } from './htmlParser'; 
+import { HTMLToBlockParser } from '../../../utils/parsers/HTMLToBlockParser';
+/* import { HTMLToBlockParser } from './htmlParser';  */
 
 const inspectorDrawer = useInspectorDrawer()
 
@@ -176,7 +177,7 @@ async function handleZipUpload(event: Event) {
 
     if (currentOrigin.includes('localhost:3000') || currentOrigin.includes('localhost:5173')) {
 
-      const parser = new HTMLToBlockParser();    
+      const parser = new HTMLToBlockParser();   
       const result = await parser.parseZipToBlocks(file);  
         
       // Separar errores críticos de advertencias  
@@ -194,7 +195,7 @@ async function handleZipUpload(event: Event) {
         
       // Mostrar advertencias informativas si existen  
       if (warnings.length > 0) {  
-        console.warn('Advertencias durante la importación:', warnings);  
+        console.error('Advertencias durante la importación:', warnings);  
         // Opcional: mostrar advertencias al usuario  
         // zipWarning.value = warnings.map(w => w.message).join('\n');  
       }  

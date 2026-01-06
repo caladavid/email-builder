@@ -1,6 +1,8 @@
-import { HTMLToBlockParser } from "../../App/TemplatePanel/ImportJson/htmlParser";
+/* import { HTMLToBlockParser } from "../../App/TemplatePanel/ImportJson/htmlParser"; */
+
 import getConfiguration from "../../getConfiguration";
 import { isOriginAllowed } from "../../utils/allowedOrigins";
+import { HTMLToBlockParser } from "../../utils/parsers/HTMLToBlockParser";
 import type { TEditorConfiguration } from "./core";
 import { defineStore } from "pinia";
 import { computed, nextTick, ref, render } from "vue";
@@ -207,7 +209,21 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
       globalVariables.value
     )
 
-    const html = await renderToStaticMarkup(proccessedDocument, { rootBlockId: 'root' })
+    let html = await renderToStaticMarkup(proccessedDocument, { rootBlockId: 'root' })
+
+  const tempDiv = document.createElement('div');  
+  tempDiv.innerHTML = html;  
+  html = tempDiv.textContent || tempDiv.innerHTML || html;  
+    
+  // Si lo anterior no funciona, intentar con decodeURIComponent  
+  if (html.includes('&lt;')) {  
+    try {  
+      html = decodeURIComponent(html.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'));  
+    } catch (e) {  
+      // Fallback a replace simple  
+      html = html.replace(/&lt;br&gt;/g, '<br>').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');  
+    }  
+  }  
 
     return html;
   }

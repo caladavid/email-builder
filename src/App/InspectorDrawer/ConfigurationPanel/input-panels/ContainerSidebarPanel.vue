@@ -19,7 +19,8 @@ type ContainerSidebarPanelProps = {
   data: ContainerProps;
 }
 
-defineProps<ContainerSidebarPanelProps>()
+/* defineProps<ContainerSidebarPanelProps>() */
+const props = defineProps<ContainerSidebarPanelProps>()
 
 const emit = defineEmits<{
   (e: 'update:data', args: ContainerProps): void
@@ -35,7 +36,15 @@ function handleUpdateData(data: ContainerProps) {
   const res = ContainerPropsSchema.safeParse(data);
 
   if (res.success) {
-    emit('update:data', res.data);
+    // Hacer merge de estilos para preservar width y otras propiedades  
+    const mergedData = {  
+      ...res.data,  
+      style: {  
+        ...props.data.style,  // Preservar estilos existentes como width  
+        ...res.data.style     // Agregar nuevos estilos  
+      }  
+    };
+    emit('update:data', mergedData);
     errors.value = null;
   } else {
     errors.value = res.error;

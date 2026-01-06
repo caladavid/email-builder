@@ -6,6 +6,7 @@
       maxWidth: '100%',  
       outlineOffset: '-1px',  
       outline,  
+      marginBottom: '4px',
       opacity: dragAndDrop.isDragging.value ? 0.5 : 1,  
       transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)', // ✅ Transición suave  
       transform: getBlockTransform() ,  
@@ -109,23 +110,23 @@ function handleDragStart(event: DragEvent) {
   const isTextBlock = currentBlock?.type === "Text";
   const isHeadingBlock = currentBlock?.type === "Heading";
 
-  if (isTextBlock || isHeadingBlock) {  
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();  
-    const x = event.clientX - rect.left;  
-    const y = event.clientY - rect.top;  
-    const edgeThreshold = edgeThresholdPixel;  
-      
-    const isNearEdge = x <= edgeThreshold ||   
-                      x >= rect.width - edgeThreshold ||   
-                      y <= edgeThreshold ||   
-                      y >= rect.height - edgeThreshold;  
-  
-    if (!isNearEdge) {  
-      event.preventDefault();  
-      return;  
-    }  
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();  
+  const x = event.clientX - rect.left;  
+  const y = event.clientY - rect.top;  
+  const edgeThreshold = edgeThresholdPixel;  
+    
+  const isNearEdge = x <= edgeThreshold ||   
+                    x >= rect.width - edgeThreshold ||   
+                    y <= edgeThreshold ||   
+                    y >= rect.height - edgeThreshold;  
+
+  if (!isNearEdge) {  
+    event.preventDefault();  
+    return;  
   }  
-  
+/*   if (isTextBlock || isHeadingBlock) {  
+  }  
+   */
   dragAndDrop.handleDragStart(event);  
 }  
 
@@ -159,7 +160,21 @@ function handleDrop(event: DragEvent) {
   if (!isDraggable.value) return;    
       
   event.preventDefault();    
-  event.stopPropagation();    
+  event.stopPropagation();  
+  
+  // Solo permitir drop si el preview está visible  
+  if (!dragAndDrop.showDropIndicator.value) {  
+    console.log('❌ Drop bloqueado - no hay preview visible');  
+    return;  
+  }  
+
+  // VALIDACIÓN ADICION: Verificar posición válida  
+  if (dragAndDrop.dropPosition.value !== 'before' &&   
+      dragAndDrop.dropPosition.value !== 'after' &&   
+      dragAndDrop.dropPosition.value !== 'center') {  
+    console.log('❌ Drop bloqueado - posición inválida');  
+    return;  
+  }  
       
   const draggedData = event.dataTransfer?.getData('text/plain');    
   const target = event.target as HTMLElement;    
@@ -278,7 +293,7 @@ function handleDragOver(event: DragEvent) {
   const childWrapper = target.closest('.editor-block-wrapper');  
     
   // Si hay un wrapper hijo y no es el actual, dejar que el hijo maneje el evento  
-  if (childWrapper && childWrapper !== currentWrapper) {  
+  if (childWrapper && childWrapper !== currentWrapper && currentWrapper.contains(childWrapper)) {  
     showDropIndicator.value = false;  
     return;  
   }  

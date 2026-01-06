@@ -20,7 +20,31 @@ const processedDocument = computed(() => {
   return JSON.stringify(processed, null, 2);  
 });
 
-console.log(processedDocument.value);
+// Función para truncar base64 en el console.log (Obtener console.log sin base64, mas facil de copiar)
+/* const truncateBase64ForConsole = (obj: any): any => {  
+  if (typeof obj !== 'object' || obj === null) return obj;  
+    
+  if (Array.isArray(obj)) {  
+    return obj.map(item => truncateBase64ForConsole(item));  
+  }  
+    
+  const result: any = {};  
+  for (const [key, value] of Object.entries(obj)) {  
+    if (typeof value === 'string' && value.startsWith('data:image/') && value.includes('base64,')) {  
+      result[key] = 'test...';  
+    } else if (typeof value === 'object') {  
+      result[key] = truncateBase64ForConsole(value);  
+    } else {  
+      result[key] = value;  
+    }  
+  }  
+  return result;  
+};   */
+  
+// Modificar el console.log existente  
+/* console.log('JSON con base64 truncado:', truncateBase64ForConsole(JSON.parse(processedDocument.value))); */
+
+/* console.log(processedDocument.value); */
 
 watch(() => inspectorDrawer.document, async (document) => {
   const json = JSON.stringify(document, null, '  ')

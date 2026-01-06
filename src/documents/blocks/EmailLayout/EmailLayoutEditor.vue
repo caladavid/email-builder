@@ -95,6 +95,11 @@ function handleChangeChildren(args: { block: TEditorBlock, blockId: string, chil
 
   const document = inspectorDrawer.document;
 
+  if (!document[currentBlockId]) {  
+    console.error('Bloque padre no encontrado:', currentBlockId);  
+    return;  
+  }
+
   inspectorDrawer.setDocument({
     [blockId]: block,
     [currentBlockId]: {
