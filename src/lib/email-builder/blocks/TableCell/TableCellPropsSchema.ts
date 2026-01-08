@@ -7,14 +7,14 @@ export const TableCellPropsSchema = z.object({
     backgroundColor: z.string().optional(),  
     textAlign: z.enum(["left", "center", "right"]).optional(),  
     verticalAlign: z.enum(["top", "middle", "bottom"]).optional(),  
-  }).optional().nullable(),  
+  }).passthrough().optional().nullable(),  
   props: z.object({  
     childrenIds: z.array(z.string()).optional().default([]),  
     colspan: z.number().optional().default(1),  
     rowspan: z.number().optional().default(1),  
     align: z.enum(["left", "center", "right", "justify", "char"]).optional(),  
     valign: z.enum(["top", "middle", "bottom", "baseline"]).optional()  
-  }).optional().nullable()  
+  }).passthrough().optional().nullable()  
 });  
   
 export type TableCellProps = {  
@@ -32,5 +32,7 @@ export type TableCellProps = {
     rowspan?: number;  
     align?: "left" | "center" | "right" | "justify" | "char";  
     valign?: "top" | "middle" | "bottom" | "baseline";  
+    width?: string;
+    tagName?: string;
   } | null;  
 };

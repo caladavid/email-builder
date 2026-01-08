@@ -452,6 +452,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     canRedo,  
     authToken,
     setAuthToken,
-    sendZip
+    sendZip,
+    getHtmlFromDocument
   }
 });

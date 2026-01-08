@@ -15,12 +15,14 @@ import { ButtonMatcher } from "./matchers/ButtonMatcher";
 import { ContainerMatcher } from "./matchers/ContainerMatcher";
 import { TextElementsMatcher } from "./matchers/TextElementsMatcher";
 import { SpacerMatcher } from "./matchers/SpacerMatcher";
-import { GreedyTextMatcher } from "./matchers/GreedyTextMatcher";
-import { LayoutMatcher } from "./matchers/LayoutMatcher";
 import { TableBlockMatcher } from "./matchers/TableBlockMatcher";
 import { ScriptMatcher } from "./matchers/ScriptMatcher";
-import { TableSectionMatcher } from "./matchers/TableSectionMatcher";
 import { MixedContentMatcher } from "./matchers/MixedContentMatcher";
+import { TableRowMatcher } from "./matchers/TableRowMatcher";
+import { TableCellMatcher } from "./matchers/TableCellMatcher";
+import { LayoutTableMatcher } from "./matchers/LayoutTableMatcher";
+import { ComparisonSystem } from "./ComparisonSystem";
+import { CriticalLogger } from "./CriticalLogger";
 
 export class HTMLToBlockParser {
 
@@ -34,35 +36,26 @@ export class HTMLToBlockParser {
     private cssParser: CSSParser | EnhancedCSSParser | null = null;
     public protectedBlocks: Set<string> = new Set();
     private globalCssString: string = "";
+    private comparisonSystem: ComparisonSystem = new ComparisonSystem();
+    private comparisonMode: boolean = false;
+    public useLegacyMode: boolean = false;
 
     private matchers: BlockMatcher[] = [
         /* ScriptMatcher, */
         ImageMatcher,
         InlineIconsMatcher,
         ButtonMatcher,
-        /* WebTableMatcher,    
-        TableSectionMatcher,
-        TableRowMatcher, */
-        TextElementsMatcher,
-        MixedContentMatcher,
-
-        /* DataTableMatcher, */
-        /* TableToTextMatcher, */
-        /* StructuralTableMatcher, */
-        /* LayoutMatcher, */
-        /* GreedyTextMatcher, */
+        
         TableBlockMatcher,
+        TableRowMatcher,
+        TableCellMatcher,
+        LayoutTableMatcher,
+
+        TextElementsMatcher,
         ContainerMatcher,
+        MixedContentMatcher,
         SpacerMatcher
     ];
-
-
-    /* private matchers: BlockMatcher[] = [
-        ButtonMatcher,
-        TableBlockMatcher,
-        TextElementsMatcher,
-        SpacerMatcher
-    ]; */
 
     /* ---------------- ZIP → Blocks ---------------- */
     async parseZipToBlocks(zipFile: File): Promise<ParseResult> {
@@ -155,6 +148,8 @@ export class HTMLToBlockParser {
 
         // Eliminar Comentarios de IE/Outlook viejos
         cleaned = cleaned.replace(/<!-- \[if[\s\S]*?endif\] -->/gi, "");
+        const msoRegex = new RegExp("", "gi");
+        cleaned = cleaned.replace(msoRegex, "");
 
         // a. Si hay <tbody ...><tbody ...>, quitamos el segundo apertura
         cleaned = cleaned.replace(/(<tbody[^>]*>)\s*<tbody[^>]*>/gi, "$1");
@@ -568,6 +563,12 @@ export class HTMLToBlockParser {
             const validationErrors = this.validateHtmlStructure(doc);
             errors.push(...validationErrors);
 
+            if (this.comparisonMode) {
+                this.comparisonSystem.clearResults();
+                console.log('%c[COMPARISON] Modo comparación activado', 'color: #FF9800; font-weight: bold;');
+            }
+            CriticalLogger.reset();
+
             // 6. Generación de Bloques
             this.blocks = {};
             this.childrenIds = [];
@@ -582,6 +583,30 @@ export class HTMLToBlockParser {
             // this.flattenRedundantContainers();
 
             const configuration = this.buildConfiguration();
+
+            if (this.comparisonMode) {
+                this.comparisonSystem.printReport();
+                
+                const report = this.comparisonSystem.generateReport();
+                const highSeverity = report.summary.bySeverity.HIGH;
+                
+                if (highSeverity > 0) {
+                    warnings.push(new ParseError(
+                        `Se encontraron ${highSeverity} diferencias críticas entre legacy y matchers`,
+                        'COMPARISON_WARNING',
+                        { comparisonResults: report.details },
+                        true
+                    ));
+                }
+            }
+            
+            // Estadísticas de logging
+            const logStats = CriticalLogger.getStats();
+            if (logStats.errors > 0 || logStats.warnings > 0) {
+                console.log('%c=== LOGGING STATS ===', 'color: #333; font-weight: bold;');
+                console.log(`Errores críticos: ${logStats.errors}`);
+                console.log(`Advertencias: ${logStats.warnings}`);
+            }
 
             return { configuration, errors, warnings };
 
@@ -710,6 +735,31 @@ export class HTMLToBlockParser {
         return dataUrl || PLACEHOLDER_IMG;
     }
 
+    private debugMatch(element: Element, matcherName: string, matched: boolean) {
+        try {
+            const tag = element.tagName ? element.tagName.toLowerCase() : 'unknown';
+            const id = element.id ? `#${element.id}` : '';
+            const classes = element.className ? `.${String(element.className).split(' ').join('.')}` : '';
+            
+            // 🔥 FIX: Leemos el estilo directo del atributo, NO usamos window.getComputedStyle
+            const styleAttr = element.getAttribute('style') || '';
+            const displayMatch = styleAttr.match(/display\s*:\s*([a-z-]+)/i);
+            const display = displayMatch ? displayMatch[1] : 'default';
+
+            // Solo imprimimos si hubo match para no inundar la consola, o quita el 'if' para ver todo
+            if (matched) {
+                console.log(
+                    `%c[MATCHER] ${matcherName.padEnd(20)}`, 'color: cyan; font-weight: bold;',
+                    `| <${tag}${id}${classes}>`,
+                    `| display: ${display}`,
+                    `| children: ${element.children.length}`
+                );
+            }
+        } catch (e) {
+            console.error("Error en debugMatch:", e);
+        }
+    }
+
     /**
      * Método público para permitir recursividad desde los Matchers.
      * Busca el matcher adecuado para un elemento y lo procesa.
@@ -717,37 +767,174 @@ export class HTMLToBlockParser {
     public parseElement(element: Element, inheritedStyles: any = {}): MatcherResult | null {
         for (const matcher of this.matchers) {
             // Pasamos 'this' como segundo argumento porque la interfaz lo requiere
-            if (matcher.isComponent(element, this)) {
+            const matched = matcher.isComponent(element, this);
+            if (matched) {
                 return matcher.fromElement(element, this, inheritedStyles);
             }
         }
         return null;
     }
 
+    private getLegacyResult(
+        element: Element, 
+        inheritedStyles: Record<string, string>
+    ): { id: string; block: any } | null {
+        try {
+            // Clonamos los bloques actuales para poder revertir cambios
+            // (Esto es una simulación ligera para no instanciar todo el parser de nuevo)
+            const snapshotIds = Object.keys(this.blocks);
+            
+            // Ejecutamos legacy
+            const tempId = this.processElementLegacy(element, inheritedStyles);
+            
+            if (!tempId) return null;
 
-    private processElement(
+            const legacyBlock = { ...this.blocks[tempId] }; // Copia del bloque
+            
+            // REVERTIR CAMBIOS: Borramos el bloque creado y cualquier hijo nuevo
+            // para que no ensucien el resultado final del Matcher
+            const currentIds = Object.keys(this.blocks);
+            const newIds = currentIds.filter(id => !snapshotIds.includes(id));
+            newIds.forEach(id => delete this.blocks[id]);
+
+            return { id: tempId, block: legacyBlock };
+            
+        } catch (error) {
+            return null;
+        }
+    }
+
+/*     private getLegacyResult(
+        element: Element, 
+        inheritedStyles: Record<string, string>
+    ): { id: string; block: any } | null {
+        try {
+            // CREAR UN PARSER TEMPORAL COMPLETAMENTE AISLADO
+            const tempParser = new HTMLToBlockParser();
+            
+            // Copiar solo los recursos de assets (no el estado)
+            tempParser.imageMap = this.imageMap;
+            tempParser.fontMap = this.fontMap;
+            tempParser.mediaMap = this.mediaMap;
+            tempParser.mobileStylesMap = new Map(this.mobileStylesMap);
+            tempParser.globalCssString = this.globalCssString;
+            
+            // Copiar el CSS parser si existe
+            if (this.cssParser) {
+                // Crear uno nuevo con el mismo CSS para evitar problemas de referencia
+                tempParser.cssParser = new CSSParser(this.globalCssString);
+            }
+            
+            // Ejecutar legacy en el parser temporal
+            const tempId = tempParser.processElementLegacy(element, inheritedStyles);
+            
+            if (!tempId) {
+                return null;
+            }
+            
+            return {
+                id: tempId,
+                block: tempParser.blocks[tempId]
+            };
+        } catch (error) {
+            CriticalLogger.error(`Error en getLegacyResult`, element, error);
+            return null;
+        }
+    } */
+
+private processElement(
         element: Element,
         inheritedStyles: Record<string, string>
     ): string | null {
+        // Evitar bucles infinitos
         if (this.processedElements.has(element)) return null;
 
+        // =========================================================
+        // ESCENARIO 1: MODO LEGACY PURO (Switch de emergencia)
+        // =========================================================
+        if (this.useLegacyMode) {
+            const legacyId = this.processElementLegacy(element, inheritedStyles);
+            if (legacyId) {
+                this.processedElements.add(element);
+            }
+            return legacyId;
+        }
+
+        const tagName = element.tagName.toLowerCase();
+        const id = element.id || 'sin-id';
+
+        // 🔍 DEBUG LOG: Solo para los elementos problemáticos
+        const isProblematic = id === 'iflem' || id === 'irtcdy' || tagName === 'table'; 
+        
+        if (isProblematic) {
+            console.group(`🔍 Analizando <${tagName} id="${id}">`);
+        }
+
+        // =========================================================
+        // ESCENARIO 2 & 3: MODO MATCHERS (con o sin comparación)
+        // =========================================================
+
+        // 1. Ejecutar Matchers (Nuestra prioridad)
+        let matcherResult: MatcherResult | null = null;
+        let matcherName: string | null = null;
+        
         for (const matcher of this.matchers) {
-            if (matcher.isComponent(element, this)) {
-                const result = matcher.fromElement(element, this, inheritedStyles);
-                if (result) {
-                    this.processedElements.add(element); // Marcamos como procesado
-                    return result.id;
+            const isMatch = matcher.isComponent(element, this);
+
+            if (isProblematic) {
+                console.log(`   ❓ ${matcher.name}: ${isMatch ? "✅ SÍ" : "❌ NO"}`);
+            }
+
+            if (isMatch) {
+                matcherResult = matcher.fromElement(element, this, inheritedStyles);
+                if (isProblematic) {
+                     console.log(`   ✨ Resultado ${matcher.name}:`, matcherResult ? "OK" : "NULL (Falló en fromElement)");
                 }
+                if (matcherResult) break; 
             }
         }
 
-        // Matchers Test
-        return null;
+        if (isProblematic) {
+            console.groupEnd();
+        }
 
-        this.processedElements.add(element);
+        // 2. Si el modo comparación está activo, obtenemos el resultado legacy "en la sombra"
+        if (this.comparisonMode) {
+             const legacyData = this.getLegacyResult(element, inheritedStyles);
+             
+             // Comparamos lo que habría hecho el legacy vs lo que hizo el matcher
+             this.comparisonSystem.compare(
+                element,
+                legacyData,
+                matcherResult ? { id: matcherResult.id, block: this.blocks[matcherResult.id] } : null,
+                matcherName || 'unknown'
+            );
+        }
 
+        // 3. Retornar resultado del Matcher
+        if (matcherResult) {
+            this.processedElements.add(element);
+            return matcherResult.id;
+        }
         
+        // 4. Fallback: Si los Matchers fallaron, usamos Legacy para no dejar huecos
+        // (A menos que queramos ser estrictos, pero por ahora es seguro dejarlo)
+        const fallbackId = this.processElementLegacy(element, inheritedStyles);
+        if (fallbackId) {
+            this.processedElements.add(element);
+            return fallbackId;
+        }
+        
+        // 5. Nada funcionó
+        CriticalLogger.warning(`Elemento no procesado: <${tagName}>`, element);
+        return null;
+    }
 
+    private processElementLegacy(
+        element: Element,
+        inheritedStyles: Record<string, string>
+    ): string | null {
+        if (this.processedElements.has(element)) return null; 
         const tagName = element.tagName.toLowerCase();
         const currentStyles = this.extractStyles(element, inheritedStyles);
 
@@ -875,8 +1062,6 @@ export class HTMLToBlockParser {
 
         return null;
     }
-
-
 
     public processInlineContent(
         element: Element,
@@ -1050,6 +1235,21 @@ export class HTMLToBlockParser {
         });
 
         return { text, formats, hasListStructure };
+    }
+
+    // Método auxiliar para procesar nodos en legacy
+    private processNodeForLegacy(node: Node, inheritedStyles: Record<string, any>): string | null {
+        if (node.nodeType === Node.TEXT_NODE) {
+            const textContent = node.textContent;
+            if (!textContent || !textContent.trim()) return null;
+            return this.createTextBlock(textContent, [], inheritedStyles);
+        }
+
+        if (node.nodeType === Node.ELEMENT_NODE) {
+            return this.processElementLegacy(node as Element, inheritedStyles);
+        }
+
+        return null;
     }
 
     private isInlineOnly(el: Element): boolean {
@@ -1279,8 +1479,18 @@ export class HTMLToBlockParser {
 
     private isAvatar(element: Element, styles: any): boolean {
         if (element.tagName.toLowerCase() !== 'img') return false;
+        
         const radius = styles.borderRadius;
-        return radius && (radius.includes('50%') || parseInt(radius) >= 50);
+        if (!radius) return false;
+
+        // 🔥 FIX: Convertir a String antes de usar includes
+        const radiusStr = String(radius); 
+        
+        // Comprobamos si es porcentaje (50%) o número alto (>= 50px)
+        const isCircle = radiusStr.includes('50%');
+        const isLargeValue = parseInt(radiusStr) >= 50;
+
+        return isCircle || isLargeValue;
     }
 
     private isSpacer(element: Element, styles: any): boolean {
@@ -1724,7 +1934,9 @@ export class HTMLToBlockParser {
             return false;
         });
 
+        /* finalStyles.whiteSpace = "pre-line"; */
         finalStyles.textAlign = StyleUtils.normalizeTextAlign(finalStyles?.textAlign);
+
 
         const hasMarkdownLinks = /\[([^\]]+)\]\(([^)]+)\)/.test(finalText);
         const hasRemainingFormats = finalFormats.length > 0;
@@ -1915,17 +2127,17 @@ export class HTMLToBlockParser {
         if (!childrenIds.length) return null;
         const id = uuidv4();
 
-        // 1. Normalización
+        // 1. Normalización inicial
         const s = StyleUtils.normalizeStyles(styles || {});
 
-        // Helpers
+        // Helpers para extracción segura de valores numéricos
         const getVal = (v1: any, v2?: any) => {
             const val = v1 !== undefined ? v1 : v2;
             return parseInt(String(val || 0).replace(/px/g, '').trim()) || 0;
         };
         const getRaw = (v1: any, v2?: any) => v1 !== undefined ? v1 : v2;
 
-        // Cálculo de valores seguros
+        // 2. Cálculo de valores seguros (garantiza que sean objetos {top, right...})
         const safePadding = {
             top: getVal(s.paddingTop, s.padding?.top),
             right: getVal(s.paddingRight, s.padding?.right),
@@ -1940,14 +2152,15 @@ export class HTMLToBlockParser {
             left: getVal(s.marginLeft, s.margin?.left)
         };
 
-        // Estilos Base
+        // 3. Construcción del Estilo Base
         const styleToApply: any = {
             ...s,
             display: s.display || "block",
             boxSizing: "border-box",
+            // Forzamos que sean objetos desde el inicio
             padding: safePadding,
             margin: safeMargin,
-            // Sincronización de propiedades planas para el renderizador
+            // Sincronización de propiedades planas
             paddingTop: safePadding.top + 'px',
             paddingRight: safePadding.right + 'px',
             paddingBottom: safePadding.bottom + 'px',
@@ -1961,7 +2174,7 @@ export class HTMLToBlockParser {
         if (styles?.backgroundColor) styleToApply.backgroundColor = styles.backgroundColor;
         if (styles?.width) styleToApply.width = styles.width;
 
-        // --- LÓGICA DE CENTRADO UNIFICADA ---
+        // --- 4. LÓGICA DE CENTRADO UNIFICADA ---
         const align = s.align;
         const textAlign = s.textAlign;
         const rawMarginLeft = getRaw(s.marginLeft, s.margin?.left);
@@ -1969,25 +2182,29 @@ export class HTMLToBlockParser {
 
         const isAlignedCenter = align === 'center' || textAlign === 'center' || textAlign === '-webkit-center';
         const isExplicitlyLeft = align === 'left' || s.float === 'left';
-        const isAutoMargin = String(rawMarginLeft) === 'auto' || String(rawMarginRight) === 'auto';
+        // Check seguro de auto margin
+        const isAutoMargin = String(rawMarginLeft).includes('auto') || String(rawMarginRight).includes('auto') || (typeof s.margin === 'string' && s.margin.includes('auto'));
 
         let shouldCenter = false;
 
-        // AQUÍ ESTÁ LA LÓGICA MAESTRA (Eliminé el bloque redundante anterior)
         if (isAutoMargin || (s.width && isAlignedCenter && !isExplicitlyLeft)) {
             shouldCenter = true;
 
             styleToApply.marginLeft = "auto";
             styleToApply.marginRight = "auto";
 
-            // @ts-ignore
-            if (!styleToApply.margin) styleToApply.margin = {};
+            // 🔥 FIX CRÍTICO 1: Asegurar que margin sea objeto antes de tocarlo
+            if (!styleToApply.margin || typeof styleToApply.margin !== 'object') {
+                styleToApply.margin = { top: 0, bottom: 0, left: 0, right: 0 };
+            }
+            // Ahora es seguro asignar
             // @ts-ignore
             styleToApply.margin.left = "auto";
             // @ts-ignore
             styleToApply.margin.right = "auto";
         }
 
+        // Configuración Flexbox si aplica
         if (styleToApply.display === "flex") {
             styleToApply.flexDirection = styleToApply.flexDirection || "row";
             styleToApply.justifyContent = styleToApply.justifyContent || "flex-start";
@@ -1998,31 +2215,34 @@ export class HTMLToBlockParser {
             }
         }
 
-        // --- FUSIÓN (MERGE) ---
+        // --- 5. FUSIÓN (MERGE) CON HIJO ÚNICO ---
         if (childrenIds.length === 1) {
             const childId = childrenIds[0];
             const childBlock = this.blocks[childId];
-            const isMergeableType = ['Container', 'Image', 'Text', 'Button'].includes(childBlock.type);
+            
+            const isMergeableType = ['Container', 'Image', 'Text', 'Button'].includes(childBlock?.type);
 
             if (childBlock && isMergeableType) {
                 const childStyle = childBlock.data.style || {};
 
                 const pBg = styleToApply.backgroundColor ? String(styleToApply.backgroundColor).toLowerCase() : '';
                 const cBg = childStyle.backgroundColor ? String(childStyle.backgroundColor).toLowerCase() : '';
-                const parentHasBg = pBg && pBg !== 'transparent' && pBg !== '#ffffff' && pBg !== '#fff';
+                
+                const parentHasBg = pBg && pBg !== 'transparent' && pBg !== '#ffffff' && pBg !== '#fff' && pBg !== 'rgba(0, 0, 0, 0)';
                 const childHasBg = cBg && cBg !== 'transparent';
 
                 const colorsAreSame = parentHasBg && pBg === cBg;
                 const colorsAreDifferent = parentHasBg && childHasBg && !colorsAreSame;
 
                 const childIsConstrained = childStyle.width && childStyle.width !== '100%' && childStyle.width !== '100.0%';
+                
                 const preventFusion = colorsAreDifferent || (parentHasBg && childIsConstrained && !colorsAreSame);
 
                 if (!preventFusion) {
-                    // === FUSIÓN ACEPTADA ===
+                    // === CASO A: FUSIÓN ACEPTADA (El padre absorbe al hijo) ===
                     const mergedStyle = { ...childStyle };
 
-                    // Usar mergePx para evitar duplicación de padding
+                    // Fusionar Padding
                     mergedStyle.paddingTop = this.mergePx(childStyle.paddingTop, safePadding.top);
                     mergedStyle.paddingBottom = this.mergePx(childStyle.paddingBottom, safePadding.bottom);
                     mergedStyle.paddingLeft = this.mergePx(childStyle.paddingLeft, safePadding.left);
@@ -2035,29 +2255,37 @@ export class HTMLToBlockParser {
                         right: mergedStyle.paddingRight
                     };
 
+                    // Heredar fondo del padre si el hijo no tiene
                     if (!childHasBg && parentHasBg) mergedStyle.backgroundColor = pBg;
 
+                    // Aplicar centrado
                     if (shouldCenter) {
                         mergedStyle.marginLeft = "auto";
                         mergedStyle.marginRight = "auto";
                         mergedStyle.display = "block";
-                        if (!mergedStyle.margin) mergedStyle.margin = {};
+                        
+                        // 🔥 FIX CRÍTICO 2 (FUSIÓN): Validar margin del hijo antes de tocar
+                        if (!mergedStyle.margin || typeof mergedStyle.margin !== 'object') {
+                            mergedStyle.margin = { top: 0, bottom: 0, left: 0, right: 0 };
+                        }
                         // @ts-ignore
                         mergedStyle.margin.left = "auto";
                         // @ts-ignore
                         mergedStyle.margin.right = "auto";
                     }
 
+                    // Heredar ancho del padre si el hijo es fluido
                     if (s.width && !childIsConstrained) {
                         mergedStyle.width = s.width;
                         if (s.maxWidth) mergedStyle.maxWidth = s.maxWidth;
                     }
 
+                    // Actualizamos el bloque hijo y devolvemos su ID (eliminando el contenedor padre)
                     this.blocks[childId].data.style = mergedStyle;
                     return childId;
                 }
                 else {
-                    // === NO FUSIÓN ===
+                    // === CASO B: NO FUSIÓN (Mantenemos padre e hijo separados) ===
                     const currentChildStyle = { ...childBlock.data.style };
 
                     if (shouldCenter || childIsConstrained) {
@@ -2065,7 +2293,10 @@ export class HTMLToBlockParser {
                         currentChildStyle.marginRight = "auto";
                         currentChildStyle.display = "block";
 
-                        if (!currentChildStyle.margin) currentChildStyle.margin = {};
+                        // 🔥 FIX CRÍTICO 3 (HIJO): Validar margin del hijo
+                        if (!currentChildStyle.margin || typeof currentChildStyle.margin !== 'object') {
+                            currentChildStyle.margin = { top: 0, bottom: 0, left: 0, right: 0 };
+                        }
                         // @ts-ignore
                         currentChildStyle.margin.left = "auto";
                         // @ts-ignore
@@ -2078,25 +2309,32 @@ export class HTMLToBlockParser {
 
                     this.blocks[childId].data.style = currentChildStyle;
 
+                    // Ajustes finales al padre si tiene fondo
                     if (parentHasBg) {
                         styleToApply.width = '100%';
                         styleToApply.maxWidth = '100%';
                         styleToApply.marginLeft = 0;
                         styleToApply.marginRight = 0;
+                        
+                        // 🔥 FIX CRÍTICO 4 (PADRE): Validar margin del padre
+                        if (!styleToApply.margin || typeof styleToApply.margin !== 'object') {
+                            styleToApply.margin = { top: 0, bottom: 0, left: 0, right: 0 };
+                        }
                         // @ts-ignore
-                        if (styleToApply.margin) { styleToApply.margin.left = 0; styleToApply.margin.right = 0; }
+                        styleToApply.margin.left = 0;
+                        // @ts-ignore
+                        styleToApply.margin.right = 0;
                     }
                 }
             }
         }
 
+        // 6. Limpieza de padding redundante en hijos (Fix para Unlayer/Outlook)
         if (childrenIds.length > 0) {
             const pTop = parseInt(styleToApply.paddingTop) || 0;
             const pBottom = parseInt(styleToApply.paddingBottom) || 0;
-            const pLeft = parseInt(styleToApply.paddingLeft) || 0;
-            const pRight = parseInt(styleToApply.paddingRight) || 0;
 
-            if (pTop > 0 || pBottom > 0 || pLeft > 0 || pRight > 0) {
+            if (pTop > 0 || pBottom > 0) {
                 childrenIds.forEach(childId => {
                     const child = this.blocks[childId];
                     if (!child || !child.data || !child.data.style) return;
@@ -2104,23 +2342,22 @@ export class HTMLToBlockParser {
                     const cStyle = child.data.style;
                     const cTop = parseInt(cStyle.paddingTop) || 0;
                     const cBottom = parseInt(cStyle.paddingBottom) || 0;
-                    // ... (left/right si es necesario)
 
-                    // Si el hijo tiene EXACTAMENTE el mismo padding que el padre, 
-                    // asumimos que fue heredado/duplicado erróneamente y lo borramos del hijo.
                     if (cTop === pTop && cTop > 0) {
                         cStyle.paddingTop = "0px";
-                        if (cStyle.padding) cStyle.padding.top = 0;
+                        // 🔥 FIX: Validar objeto padding antes de tocar
+                        if (cStyle.padding && typeof cStyle.padding === 'object') cStyle.padding.top = 0;
                     }
                     if (cBottom === pBottom && cBottom > 0) {
                         cStyle.paddingBottom = "0px";
-                        if (cStyle.padding) cStyle.padding.bottom = 0;
+                        // 🔥 FIX: Validar objeto padding antes de tocar
+                        if (cStyle.padding && typeof cStyle.padding === 'object') cStyle.padding.bottom = 0;
                     }
-                    // Lo mismo para left/right si aplica, aunque en emails suele ser top/bottom el problema
                 });
             }
         }
 
+        // 7. Crear y guardar el bloque
         this.blocks[id] = {
             type: "Container",
             data: {
@@ -2767,62 +3004,144 @@ export class HTMLToBlockParser {
         }
     }
 
+    /**
+     * Configurar modo de comparación
+     */
+    public setComparisonMode(enabled: boolean): void {
+        this.comparisonMode = enabled;
+        if (enabled) {
+            console.log('%c[COMPARISON] Modo comparación activado', 'color: #FF9800; font-weight: bold;');
+        }
+    }
+
+    /**
+     * Obtener reporte de comparación
+     */
+    public getComparisonReport(): any {
+        return this.comparisonSystem.generateReport();
+    }
+
+    /**
+     * Imprimir reporte de comparación
+     */
+    public printComparisonReport(): void {
+        this.comparisonSystem.printReport();
+    }
+
+    /**
+     * Obtener estadísticas de logging
+     */
+    public getLogStats(): { errors: number; warnings: number } {
+        return CriticalLogger.getStats();
+    }
+
     private buildConfiguration(): TEditorConfiguration {
         const rootId = "root";
 
         Object.keys(this.blocks).forEach(blockId => {
             const block = this.blocks[blockId];
             if (block.data && block.data?.style) {
+                const style = block.data.style;
 
-                // ... (tu lógica de padding y fontSize sigue igual) ...
-                if (!block.data.style.padding) block.data.style.padding = { top: 0, right: 0, bottom: 0, left: 0 };
-                const p = block.data.style.padding;
-                ['top', 'right', 'bottom', 'left'].forEach(k => {
-                    if (typeof p[k] === 'string') p[k] = parseInt(p[k]) || 0;
+                ['lineHeight', 'verticalAlign', 'textAlign', 'color', 'backgroundColor'].forEach(prop => {
+                if (typeof style[prop] === 'string') {
+                    style[prop] = style[prop].replace(/!important/gi, '').trim();
+                    if (style[prop] === 'inherit') delete style[prop]; // Evita error de Enum
+                    }
                 });
 
-                if (typeof block.data.style.fontSize === 'string') {
-                    const num = parseInt(block.data.style.fontSize);
+                // 2. NORMALIZACIÓN DE PADDING A NÚMEROS (Soluciona el error invalid_type)
+                if (style.padding && typeof style.padding === 'object') {
+                    style.padding = {
+                        top: parseInt(String(style.padding.top || 0)) || 0,
+                        right: parseInt(String(style.padding.right || 0)) || 0,
+                        bottom: parseInt(String(style.padding.bottom || 0)) || 0,
+                        left: parseInt(String(style.padding.left || 0)) || 0
+                    };
+                }
+
+                const colorProps = ['backgroundColor', 'color', 'borderColor'];
+                
+                colorProps.forEach(prop => {
+                    if (style[prop]) {
+                        // 1. Clean string
+                        let val = String(style[prop]).replace(/!important/g, '').trim();
+                        
+                        // 2. Normalize to HEX using the improved util
+                        let hex = StyleUtils.normalizeColor(val);
+                        
+                        // 3. Final Regex Check (Safety Net)
+                        if (hex && /^#[0-9a-f]{6}$/i.test(hex)) {
+                            style[prop] = hex;
+                        } else {
+                            // If invalid, DELETE IT. Better to have no color than a crash.
+                            delete style[prop]; 
+                            
+                            // Optional: Set defaults if critical
+                            if (prop === 'color' && !style[prop]) style.color = '#000000';
+                            // Background usually defaults to transparent if missing
+                        }
+                    }
+                });
+
+                // 3. Fallback para verticalAlign (Enum 'top' | 'middle' | 'bottom')
+                const validVA = ['top', 'middle', 'bottom'];
+                if (style.verticalAlign && !validVA.includes(style.verticalAlign)) {
+                    style.verticalAlign = 'top';
+                }
+
+                // 4. Asegurar que fontSize sea Number
+                if (style.fontSize) {
+                    style.fontSize = parseInt(String(style.fontSize)) || 16;
+                }
+
+                if (typeof style.fontSize === 'string') {
+                    const num = parseInt(style.fontSize);
                     block.data.style.fontSize = isNaN(num) ? 16 : num;
                 }
 
-                if (block.data.style.fontWeight && !['bold', 'normal'].includes(block.data.style.fontWeight)) {
+                if (style.fontWeight && !['bold', 'normal'].includes(style.fontWeight)) {
                     const weight = String(block.data.style.fontWeight);
                     block.data.style.fontWeight = (parseInt(weight) >= 600) ? 'bold' : 'normal';
                 }
 
+                const validTA = ['left', 'center', 'right'];
+                if (!style.textAlign || !validTA.includes(style.textAlign)) {
+                    // Si es 'inherit', intentamos usar el align de las props o 'left'
+                    style.textAlign = block.data.props?.align || 'left';
+                }
+
                 // 🔥 CORRECCIÓN AQUÍ: No borramos el color si no es hex perfecto.
                 // Solo normalizamos y confiamos en el valor.
-                if (block.data.style.backgroundColor) {
-                    const color = StyleUtils.normalizeColor(block.data.style.backgroundColor);
+                if (style.backgroundColor) {
+                    let color = String(style.backgroundColor).replace(/!important/g, '').trim();
+                    color = StyleUtils.normalizeColor(color); // Debe devolver un #HEX
+                    // Si no es un hex válido (ej. "transparent"), poner "transparent" o eliminar si el regex falla
+                    style.backgroundColor = /^#[0-9A-F]{6}$/i.test(color) ? color : "transparent";
+                } else {
+                    style.backgroundColor = "transparent";
+                }
 
-                    // Si Zod es estricto con Hex:
+
+                if (style.color) {
+                    const color = StyleUtils.normalizeColor(style.color);
+
                     if (!/^#[0-9A-F]{6}$/i.test(color)) {
-                        delete block.data.style.backgroundColor; // Borrar si no es válido
+                        delete style.color;
                     } else {
-                        block.data.style.backgroundColor = color;
+                        style.color = color;
                     }
                 }
 
-                if (block.data.style.color) {
-                    const color = StyleUtils.normalizeColor(block.data.style.color);
-
-                    if (!/^#[0-9A-F]{6}$/i.test(color)) {
-                        delete block.data.style.color;
-                    } else {
-                        block.data.style.color = color;
-                    }
-                }
-
-                if (block.data.style.borderRadius) {
-                    const radius = parseInt(String(block.data.style.borderRadius));
-                    block.data.style.borderRadius = isNaN(radius) ? 0 : radius;
+                if (style.borderRadius) {
+                    const radius = parseInt(String(style.borderRadius));
+                    style.borderRadius = isNaN(radius) ? 0 : radius;
                 }
 
                 // 7. CORRECCIÓN FONT FAMILY (Fallback seguro)
                 // Asegura que siempre sea uno de los Enums permitidos (MODERN_SANS, etc.)
-                if (block.data.style.fontFamily) {
-                    block.data.style.fontFamily = StyleUtils.normalizeFontFamily(block.data.style.fontFamily);
+                if (style.fontFamily) {
+                    style.fontFamily = StyleUtils.normalizeFontFamily(style.fontFamily);
                 }
                 
             }
@@ -2830,17 +3149,17 @@ export class HTMLToBlockParser {
 
         const config = {
             [rootId]: {
-                type: "EmailLayout",
+                type: "EmailLayout" as const,
                 data: {
                     backdropColor: "#F8F8F8",
                     canvasColor: "#FFFFFF",
                     textColor: "#242424",
-                    fontFamily: "MODERN_SANS",
+                    fontFamily: "MODERN_SANS" as const,
                     childrenIds: this.childrenIds
                 }
             },
             ...this.blocks
-        };
+        } as unknown as TEditorConfiguration;;
 
         const validation = EditorConfigurationSchema.safeParse(config);
         if (!validation.success) {

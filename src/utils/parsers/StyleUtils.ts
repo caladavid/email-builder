@@ -215,49 +215,52 @@ export class StyleUtils {
         return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
     }
 
-    static normalizeColor(color: string): string {  
-        if (!color || color.trim() === "") return "#FFFFFF";  
+    public static normalizeColor(color: string | null | undefined): string | undefined {
+        if (!color || color === 'transparent' || color === 'inherit' || color === 'initial') {
+            return undefined; // Or "transparent" if your schema allows it
+        }
+
+        const c = color.trim().toLowerCase();
+
+        // 1. Already HEX?
+        if (/^#[0-9a-f]{6}$/i.test(c)) return c;
+        if (/^#[0-9a-f]{3}$/i.test(c)) {
+            // Expand #FFF to #FFFFFF
+            return '#' + c[1] + c[1] + c[2] + c[2] + c[3] + c[3];
+        }
+
+        // 2. Handle RGB/RGBA
+        if (c.startsWith('rgb')) {
+            const matches = c.match(/\d+/g);
+            if (matches && matches.length >= 3) {
+                const r = parseInt(matches[0]);
+                const g = parseInt(matches[1]);
+                const b = parseInt(matches[2]);
+                const toHex = (n: number) => {
+                    const hex = n.toString(16);
+                    return hex.length === 1 ? '0' + hex : hex;
+                };
+                return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+            }
+        }
+
+        // 3. Handle Common Names (Optional, add more if needed)
+        const colors: Record<string, string> = {
+            white: '#ffffff',
+            black: '#000000',
+            red: '#ff0000',
+            blue: '#0000ff',
+            green: '#008000',
+            gray: '#808080',
+            grey: '#808080'
+        };
         
-        const trimmedColor = color.trim().toLowerCase();  
-        
-        // Valores especiales  
-        if (trimmedColor === "transparent") return "transparent";  
-        if (trimmedColor === "inherit") return "inherit";  
-        if (trimmedColor === "initial") return "#000000";  
-        if (trimmedColor === "unset") return "#000000";  
-        
-        // Ya es hex válido  
-        if (/^#[0-9a-f]{6}$/i.test(trimmedColor)) return trimmedColor;  
-        if (/^#[0-9a-f]{3}$/i.test(trimmedColor)) {  
-            // Expandir hex corto  
-            return `#${trimmedColor[1]}${trimmedColor[1]}${trimmedColor[2]}${trimmedColor[2]}${trimmedColor[3]}${trimmedColor[3]}`;  
-        }  
-        
-        // RGB/RGBA  
-        if (trimmedColor.startsWith("rgb")) {  
-            const hex = this.rgbToHex(trimmedColor);  
-            if (/^#[0-9a-f]{6}$/i.test(hex)) return hex;  
-        }  
-        
-        // HSL/HSLA  
-        if (trimmedColor.startsWith("hsl")) {  
-            const hex = this.hslToHex(trimmedColor);  
-            if (/^#[0-9a-f]{6}$/i.test(hex)) return hex;  
-        }  
-        
-        // Colores nombrados extendidos  
-        const namedColors: Record<string, string> = {  
-            white: "#FFFFFF", black: "#000000", red: "#FF0000", green: "#008000",  
-            blue: "#0000FF", gray: "#808080", grey: "#808080", yellow: "#FFFF00",  
-            cyan: "#00FFFF", magenta: "#FF00FF", orange: "#FFA500", purple: "#800080",  
-            pink: "#FFC0CB", brown: "#A52A2A", olive: "#808000", navy: "#000080",  
-            teal: "#008080", lime: "#00FF00", aqua: "#00FFFF", fuchsia: "#FF00FF",  
-            silver: "#C0C0C0", maroon: "#800000", darkgray: "#A9A9A9", darkgrey: "#A9A9A9",  
-            lightgray: "#D3D3D3", lightgrey: "#D3D3D3"  
-        };  
-        
-        return namedColors[trimmedColor] || "#FFFFFF";  
-    }  
+        if (colors[c]) return colors[c];
+
+        // If we can't normalize, return undefined to avoid Zod error
+        // forcing a fallback to default color.
+        return undefined; 
+    }
 
     /**
      * Expande shorthands CSS (padding: 10px -> padding-top: 10px...)

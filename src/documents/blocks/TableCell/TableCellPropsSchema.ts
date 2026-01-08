@@ -6,25 +6,28 @@ export const TableCellPropsSchema = z.object({
     padding: z.string().optional(),  
     backgroundColor: z.string().optional(),  
     textAlign: z.enum(["left", "center", "right"]).optional(),  
+    width: z.string().optional(),
     verticalAlign: z.enum(["top", "middle", "bottom"]).optional(),  
-  }).optional().nullable(),  
+  }).passthrough().optional().nullable(),  
   props: z.object({  
     childrenIds: z.array(z.string()).optional().default([]),  
     colspan: z.number().optional().default(1),  
     rowspan: z.number().optional().default(1),  
     align: z.enum(["left", "center", "right", "justify", "char"]).optional(),  
-    valign: z.enum(["top", "middle", "bottom", "baseline"]).optional()  
-  }).optional().nullable()  
+    valign: z.enum(["top", "middle", "bottom", "baseline"]).optional(),
+    width: z.string().optional(), 
+    tagName: z.string().optional(),
+  }).passthrough().optional().nullable()  
 });  
   
 export type TableCellProps = {  
-  document: Record<string, any>;  
   style?: {  
     border?: string;  
     padding?: string;  
     backgroundColor?: string;  
     textAlign?: "left" | "center" | "right";  
-    verticalAlign?: "top" | "middle" | "bottom";  
+    verticalAlign?: "top" | "middle" | "bottom"; 
+    width?: string; 
   } | null;  
   props?: {  
     childrenIds?: string[] | null;  
@@ -32,5 +35,6 @@ export type TableCellProps = {
     rowspan?: number;  
     align?: "left" | "center" | "right" | "justify" | "char";  
     valign?: "top" | "middle" | "bottom" | "baseline";  
+    width?: string; 
   } | null;  
 };

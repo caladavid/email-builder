@@ -12,6 +12,7 @@ import { computed, type CSSProperties } from 'vue';
 
 const props = defineProps<ContainerProps>()
 
+
   /* const childrenIds = props.props?.childrenIds ?? [] */
   const childrenIds = computed(() => props.props?.childrenIds ?? []);
   
@@ -44,13 +45,9 @@ const props = defineProps<ContainerProps>()
 const containerStyles = computed<CSSProperties>(() => {
   const raw = props.style || {};
   
-  const styles: CSSProperties = {
+  const styles: any = {
+    ...raw,
     // Propiedades directas
-    backgroundColor: raw.backgroundColor ?? undefined,
-    width: raw.width ?? undefined,
-    maxWidth: raw.maxWidth ?? undefined,
-    height: raw.height ?? undefined,
-    display: raw.display ?? undefined,
 
     // Propiedades transformadas
     border: raw.borderColor ? `1px solid ${raw.borderColor}` : undefined,
@@ -58,10 +55,15 @@ const containerStyles = computed<CSSProperties>(() => {
     padding: getPadding(raw.padding),
     margin: getMargin(raw.margin),
     
-    boxSizing: 'border-box'
+    display: raw.display || 'block',
+    width: raw.width || '100%',
+
   };
 
-  return styles;
+  delete styles.padding;
+  delete styles.margin;
+
+  return styles as CSSProperties;
 });
 
 

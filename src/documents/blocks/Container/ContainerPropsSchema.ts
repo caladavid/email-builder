@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { ContainerPropsSchema as BaseContainerPropsSchema } from '@flyhub/email-block-container';
+import { ContainerPropsSchema as BaseContainerPropsSchema} from '../../../lib/email-builder/blocks/Container';
 import type { ContainerProps as BaseContainerProps } from '@flyhub/email-block-container';
 
 const ContainerPropsSchema = z.object({

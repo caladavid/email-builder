@@ -21,7 +21,7 @@ const processedDocument = computed(() => {
 });
 
 // Función para truncar base64 en el console.log (Obtener console.log sin base64, mas facil de copiar)
-/* const truncateBase64ForConsole = (obj: any): any => {  
+const truncateBase64ForConsole = (obj: any): any => {  
   if (typeof obj !== 'object' || obj === null) return obj;  
     
   if (Array.isArray(obj)) {  
@@ -39,10 +39,10 @@ const processedDocument = computed(() => {
     }  
   }  
   return result;  
-};   */
+};  
   
 // Modificar el console.log existente  
-/* console.log('JSON con base64 truncado:', truncateBase64ForConsole(JSON.parse(processedDocument.value))); */
+console.log('JSON con base64 truncado:', truncateBase64ForConsole(JSON.parse(processedDocument.value)));
 
 /* console.log(processedDocument.value); */
 

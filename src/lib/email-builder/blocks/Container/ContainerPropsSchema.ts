@@ -23,20 +23,50 @@ const MARGIN_SCHEMA = z.object({
 
 const BaseContainerPropsSchema = z.object({  
   style: z.object({  
-    backgroundColor: COLOR_SCHEMA,  
-    borderColor: COLOR_SCHEMA,  
-    borderRadius: z.number().optional().nullable(),  
-    width: z.string().optional().nullable(),  
-    maxWidth: z.string().optional().nullable(), 
-    height: z.string().optional().nullable(), 
+    // Propiedades básicas y Colores
+    backgroundColor: COLOR_SCHEMA,
+    backgroundImage: z.string().optional().nullable(),
+    borderColor: COLOR_SCHEMA,
+    color: COLOR_SCHEMA,
+    
+    // Dimensiones y Layout (Resuelve error TS y W:Auto)
+    borderRadius: z.number().optional().nullable(),
+    width: z.string().optional().nullable(),
+    maxWidth: z.string().optional().nullable(),
+    height: z.string().optional().nullable(),
     display: z.string().optional().nullable(),
-    padding: PADDING_SCHEMA,  
-    margin: MARGIN_SCHEMA,
+    boxSizing: z.string().optional().nullable(),
+    
+    // Alineación (Crucial para corregir el "Start")
+    textAlign: z.string().optional().nullable(),
+    verticalAlign: z.string().optional().nullable(),
+    flexDirection: z.string().optional().nullable(),
+    justifyContent: z.string().optional().nullable(),
+    lineHeight: z.string().optional().nullable(),
 
-  }).optional().nullable(),  
+    // Espaciado (Objetos y Propiedades Planas)
+    padding: PADDING_SCHEMA,
+    margin: MARGIN_SCHEMA,
+    paddingTop: z.string().optional().nullable(),
+    paddingBottom: z.string().optional().nullable(),
+    paddingLeft: z.string().optional().nullable(),
+    paddingRight: z.string().optional().nullable(),
+    marginTop: z.string().optional().nullable(),
+    marginBottom: z.string().optional().nullable(),
+    marginLeft: z.string().optional().nullable(),
+    marginRight: z.string().optional().nullable(),
+
+    // Soporte para estilos móviles del Parser
+    mobileStyle: z.any().optional(),
+
+  }).passthrough().optional().nullable(),  
   props: z.object({  
-    childrenIds: z.array(z.string()).optional().nullable()  
-  }).optional().nullable()  
+    childrenIds: z.array(z.string()).optional().nullable(),
+    tagName: z.string().optional().nullable(),
+    className: z.string().optional().nullable(),
+    id: z.string().optional().nullable(),
+    align: z.string().optional().nullable(),
+  }).passthrough().optional().nullable()  
 });  
 
 export const ContainerPropsSchema = z.object({
@@ -50,10 +80,17 @@ export const ContainerPropsSchema = z.object({
 });
 
 // export type ContainerProps = z.infer<typeof ContainerPropsSchema>;
-export type ContainerProps = BaseContainerProps & {
-  // FIXME: type
-  document: Record<string, any>; // required to render the ContainerColumn's children
+export type ContainerProps = {
+  style?: z.infer<typeof BaseContainerPropsSchema>['style'];
   props?: {
     childrenIds?: string[] | null;
+    tagName?: string | null;
+    className?: string | null;
+    id?: string | null;
+    align?: string | null;
+    textAlign?: string | null; 
+    display?: string | null;
+    width?: string | null;
   } | null;
+  document: Record<string, any>; // Obligatorio para el Reader
 }

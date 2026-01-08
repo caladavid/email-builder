@@ -1,6 +1,12 @@
 <template>
   <BaseContainer 
-    :style="props.style"
+    :style="{
+      ...props.style,
+      // Forzamos que el contenedor sea un bloque de ancho completo
+      width: props.style?.width || '100%',
+      // Aseguramos que la alineación de texto afecte a los bloques hijos inline
+      textAlign: props.style?.textAlign || 'inherit'
+    }"
     class="container-drop-zone"  
     @dragover="handleContainerDragOver"  
     @drop="handleContainerDrop" 
@@ -8,7 +14,9 @@
 
     <div class="debug-overlay"> 
       W: {{ props.style?.width || 'Auto' }}
-      
+      <br>
+      Container
+      <br>
       AlignAttr: [{{ props.style?.align || 'Vacío' }}] <br>
       
       TextAlign: [{{ props.style?.textAlign || 'Vacío' }}] <br>
@@ -27,12 +35,13 @@
 <script setup lang="ts">
 import EditorChildrenIds from '../helpers/EditorChildrenIds.vue';
 import type { EditorChildrenChange } from '../helpers/EditorChildrenIds.vue';
-import type { ContainerProps } from './ContainerPropsSchema';
+/* import type { ContainerProps } from './ContainerPropsSchema'; */
 import { currentBlockIdSymbol } from '../../editor/EditorBlock.vue';
 import { useInspectorDrawer } from '../../editor/editor.store';
 import { computed, inject } from 'vue';
 import { useDragAndDrop } from '../../../composables/useDragAndDrop';
 import BaseContainer from '../../../components/BaseContainer.vue';
+import type { ContainerProps } from '../../../lib/email-builder/blocks/Container';
 
 /* defineProps<ContainerProps>() */
   const props = defineProps<ContainerProps>()

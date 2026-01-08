@@ -35,4 +35,11 @@ const block = computed(() => inspectorDrawer.document[props.id])
   });  
 }, { deep: true });   */
 
+/* watch(() => inspectorDrawer.document, async (newDoc) => {  
+  const html = await inspectorDrawer.getHtmlFromDocument()  
+  console.log('🔄 Document actualizado:', {  
+    blockCount: Object.keys(newDoc).length,  
+    html: html  
+  })  
+}, { deep: true })   */ 
 </script>

@@ -13,8 +13,6 @@ export const TableSectionPropsSchema = z.object({
 
 // 2. Tipo TypeScript Manual (Para que Vue pueda leerlo sin errores)
 export type TableSectionProps = {
-  // Vue necesita ver 'document' aquí si lo vas a usar en props
-  document: Record<string, any>; 
   
   style?: Record<string, any> | null;
   
