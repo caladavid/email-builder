@@ -88,6 +88,7 @@ const containerStyles = computed(() => {
   const blockData = currentBlock.value?.data as { props?: ButtonBlockProps; style?: any };  
     
   return {  
+    ...blockData?.style,
     padding: blockData?.style?.padding  
       ? `${blockData.style.padding.top}px ${blockData.style.padding.right}px ${blockData.style.padding.bottom}px ${blockData.style.padding.left}px`  
       : '16px 24px',   

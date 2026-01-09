@@ -1,21 +1,23 @@
 <template>
-  <BaseColumnsContainer
+  <DynamicColumnsContainer
     :props="restProps"
     :style="style"
   >
-    <template #column-0>
-      <EditorChildrenIds :children-ids="columns?.[0]?.childrenIds" @change="handleUpdateColumns(0, $event)" />
+    <template 
+      v-for="(_col, index) in columnsValue" 
+      :key="index" 
+      #[`column-${index}`]
+    >
+      <EditorChildrenIds 
+        :children-ids="columnsValue[index]?.childrenIds" 
+        @change="handleUpdateColumns(index, $event)" 
+      />
     </template>
-    <template #column-1>
-      <EditorChildrenIds :children-ids="columns?.[1]?.childrenIds" @change="handleUpdateColumns(1, $event)" />
-    </template>
-    <template #column-2>
-      <EditorChildrenIds :children-ids="columns?.[2]?.childrenIds" @change="handleUpdateColumns(2, $event)" />
-    </template>
-  </BaseColumnsContainer>
+  </DynamicColumnsContainer>
 </template>
 
 <script setup lang="ts">
+import { computed, inject } from 'vue';
 import BaseColumnsContainer from '@flyhub/email-block-columns-container';
 import ColumnsContainerPropsSchema from './ColumnsContainerPropsSchema';
 import type { ColumnsContainerProps } from './ColumnsContainerPropsSchema';
@@ -23,11 +25,12 @@ import { currentBlockIdSymbol } from '../../editor/EditorBlock.vue';
 import { useInspectorDrawer } from '../../editor/editor.store';
 import type { EditorChildrenChange } from '../helpers/EditorChildrenIds.vue';
 import EditorChildrenIds from '../helpers/EditorChildrenIds.vue';
-import { computed, inject } from 'vue';
+import DynamicColumnsContainer from '../../../components/DynamicColumnsContainer.vue';
 
 const props = defineProps<ColumnsContainerProps>()
 
-const EMPTY_COLUMNS = [{ childrenIds: [] }, { childrenIds: [] }, { childrenIds: [] }]
+// Inicializamos 8 columnas vacías por seguridad para el fallback
+const EMPTY_COLUMNS = Array.from({ length: 8 }, () => ({ childrenIds: [] }));
 
 const inspectorDrawer = useInspectorDrawer()
 
@@ -37,19 +40,24 @@ const currentBlockId = inject(currentBlockIdSymbol)!
 
 /** Computed */
 
-const columns = computed(() => props.props?.columns)
-const restProps = computed(() => {
-  const { columns: _, ...rest } = props.props ?? {}
+// Calculamos las columnas reales o usamos el fallback
+const columnsValue = computed(() => props.props?.columns ?? EMPTY_COLUMNS.slice(0, props.props?.columnsCount ?? 2))
 
+// Extraemos el resto de props para pasarlas al Base
+const restProps = computed(() => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { columns: _, ...rest } = props.props ?? {}
   return rest
 })
-const columnsValue = computed(() => props.props?.columns ?? EMPTY_COLUMNS)
 
 /** Functions */
 
-function handleUpdateColumns(columnIndex: 0 | 1 | 2, { block, blockId, childrenIds }: EditorChildrenChange) {
+// 🔥 Actualizado: index ahora es 'number' para aceptar 0-7
+function handleUpdateColumns(columnIndex: number, { block, blockId, childrenIds }: EditorChildrenChange) {
+  // Copia defensiva del array de columnas
   const nColumns = [...columnsValue.value]
 
+  // Actualizamos la columna específica
   nColumns[columnIndex] = { childrenIds }
 
   inspectorDrawer.setDocument({

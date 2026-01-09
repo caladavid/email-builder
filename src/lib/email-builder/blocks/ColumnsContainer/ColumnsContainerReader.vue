@@ -1,15 +1,18 @@
 <template>
-  <BaseColumnsContainer :props="restProps" :style="style">
-    <template #column-0>
-      <ReaderEditorChildrenIds :children-ids="columns?.[0]?.childrenIds" :document="document" />
+  <DynamicColumnsContainer :props="props.props" :style="style">
+    
+    <template 
+      v-for="(column, index) in columns" 
+      :key="index" 
+      #[`column-${index}`]
+    >
+      <ReaderEditorChildrenIds 
+        :children-ids="column?.childrenIds" 
+        :document="document" 
+      />
     </template>
-    <template #column-1>
-      <ReaderEditorChildrenIds :children-ids="columns?.[1]?.childrenIds" :document="document" />
-    </template>
-    <template #column-2>
-      <ReaderEditorChildrenIds :children-ids="columns?.[2]?.childrenIds" :document="document" />
-    </template>
-  </BaseColumnsContainer>
+
+  </DynamicColumnsContainer>
 </template>
 
 <script setup lang="ts">
@@ -17,15 +20,16 @@ import BaseColumnsContainer from '@flyhub/email-block-columns-container';
 import ReaderEditorChildrenIds from '../../helpers/ReaderEditorChildrenIds.vue';
 import type { ColumnsContainerProps } from './ColumnsContainerPropsSchema';
 import { computed } from 'vue';
+import DynamicColumnsContainer from '../../../../components/DynamicColumnsContainer.vue';
 
-const props = defineProps<ColumnsContainerProps>()
+const props = defineProps<ColumnsContainerProps & { document: any }>()
 
 /** Computed */
 
-const columns = computed(() => props.props?.columns)
-const restProps = computed(() => {
+const columns = computed(() => props.props?.columns ?? []);
+/* const restProps = computed(() => {
   const { columns: _, ...rest } = props.props ?? {}
 
   return rest
-})
+}) */
 </script>

@@ -1,40 +1,45 @@
+// ImageMatcher.ts
 import { v4 as uuidv4 } from "uuid";
 import type { BlockMatcher, MatcherResult } from "./types";
 import type { HTMLToBlockParser } from "../HTMLToBlockParser";
 import { StyleUtils } from "../StyleUtils"; 
 
-// Recursive helper to detect if a container wraps exactly one image
+// Helper recursive: busca si el elemento termina conteniendo UNA sola imagen
 function isSingleImageWrapper(element: Element): boolean {
-    const children = element.childNodes;
+    const children = Array.from(element.childNodes);
     let imageCount = 0;
+    let hasBlockers = false;
 
-    for (let index = 0; index < children.length; index++) {
-        const node = children[index];
-
+    for (const node of children) {
         if (node.nodeType === Node.TEXT_NODE) {
-            const text = node.textContent?.replace(/[\s\u00A0\n\r]/g, '') || '';
-            if (text.length > 0) return false;
+            // 🔥 FIX: Regex agresivo para ignorar todo lo que no sea texto visible real
+            // Incluye Zero Width Space (\u200B), NBSP (\u00A0) y otros controles.
+            const cleanText = node.textContent?.replace(/[\s\n\r\t\u00A0\u200B\uFEFF]+/g, '') || '';
+            if (cleanText.length > 0) {
+                // console.log('❌ Rechazado por texto:', cleanText); 
+                return false;
+            }
         } 
         else if (node.nodeType === Node.ELEMENT_NODE) {
             const el = node as Element;
             const tag = el.tagName.toLowerCase();
 
-            if (tag === "img") {
+            if (tag === 'img') {
                 imageCount++;
-            } else if (tag === "br") {
+            } else if (['br', 'script', 'style', 'meta', 'link', 'noscript'].includes(tag)) {
                 continue;
-            } else if (['a', 'span', 'div', 'p', 'center', 'td', 'strong', 'b'].includes(tag)) {
-                if (isSingleImageWrapper(el)) {
-                    imageCount++;
-                } else {
-                    return false;
-                }
             } else {
-                return false;
+                // Recursividad
+                if (isSingleImageWrapper(el)) {
+                    imageCount++; 
+                } else {
+                    hasBlockers = true; 
+                }
             }
         }
     }
-    return imageCount === 1;
+    
+    return imageCount === 1 && !hasBlockers;
 }
 
 export const ImageMatcher: BlockMatcher = {
@@ -43,102 +48,80 @@ export const ImageMatcher: BlockMatcher = {
     isComponent: (element: Element) => {
         const tag = element.tagName.toLowerCase();
         
-        if (tag === "img"){
-            // Avoid matching if inside an <a> (handled by wrapper logic or link logic)
-            if (element.parentElement?.tagName.toLowerCase() === 'a') return false;
-            return true
+        if (tag === "img") {
+            // Si el padre directo es <a>, dejamos que el <a> sea el componente (si queremos)
+            // Ojo: En tu caso, tenemos div > a > img. 
+            // Queremos detectar el DIV wrapper como "Image Component" para InlineIconsMatcher.
+            return true; 
         }
 
-        if (['a', 'td', 'div', 'span', 'p', 'center'].includes(tag)) {
-            if (tag === 'a') return isSingleImageWrapper(element);
-            
-            // For block containers, only match single images (InlineIcons handles multiple)
-            if (['td', 'div', 'span', 'p'].includes(tag)) {
-                 return isSingleImageWrapper(element);
-            }
+        // Aceptamos cualquier contenedor estructural si envuelve una sola imagen
+        if (['a', 'td', 'div', 'span', 'p', 'center', 'table', 'tbody', 'tr'].includes(tag)) {
+            return isSingleImageWrapper(element);
         }
 
         return false;
     },
 
     fromElement: (element: Element, parser: HTMLToBlockParser, inheritedStyles: any): MatcherResult | null => {
-        // 1. Locate the image element
-        const imgEl = element.tagName.toLowerCase() === 'img' 
-            ? element 
-            : element.querySelector('img');
-
+        // ... (Tu código fromElement existente, que ya funciona bien con la escalada de estilos) ...
+        // ... (Solo asegúrate de usar la versión que te pasé antes que tiene la lógica de "Subir" en el DOM) ...
+        
+        // REPETICIÓN DEL fromElement POR SEGURIDAD (Copia esto dentro de tu archivo):
+        
+        // 1. Encontrar imagen
+        const imgEl = element.tagName.toLowerCase() === 'img' ? element : element.querySelector('img');
         if (!imgEl) return null;
 
-        // 2. Locate the link (if any)
-        let linkHref: string | undefined = undefined;
-        const anchor = element.tagName.toLowerCase() === 'a' 
-            ? element 
-            : element.querySelector('a');
-        if (anchor) linkHref = anchor.getAttribute('href') || undefined;
+        // 2. Encontrar link
+        let linkHref = undefined;
+        const anchor = element.closest('a') || element.querySelector('a');
+        if (anchor) linkHref = anchor.getAttribute('href');
 
-        // 3. Style Absorption (Climb up to capture wrapper styles)
+        // 3. Absorber estilos
         let combinedStyles = StyleUtils.extractUnifiedStyles(imgEl);
         let current: Element | null = imgEl;
-        const processedNodes = new Set<Element>();
+        const processedNodes = new Set();
         
         while (current && !processedNodes.has(current)) {
             processedNodes.add(current);
-
             if (current !== imgEl) {
                 const layerStyles = StyleUtils.extractUnifiedStyles(current);
-                
-                // Inherit background, align, padding, border if not present on image
-                if (!combinedStyles.backgroundColor && layerStyles.backgroundColor && layerStyles.backgroundColor !== 'transparent') {
-                    combinedStyles.backgroundColor = layerStyles.backgroundColor;
-                }
-                if (!combinedStyles.textAlign && layerStyles.textAlign) {
-                    combinedStyles.textAlign = layerStyles.textAlign;
-                }
+                if (!combinedStyles.backgroundColor && layerStyles.backgroundColor !== 'transparent') combinedStyles.backgroundColor = layerStyles.backgroundColor;
+                if (!combinedStyles.textAlign && layerStyles.textAlign) combinedStyles.textAlign = layerStyles.textAlign;
                 if (layerStyles.padding) combinedStyles.padding = layerStyles.padding;
-                if (layerStyles.border) combinedStyles.border = layerStyles.border;
             }
-
-            // Stop if we hit the element that triggered the matcher
             if (current === element) break;
             current = current.parentElement;
         }
 
-        // 4. Data Preparation
+        // 4. Crear bloque
         const PLACEHOLDER_IMG = 'https://placehold.net/default.png';
         let src = imgEl.getAttribute("src") || "";
-        const base = (src.split("/").pop() || src).toLowerCase();
-        
-        // Filter out tracking pixels or blank images
-        if (/^blanco\.(png|gif|jpg|jpeg)$/.test(base)) return null;
         if (!src) src = PLACEHOLDER_IMG;
-
-        const dataUrl = parser.resolveAssetUrl(src);
+        
         const id = uuidv4();
-
         const widthAttr = imgEl.getAttribute("width");
-        const heightAttr = imgEl.getAttribute("height");
-        // Use attribute width > style width > fallback
         const widthVal = widthAttr ? parseInt(widthAttr) : (combinedStyles.width ? parseInt(String(combinedStyles.width)) : 999);
         const isSmallIcon = widthVal <= 60;
 
-        const finalStyles = {
-            ...inheritedStyles,
-            ...combinedStyles
-        };
-
-        if (!finalStyles.padding) finalStyles.padding = { top: 0, right: 0, bottom: 0, left: 0 };
-        if (!finalStyles.textAlign) finalStyles.textAlign = "center";
+        const finalStyles = { ...inheritedStyles, ...combinedStyles };
+        
+        // Reset padding/align por defecto
+        if (!finalStyles.padding) finalStyles.padding = {top:0, right:0, bottom:0, left:0};
+        if (!finalStyles.textAlign) finalStyles.textAlign = 'center';
 
         if (isSmallIcon) {
-            finalStyles.display = "inline-block";
-            if (!finalStyles.margin) finalStyles.margin = { top: 0, right: 0, bottom: 0, left: 0 };
+            finalStyles.display = 'inline-block';
+            if (!finalStyles.margin) finalStyles.margin = {top:0, right:0, bottom:0, left:0}; // Sin auto margin
         } else {
-            if (!finalStyles.display) finalStyles.display = "block";
-            if (!widthAttr) finalStyles.maxWidth = "100%";
-            if (!finalStyles.margin) finalStyles.margin = "0 auto";
+            if (!finalStyles.display) finalStyles.display = 'block';
+            if (!finalStyles.margin) finalStyles.margin = '0 auto';
+            if (!widthAttr) finalStyles.maxWidth = '100%';
         }
 
-        if (finalStyles.width === '100%') delete finalStyles.width;
+        // Limpieza final
+        delete finalStyles.width; // Dejamos que el atributo width del img mande o el css
         if (finalStyles.backgroundColor === 'transparent') delete finalStyles.backgroundColor;
 
         parser.addBlock(id, {
@@ -146,16 +129,15 @@ export const ImageMatcher: BlockMatcher = {
             data: {
                 style: finalStyles,
                 props: {
-                    url: dataUrl,
+                    url: parser.resolveAssetUrl(src),
                     alt: imgEl.getAttribute("alt") || "Image",
                     linkHref: linkHref,
                     width: widthAttr ? parseInt(widthAttr) : undefined,
-                    height: heightAttr ? parseInt(heightAttr) : undefined,
-                    contentAlignment: "middle",
+                    height: imgEl.getAttribute("height") ? parseInt(imgEl.getAttribute("height")!) : undefined,
+                    contentAlignment: "middle"
                 }
             }
         });
-
         return { id };
     }
 };

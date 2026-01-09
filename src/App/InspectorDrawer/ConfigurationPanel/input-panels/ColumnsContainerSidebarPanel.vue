@@ -3,8 +3,14 @@
     <RadioGroupInput
       label="Numeros de columnas"
       :model-value="data.props?.columnsCount === 2 ? '2' : '3'"
-      :items="[{ label: '2', value: '2' }, { label: '3', value: '3' }]"
-      @update:model-value="handleUpdateData({ ...data, props: { ...data.props, columnsCount: $event === '2' ? 2 : 3 } })"
+      :items="[  
+        { label: '2', value: '2' },   
+        { label: '3', value: '3' },  
+        { label: '4', value: '4' },  
+        { label: '5', value: '5' },  
+        { label: '6', value: '6' }  
+      ]"
+      @update:model-value="handleUpdateData({ ...data, props: { ...data.props, columnsCount: parseInt($event) } })"
     />
     <ColumnWidthsInput
       :columns-count="data.props?.columnsCount ?? 3"

@@ -9,9 +9,24 @@ export const TableBlockMatcher: BlockMatcher = {
 
     isComponent(element: Element): boolean {
         const tag = element.tagName.toLowerCase();
+
+        const anchors = element.querySelectorAll('a');
+        if (anchors.length === 1) {
+            const tableText = element.textContent?.trim() || "";
+            const anchorText = anchors[0].textContent?.trim() || "";
+            
+            // Si la tabla es solo un envoltorio del texto del botón
+            if (tableText === anchorText && tableText !== "") {
+                // En lugar de decir 'false', forzamos la detección del hijo ahora mismo
+                return true; 
+            }
+        }
+        
         
         // A. Detección básica
         if (tag === 'table') return true;
+
+        
         if (!element.getAttribute('style')?.includes('display: table')) return false;
 
         // B. Si tiene role="presentation", casi siempre es estructura (Layout)
@@ -33,6 +48,7 @@ export const TableBlockMatcher: BlockMatcher = {
             if (!hasBlockChildren) return false; 
             return true;
         }
+
         return false;
     },
 
@@ -40,6 +56,37 @@ export const TableBlockMatcher: BlockMatcher = {
         // --- 1. RECOLECCIÓN MANUAL DE FILAS (Saltando TBODY) ---
         let rawRows: Element[] = [];
         let areRowsVirtual = false;
+
+        const anchors = element.querySelectorAll('a');
+    
+        // 🔥 EL TRUCO: Si detectamos que es una tabla envolvente de botón
+        if (anchors.length === 1 && element.textContent?.trim() === anchors[0].textContent?.trim()) {
+            
+            // 1. Extraemos los estilos de la tabla y la celda
+            const tableStyles = parser.extractStyles(element, inheritedStyles);
+            const cell = element.querySelector('td');
+            const combinedStyles = cell ? parser.extractStyles(cell, tableStyles) : tableStyles;
+
+            // 🔥 CRITERIO DE VERIFICACIÓN: ¿Realmente parece un botón?
+            // Un botón real DEBE tener un color de fondo o un borde visible.
+            const hasBg = combinedStyles.backgroundColor && 
+                        combinedStyles.backgroundColor !== 'transparent' && 
+                        combinedStyles.backgroundColor !== 'rgba(0, 0, 0, 0)' &&
+                        combinedStyles.backgroundColor !== '#ffffff';
+            
+            const hasBorder = combinedStyles.border && combinedStyles.border !== 'none' && combinedStyles.border !== '0px';
+            const hasVButton = anchors[0].classList.contains('v-button');
+
+            // 2. Solo hacemos el Túnel si tiene apariencia visual de botón
+            if (hasBg || hasBorder || hasVButton) {
+                const buttonResult = parser.parseElement(anchors[0], combinedStyles);
+                
+                if (buttonResult) {
+                    parser.processedElements.add(element);
+                    return buttonResult; 
+                }
+            }
+        }
         
         const children = Array.from(element.children);
         

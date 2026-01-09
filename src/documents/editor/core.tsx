@@ -3,7 +3,8 @@ import { z } from 'zod';
 import Heading, { HeadingPropsSchema } from '@flyhub/email-block-heading';
 import Text, { TextPropsSchema } from '@flyhub/email-block-text';
 import Button, { ButtonPropsSchema } from '@flyhub/email-block-button';
-import Image, { ImagePropsSchema } from '@flyhub/email-block-image';
+/* import Image, { ImagePropsSchema } from '@flyhub/email-block-image'; */
+import ImageReader, { ImagePropsSchema } from '../blocks/Image/ImageReader.vue'; 
 import Avatar, { AvatarPropsSchema } from '@flyhub/email-block-avatar';
 import Divider, { DividerPropsSchema } from '@flyhub/email-block-divider';
 import Spacer, { SpacerPropsSchema } from '@flyhub/email-block-spacer';
@@ -34,6 +35,7 @@ import { TableCellPropsSchema } from '../blocks/TableCell/TableCellPropsSchema';
 import TableCellEditor from '../blocks/TableCell/TableCellEditor.vue';
 import { TableSectionPropsSchema } from '../blocks/TableSection/TableSectionPropsSchema';
 import TableSectionEditor from '../blocks/TableSection/TableSectionEditor.vue';
+
 
 /* const globalVariables = ref<Record<string, string>>({
   // Variables de ejemplo  
@@ -154,7 +156,7 @@ export const EDITOR_DICTIONARY = buildBlockConfigurationDictionary({
       // Cambiar ...data por ...processedProps, para obtener su value
       return (
         <EditorBlockWrapper>
-          <Image {...props} />
+          <ImageReader {...props} />
         </EditorBlockWrapper>
       );
     },

@@ -18,12 +18,14 @@ const props = defineProps<ContainerProps>()
   
   function getPadding(padding: any) {
     if (!padding) return undefined;
+    if (typeof padding === 'string') return padding;
     // Convierte el objeto {top:10...} en "10px 0px..."
     return `${padding.top}px ${padding.right}px ${padding.bottom}px ${padding.left}px`;
   }
   
   function getMargin(margin: any) {
     if (!margin) return undefined;
+    if (typeof margin === 'string') return margin;
     
     const fmt = (val: number | string | undefined) => {
       if (val === undefined || val === null) return '0px';
@@ -50,7 +52,7 @@ const containerStyles = computed<CSSProperties>(() => {
     // Propiedades directas
 
     // Propiedades transformadas
-    border: raw.borderColor ? `1px solid ${raw.borderColor}` : undefined,
+    border: raw.borderColor,
     borderRadius: getBorder(raw.borderRadius),
     padding: getPadding(raw.padding),
     margin: getMargin(raw.margin),

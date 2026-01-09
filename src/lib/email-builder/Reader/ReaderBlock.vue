@@ -11,7 +11,8 @@ import Button, { ButtonPropsSchema } from '@flyhub/email-block-button';
 import Divider, { DividerPropsSchema } from '@flyhub/email-block-divider';
 import Heading, { HeadingPropsSchema } from '@flyhub/email-block-heading';
 import Html, { HtmlPropsSchema } from '@flyhub/email-block-html';
-import Image, { ImagePropsSchema } from '@flyhub/email-block-image';
+/* import Image, { ImagePropsSchema } from '@flyhub/email-block-image'; */
+import ImageReader, { ImagePropsSchema } from '../../../documents/blocks/Image/ImageReader.vue'; 
 import Spacer, { SpacerPropsSchema } from '@flyhub/email-block-spacer';
 import Text, { TextPropsSchema } from '@flyhub/email-block-text';
 
@@ -81,7 +82,7 @@ const READER_DICTIONARY = {
   },
   Image: {
     schema: ImagePropsSchema,
-    Component: Image,
+    Component: ImageReader,
   },
   Spacer: {
     schema: SpacerPropsSchema,

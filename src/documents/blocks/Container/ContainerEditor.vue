@@ -12,7 +12,7 @@
     @drop="handleContainerDrop" 
   >
 
-    <div class="debug-overlay"> 
+    <!-- <div class="debug-overlay"> 
       W: {{ props.style?.width || 'Auto' }}
       <br>
       Container
@@ -22,8 +22,7 @@
       TextAlign: [{{ props.style?.textAlign || 'Vacío' }}] <br>
 
 
-      <!-- {{ props.style?.paddingTop ? `| P:${props.style.paddingTop}` : '' }} -->
-    </div>
+    </div> -->
 
     <EditorChildrenIds
       :children-ids="props.props?.childrenIds ?? []"

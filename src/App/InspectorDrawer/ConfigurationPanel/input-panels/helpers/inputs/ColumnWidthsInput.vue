@@ -14,11 +14,7 @@ import TextDimensionInput from './TextDimensionInput.vue';
 import { computed } from 'vue';
 
 type TWidthValue = number | null | undefined;
-type FixedWidths = [
-  TWidthValue,
-  TWidthValue,
-  TWidthValue
-];
+type FixedWidths = TWidthValue[]; 
 
 type ColumnsLayoutInputProps = {
   columnsCount: number,
@@ -33,7 +29,11 @@ const emit = defineEmits<{
 
 /** Computed */
 
-const currentValue = computed(() => props.modelValue ?? [null, null, null] satisfies FixedWidths)
+const currentValue = computed(() => {  
+  console.log('🔍 ColumnWidthsInput - columnsCount:', props.columnsCount);  
+  const defaultValue = Array.from({ length: props.columnsCount }, () => null);  
+  return props.modelValue ?? defaultValue;  
+})
 
 /** Functions */
 

@@ -42,9 +42,9 @@ export class HTMLToBlockParser {
 
     private matchers: BlockMatcher[] = [
         /* ScriptMatcher, */
+        ButtonMatcher,
         ImageMatcher,
         InlineIconsMatcher,
-        ButtonMatcher,
         
         TableBlockMatcher,
         TableRowMatcher,
@@ -842,7 +842,7 @@ export class HTMLToBlockParser {
         }
     } */
 
-private processElement(
+    private processElement(
         element: Element,
         inheritedStyles: Record<string, string>
     ): string | null {
@@ -862,6 +862,12 @@ private processElement(
 
         const tagName = element.tagName.toLowerCase();
         const id = element.id || 'sin-id';
+
+        if (tagName === 'a') {
+            console.log(`🎯 [TRACE] Evaluando enlace: "${element.textContent?.trim()}"`);
+            console.log(`   - Clases: ${element.className}`);
+            console.log(`   - Style Attr: ${element.getAttribute('style')}`);
+        }
 
         // 🔍 DEBUG LOG: Solo para los elementos problemáticos
         const isProblematic = id === 'iflem' || id === 'irtcdy' || tagName === 'table'; 

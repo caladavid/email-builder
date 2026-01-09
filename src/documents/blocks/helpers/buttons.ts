@@ -123,7 +123,7 @@ export const BUTTONS: TButtonProps[] = [
         props: {
           columnsGap: 16,
           columnsCount: 3,
-          columns: [{ childrenIds: [] }, { childrenIds: [] }, { childrenIds: [] }],
+          columns: Array.from({ length: 3 }, () => ({ childrenIds: [] })),
         },
         style: { padding: { top: 16, bottom: 16, left: 24, right: 24 } },
       },

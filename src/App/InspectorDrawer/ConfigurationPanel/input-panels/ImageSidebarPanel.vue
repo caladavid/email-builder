@@ -80,11 +80,10 @@ import BaseSidebarPanel from './helpers/BaseSidebarPanel.vue';
 import MultiStylePropertyPanel from './helpers/style-inputs/MultiStylePropertyPanel.vue';
 import RadioGroupInput from './helpers/inputs/RadioGroupInput.vue';
 import TextDimensionInput from './helpers/inputs/TextDimensionInput.vue';
-import type { ImageProps } from '@flyhub/email-block-image';
-import { ImagePropsSchema } from '@flyhub/email-block-image';
+import type { ImageProps } from '../../../../documents/blocks/Image/ImageReader.vue'; 
+import { ImagePropsSchema } from '../../../../documents/blocks/Image/ImageReader.vue'; 
 import { ref } from 'vue';
 import { z } from 'zod';
-
 const file = ref<File | null>(null);
 
 type ImageSidebarPanelProps = {
