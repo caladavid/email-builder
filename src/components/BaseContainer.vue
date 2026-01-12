@@ -7,7 +7,8 @@
 <script lang="ts">
 import { COLOR_SCHEMA, PADDING_SCHEMA, getPadding } from '@flyhub/email-core';
 import { z } from 'zod';
-import { computed } from 'vue';
+import { computed, nextTick, watch } from 'vue';
+import { getCleanBlockStyle } from '../utils/blockStyleUtils';
 
 const MARGIN_VALUE_SCHEMA = z.union([z.number(), z.string()]);
 
@@ -84,42 +85,27 @@ export type ContainerProps = {
 </script>
 
 <script setup lang="ts">
-const props = defineProps<ContainerProps>()
+const props = defineProps<{
+  style?: any // O tu tipo ContainerProps
+}>();
 
   /* console.log("BaseContainer", props.style); */
-const wStyle = computed(() => ({
-  ...props.style,
-  display: 'block',
-  backgroundColor: props.style?.backgroundColor ?? undefined,
-  border: getBorder(props.style),
-  borderRadius: props.style?.borderRadius ? props.style.borderRadius + 'px' : undefined,
-  padding: getPadding(props.style?.padding),
-  width: props.style?.width || "100%",
-  maxWidth: props.style?.maxWidth ?? undefined,
-  margin: getMargin(props.style?.margin), 
-  textAlign: (props.style as any)?.textAlign || 'inherit'
-}))
-
-function getBorder(style: ContainerProps['style']) {
-  if (!style || !style.borderColor) {
-    return undefined;
-  }
-  return `1px solid ${style.borderColor}`;
-}
-
-// Agrega esta función en tu <script setup> o en tus helpers
-function getMargin(margin: any) {
-  if (!margin) return undefined;
-
-  // Helper interno para formatear cada valor
-  const fmt = (val: any) => {
-    if (val === undefined || val === null) return '0px';
-    if (val === 'auto') return 'auto'; // Si es auto, lo devuelve limpio
-    if (typeof val === 'number') return `${val}px`; // Si es número, agrega px
-    return val; // Si es string "10%", lo devuelve tal cual
-  };
-
-  return `${fmt(margin.top)} ${fmt(margin.right)} ${fmt(margin.bottom)} ${fmt(margin.left)}`;
-}
+const wStyle = computed(() => {
+  // Llamamos al helper pasando los estilos crudos y los DEFAULTS específicos de Container
+  return getCleanBlockStyle(props.style, {
+    // Estos son los valores que se usarán si props.style no trae nada
+    display: 'block',         // Equivale a: s.display || 'block'
+    width: '100%',            // Equivale a: s.width || '100%'
+    boxSizing: 'border-box',
+    
+    // Defaults de fondo
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+    
+    // Defaults de texto
+    textAlign: 'inherit'
+  });
+});
 
 </script>

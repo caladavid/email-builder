@@ -18,7 +18,7 @@ export interface ComparisonResult {
 export class ComparisonSystem {
     private comparisonResults: ComparisonResult[] = [];
     private legacyBlocksCache: Map<Element, { id: string; block: any }> = new Map();
-    private loggingEnabled: boolean = true;
+    private loggingEnabled: boolean = false;
     private startTime: number = 0;
 
     constructor() {

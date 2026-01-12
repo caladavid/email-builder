@@ -44,8 +44,8 @@ export const InlineIconsMatcher: BlockMatcher = {
         const id = uuidv4();
         const styles = StyleUtils.extractUnifiedStyles(element, inheritedStyles);
 
-        console.group('🕵️‍♀️ DEBUG InlineIconsMatcher Process');
-        console.log('Total hijos en DOM:', element.children.length);
+        /* console.group('🕵️‍♀️ DEBUG InlineIconsMatcher Process');
+        console.log('Total hijos en DOM:', element.children.length); */
 
         const validChildElements: Element[] = [];
         const children = Array.from(element.children);
@@ -57,18 +57,10 @@ export const InlineIconsMatcher: BlockMatcher = {
             const isValid = ImageMatcher.isComponent(child);
             if (isValid) {
                 validChildElements.push(child);
-                console.log(`✅ Hijo ${i} (${tag}): ACEPTADO`);
-            } else {
-                console.log(`❌ Hijo ${i} (${tag}): RECHAZADO por ImageMatcher`);
-                // Intento de rescate: ¿Tiene una imagen dentro aunque ImageMatcher diga false?
-                if (child.querySelector('img')) {
-                    console.log(`   ⚠️ ALERTA: Tiene imagen pero falló validación estricta. Ver estructura interna.`);
-                    console.log(child.outerHTML.substring(0, 100) + '...');
-                }
             }
         });
-        console.log('Total elementos válidos:', validChildElements.length);
-        console.groupEnd();
+        /* console.log('Total elementos válidos:', validChildElements.length);
+        console.groupEnd(); */
 
         const columnsCount = validChildElements.length;
         const childBlocksIds: string[] = [];

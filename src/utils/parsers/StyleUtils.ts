@@ -215,51 +215,39 @@ export class StyleUtils {
         return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
     }
 
-    public static normalizeColor(color: string | null | undefined): string | undefined {
-        if (!color || color === 'transparent' || color === 'inherit' || color === 'initial') {
-            return undefined; // Or "transparent" if your schema allows it
+    public static normalizeColor(value: any): string | null {
+        if (!value || typeof value !== 'string') return null;
+        
+        let color = value.trim().toLowerCase();
+
+        // 1. Manejo de Transparent (El esquema permite null)
+        if (color === 'transparent' || color === 'rgba(0, 0, 0, 0)' ) {
+            return null; 
         }
 
-        const c = color.trim().toLowerCase();
-
-        // 1. Already HEX?
-        if (/^#[0-9a-f]{6}$/i.test(c)) return c;
-        if (/^#[0-9a-f]{3}$/i.test(c)) {
-            // Expand #FFF to #FFFFFF
-            return '#' + c[1] + c[1] + c[2] + c[2] + c[3] + c[3];
-        }
-
-        // 2. Handle RGB/RGBA
-        if (c.startsWith('rgb')) {
-            const matches = c.match(/\d+/g);
-            if (matches && matches.length >= 3) {
-                const r = parseInt(matches[0]);
-                const g = parseInt(matches[1]);
-                const b = parseInt(matches[2]);
-                const toHex = (n: number) => {
-                    const hex = n.toString(16);
-                    return hex.length === 1 ? '0' + hex : hex;
-                };
-                return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+        // 2. Convertir RGB/RGBA a Hex
+        if (color.startsWith('rgb')) {
+            const match = color.match(/\d+/g);
+            if (match && match.length >= 3) {
+                const r = parseInt(match[0]);
+                const g = parseInt(match[1]);
+                const b = parseInt(match[2]);
+                // Convertir a hex
+                color = "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
             }
         }
 
-        // 3. Handle Common Names (Optional, add more if needed)
-        const colors: Record<string, string> = {
-            white: '#ffffff',
-            black: '#000000',
-            red: '#ff0000',
-            blue: '#0000ff',
-            green: '#008000',
-            gray: '#808080',
-            grey: '#808080'
-        };
-        
-        if (colors[c]) return colors[c];
+        // 3. Expandir Hex de 3 dígitos (#fff -> #ffffff)
+        if (/^#[0-9a-f]{3}$/.test(color)) {
+            color = "#" + color[1] + color[1] + color[2] + color[2] + color[3] + color[3];
+        }
 
-        // If we can't normalize, return undefined to avoid Zod error
-        // forcing a fallback to default color.
-        return undefined; 
+        // 4. Validación final contra el Regex de Flyhub
+        if (/^#[0-9a-f]{6}$/.test(color)) {
+            return color.toUpperCase(); // Estandarizar a mayúsculas
+        }
+
+        return null; // Si falla, mejor null que un error de Zod
     }
 
     /**
@@ -270,25 +258,25 @@ export class StyleUtils {
         const normalized = { ...styles };
 
         // 1. PADDING
-        if (normalized.padding) {
-            if (typeof normalized.padding === 'object') {
-                // CASO A: Ya es un objeto (lo que muestra tu log)
-                // Asignamos directamente si no existen las propiedades individuales
-                if (normalized.paddingTop === undefined) normalized.paddingTop = normalized.padding.top;
-                if (normalized.paddingRight === undefined) normalized.paddingRight = normalized.padding.right;
-                if (normalized.paddingBottom === undefined) normalized.paddingBottom = normalized.padding.bottom;
-                if (normalized.paddingLeft === undefined) normalized.paddingLeft = normalized.padding.left;
-            } 
-            else {
-                // CASO B: Es un string "10px 20px" (Shorthand CSS)
-                const p = this.expandSpacing(normalized.padding);
-                if (p) {
-                    if (normalized.paddingTop === undefined) normalized.paddingTop = p.top;
-                    if (normalized.paddingRight === undefined) normalized.paddingRight = p.right;
-                    if (normalized.paddingBottom === undefined) normalized.paddingBottom = p.bottom;
-                    if (normalized.paddingLeft === undefined) normalized.paddingLeft = p.left;
-                }
-            }
+        if (normalized.padding) {  
+            if (typeof normalized.padding === 'object') {  
+                // 🔥 FIX: Detectar y convertir arrays  
+                ['top', 'right', 'bottom', 'left'].forEach(side => {  
+                    if (Array.isArray(normalized.padding[side])) {  
+                        console.warn('🔍 Padding.' + side + ' es array en normalizeStyles:', normalized.padding[side]);  
+                        normalized.padding[side] = normalized.padding[side][0] || 0;  
+                    }  
+                    // Asegurar que sea string para compatibilidad  
+                    if (typeof normalized.padding[side] === 'number') {  
+                        normalized.padding[side] = String(normalized.padding[side]) + 'px';  
+                    }  
+                });  
+                
+                if (normalized.paddingTop === undefined) normalized.paddingTop = normalized.padding.top;  
+                if (normalized.paddingRight === undefined) normalized.paddingRight = normalized.padding.right;  
+                if (normalized.paddingBottom === undefined) normalized.paddingBottom = normalized.padding.bottom;  
+                if (normalized.paddingLeft === undefined) normalized.paddingLeft = normalized.padding.left;  
+            }  
         }
 
         // 2. MARGIN
@@ -322,7 +310,7 @@ export class StyleUtils {
         if (normalized.border) {
             if (String(normalized.border).includes('none') || String(normalized.border) === '0') {
                 normalized.borderWidth = '0px';
-                normalized.borderColor = 'transparent';
+                normalized.borderColor = null;
             }
         }
 
@@ -361,14 +349,29 @@ export class StyleUtils {
         return undefined;
     }
 
-    static parseSpacing(spacing: string): any {
-        if (!spacing) return { top: 0, right: 0, bottom: 0, left: 0 };
-        const parts = spacing.trim().split(/\s+/).map(v => this.parseDimension(v) || '0px');
+    static parseSpacing(val: string | number): { top: string, right: string, bottom: string, left: string } | null {  
+        if (!val) return null;  
         
-        if (parts.length === 1) return { top: parts[0], right: parts[0], bottom: parts[0], left: parts[0] };
-        if (parts.length === 2) return { top: parts[0], right: parts[1], bottom: parts[0], left: parts[1] };
-        if (parts.length === 3) return { top: parts[0], right: parts[1], bottom: parts[2], left: parts[1] };
-        return { top: parts[0], right: parts[1], bottom: parts[2], left: parts[3] || parts[1] };
+        // 🔥 FIX: Si ya es un objeto con propiedades numéricas, convertirlo  
+        if (typeof val === 'object' && val !== null && !Array.isArray(val)) {  
+            return {  
+                top: String(val.top || 0),  
+                right: String(val.right || 0),   
+                bottom: String(val.bottom || 0),  
+                left: String(val.left || 0)  
+            };  
+        }  
+        
+        const v = String(val).trim();  
+        const parts = v.split(/\s+/);  
+        
+        let t, r, b, l;  
+        if (parts.length === 1) { t = r = b = l = parts[0]; }  
+        else if (parts.length === 2) { t = b = parts[0]; r = l = parts[1]; }  
+        else if (parts.length === 3) { t = parts[0]; r = l = parts[1]; b = parts[2]; }  
+        else { t = parts[0]; r = parts[1]; b = parts[2]; l = parts[3]; }  
+    
+        return { top: t, right: r, bottom: b, left: l };  
     }
 
     static normalizeTextAlign(val?: string) {
@@ -429,16 +432,54 @@ export class StyleUtils {
         return this.parseDimension(val);
     }
 
-    static parseBorder(val: string): any {
-        // Parseo simplificado de borde: "1px solid red"
-        if (!val) return undefined;
-        const parts = val.split(/\s+/);
-        // Heurística simple
-        const width = parts.find(p => p.includes('px')) || '1px';
-        const style = parts.find(p => ['solid', 'dashed', 'dotted'].includes(p)) || 'solid';
-        const color = parts.find(p => p.startsWith('#') || p.startsWith('rgb') || ['red', 'blue', 'black', 'white'].includes(p)) || '#000000';
-        
-        return { width: this.parseDimension(width), style, color: this.normalizeColor(color) };
+    public static parseBorder(value: any): { width: string; style: string; color: string } | null {
+        if (!value || typeof value !== 'string') return null;
+        const clean = value.toLowerCase().trim();
+
+        // 1. Filtros de Salida Rápida
+        if (clean === 'none' || clean === 'hidden' || clean === '0' || clean === '0px') {
+            return null;
+        }
+
+        // Valores por defecto "seguros" (si falta el color, transparente es mejor que negro)
+        let width = '1px';
+        let style = 'solid';
+        let color = null; // 🔥 CAMBIO CLAVE: Antes era #000000
+
+        // 2. Extraer Color
+        // Detecta hex, rgb, o nombres de color, ignorando palabras clave de estilo
+        const colorMatch = value.match(/(#[0-9a-f]{3,6}|rgb\([^)]+\)|rgba\([^)]+\)|transparent|[a-z]+)/gi);
+        if (colorMatch) {
+            // Filtramos keywords que parecen colores pero son estilos
+            const keywords = ['solid', 'dashed', 'dotted', 'double', 'none', 'hidden', 'thin', 'medium', 'thick'];
+            const found = colorMatch.find(c => !keywords.includes(c.toLowerCase()));
+            if (found) {
+                color = this.normalizeColor(found) || found;
+            }
+        }
+
+        // 3. Extraer Ancho
+        const widthMatch = value.match(/(\d+(?:\.\d+)?(?:px|em|rem|%)?|thin|medium|thick)/i);
+        if (widthMatch) {
+            width = widthMatch[0];
+            // Si es '0' o '0px', invalidamos todo el borde
+            if (parseFloat(width) === 0) return null;
+            if (!isNaN(parseFloat(width)) && !width.match(/[a-z%]/i)) width += 'px';
+        }
+
+        // 4. Extraer Estilo
+        const styleMatch = value.match(/(solid|dashed|dotted|double|groove|ridge|inset|outset)/i);
+        if (styleMatch) {
+            style = styleMatch[0].toLowerCase();
+        }
+
+        // Si el color sigue siendo transparente y no se definió explícitamente "transparent",
+        // pero tenemos ancho y estilo, entonces sí usamos negro (estándar CSS).
+        if (color === 'transparent' && !clean.includes('transparent')) {
+             color = '#000000';
+        }
+
+        return { width, style, color };
     }
 
     static parseBorderRadius(value: string): any {
@@ -504,4 +545,52 @@ export class StyleUtils {
         if (!value || value === 'none') return undefined;
         return String(value);
     }
+
+    // En StyleUtils.ts
+
+/**
+ * Normaliza cualquier entrada de padding a un objeto { top, right, bottom, left } con números.
+ * Soporta strings ("10px 20px"), objetos parciales y valores nulos.
+ */
+public static normalizePadding(input: any): { top: number, right: number, bottom: number, left: number } {
+    const result = { top: 0, right: 0, bottom: 0, left: 0 };
+
+    if (!input) return result;
+
+    // 1. Si es un string CSS (ej: "10px" o "10px 20px")
+    if (typeof input === 'string') {
+        const parts = input.trim().split(/\s+/).map(p => parseInt(p, 10) || 0);
+        switch (parts.length) {
+            case 1: // "10px" -> Todo 10
+                return { top: parts[0], right: parts[0], bottom: parts[0], left: parts[0] };
+            case 2: // "10px 20px" -> Y: 10, X: 20
+                return { top: parts[0], right: parts[1], bottom: parts[0], left: parts[1] };
+            case 3: // "10px 20px 30px"
+                return { top: parts[0], right: parts[1], bottom: parts[2], left: parts[1] };
+            case 4: // "10px 20px 30px 40px"
+                return { top: parts[0], right: parts[1], bottom: parts[2], left: parts[3] };
+            default:
+                return result;
+        }
+    }
+
+    // 2. Si ya es un objeto (ej: { paddingTop: "10px", ... })
+    if (typeof input === 'object') {
+        const getVal = (keys: string[]) => {
+            for (const key of keys) {
+                if (input[key] !== undefined && input[key] !== null && input[key] !== '') {
+                    return parseInt(String(input[key]), 10) || 0;
+                }
+            }
+            return 0;
+        };
+
+        result.top = getVal(['top', 'paddingTop', 'padding-top']);
+        result.right = getVal(['right', 'paddingRight', 'padding-right']);
+        result.bottom = getVal(['bottom', 'paddingBottom', 'padding-bottom']);
+        result.left = getVal(['left', 'paddingLeft', 'padding-left']);
+    }
+
+    return result;
+}
 }

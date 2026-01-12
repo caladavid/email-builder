@@ -32,7 +32,7 @@
     <MultiStylePropertyPanel
       :names="['color', 'backgroundColor', 'fontFamily', 'fontWeight', 'textAlign', 'padding']"
       :model-value="data.style"
-      @update:model-value="handleUpdateData({ ...data, style: $event })"
+      @update:model-value="handleStyleUpdate"
     />
   </BaseSidebarPanel>
 </template>
@@ -41,8 +41,8 @@
 import BaseSidebarPanel from './helpers/BaseSidebarPanel.vue';
 import MultiStylePropertyPanel from './helpers/style-inputs/MultiStylePropertyPanel.vue';
 import RadioGroupInput from './helpers/inputs/RadioGroupInput.vue';
-import type { HeadingProps} from '@flyhub/email-block-heading';
-import { HeadingPropsSchema, HeadingPropsDefaults } from '@flyhub/email-block-heading';
+import type { HeadingProps} from '../../../../documents/blocks/Heading/HeadingPropsSchema';
+import { HeadingPropsSchema, HeadingPropsDefaults } from '../../../../documents/blocks/Heading/HeadingPropsSchema';
 import { ref } from 'vue';
 import RichTextEditor from './RichTextEditor.vue';
 
@@ -61,6 +61,20 @@ const emit = defineEmits<{
 const errors = ref<Zod.ZodError | null>(null)
 
 /** Functions */
+
+function handleStyleUpdate(newStyle: any) {
+  const cleanStyle = { ...newStyle };
+
+  // Aplanamos arrays si el selector los devuelve así
+  if (Array.isArray(cleanStyle.fontFamily)) cleanStyle.fontFamily = cleanStyle.fontFamily[0];
+  if (Array.isArray(cleanStyle.fontWeight)) cleanStyle.fontWeight = cleanStyle.fontWeight[0];
+  if (Array.isArray(cleanStyle.textAlign)) cleanStyle.textAlign = cleanStyle.textAlign[0];
+
+  handleUpdateData({ 
+    ...props.data, 
+    style: cleanStyle 
+  });
+}
 
 
 function handleUpdateData(data: unknown) {

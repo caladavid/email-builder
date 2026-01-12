@@ -1,9 +1,7 @@
 import { z } from 'zod';
 
-/* import { ContainerPropsSchema as BaseContainerPropsSchema } from '../../../@flyhub/email-builder/blocks/Container/ContainerPropsSchema'; */
-import type { ContainerProps as BaseContainerProps } from '@flyhub/email-block-container';
-
-const COLOR_SCHEMA = z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional();
+// --- DEFINICIONES BÁSICAS ---
+const COLOR_SCHEMA = z.string().optional().nullable();
 
 const PADDING_SCHEMA = z.object({
   top: z.number(),
@@ -12,7 +10,7 @@ const PADDING_SCHEMA = z.object({
   left: z.number()
 }).optional().nullable();
 
-const MARGIN_VALUE_SCHEMA = z.union([z.number(), z.string()]); // Soporta 10 y "auto"
+const MARGIN_VALUE_SCHEMA = z.union([z.number(), z.string()]);
 
 const MARGIN_SCHEMA = z.object({
   top: MARGIN_VALUE_SCHEMA.optional(),
@@ -21,15 +19,16 @@ const MARGIN_SCHEMA = z.object({
   left: MARGIN_VALUE_SCHEMA.optional(),
 }).optional().nullable();
 
-const BaseContainerPropsSchema = z.object({  
-  style: z.object({  
+// --- 1. SCHEMA DE ESTILOS (SOLO ESTILOS) ---
+// Definimos esto por separado para poder reutilizarlo sin anidar.
+const CONTAINER_STYLE_SCHEMA = z.object({
     // Propiedades básicas y Colores
     backgroundColor: COLOR_SCHEMA,
     backgroundImage: z.string().optional().nullable(),
     borderColor: COLOR_SCHEMA,
     color: COLOR_SCHEMA,
     
-    // Dimensiones y Layout (Resuelve error TS y W:Auto)
+    // Dimensiones y Layout
     borderRadius: z.number().optional().nullable(),
     width: z.string().optional().nullable(),
     maxWidth: z.string().optional().nullable(),
@@ -37,14 +36,14 @@ const BaseContainerPropsSchema = z.object({
     display: z.string().optional().nullable(),
     boxSizing: z.string().optional().nullable(),
     
-    // Alineación (Crucial para corregir el "Start")
+    // Alineación
     textAlign: z.string().optional().nullable(),
     verticalAlign: z.string().optional().nullable(),
     flexDirection: z.string().optional().nullable(),
     justifyContent: z.string().optional().nullable(),
     lineHeight: z.string().optional().nullable(),
 
-    // Espaciado (Objetos y Propiedades Planas)
+    // Espaciado (Padding / Margin)
     padding: PADDING_SCHEMA,
     margin: MARGIN_SCHEMA,
     paddingTop: z.string().optional().nullable(),
@@ -56,41 +55,38 @@ const BaseContainerPropsSchema = z.object({
     marginLeft: z.string().optional().nullable(),
     marginRight: z.string().optional().nullable(),
 
+    // 🔥 BORDES INDIVIDUALES
+    borderTop: z.string().optional().nullable(),
+    borderRight: z.string().optional().nullable(),
+    borderBottom: z.string().optional().nullable(),
+    borderLeft: z.string().optional().nullable(),
+    borderWidth: z.string().optional().nullable(),
+    borderStyle: z.string().optional().nullable(),
+
     // Soporte para estilos móviles del Parser
     mobileStyle: z.any().optional(),
+}).passthrough(); // Importante: permite propiedades extra CSS si las hay
 
-  }).passthrough().optional().nullable(),  
-  props: z.object({  
+// --- 2. SCHEMA DE PROPS INTERNAS ---
+const CONTAINER_INTERNAL_PROPS_SCHEMA = z.object({
     childrenIds: z.array(z.string()).optional().nullable(),
     tagName: z.string().optional().nullable(),
     className: z.string().optional().nullable(),
     id: z.string().optional().nullable(),
     align: z.string().optional().nullable(),
-  }).passthrough().optional().nullable()  
-});  
+}).passthrough();
 
+// --- 3. SCHEMA PRINCIPAL (EXPORTADO) ---
+// Aquí componemos el objeto final correctamente.
 export const ContainerPropsSchema = z.object({
-  style: BaseContainerPropsSchema.optional().nullable(),
-  props: z
-    .object({
-      childrenIds: z.array(z.string()).optional().nullable(),
-    })
-    .optional()
-    .nullable(),
+  style: CONTAINER_STYLE_SCHEMA.optional().nullable(),
+  props: CONTAINER_INTERNAL_PROPS_SCHEMA.optional().nullable(),
 });
 
-// export type ContainerProps = z.infer<typeof ContainerPropsSchema>;
+// --- 4. TIPOS ---
 export type ContainerProps = {
-  style?: z.infer<typeof BaseContainerPropsSchema>['style'];
-  props?: {
-    childrenIds?: string[] | null;
-    tagName?: string | null;
-    className?: string | null;
-    id?: string | null;
-    align?: string | null;
-    textAlign?: string | null; 
-    display?: string | null;
-    width?: string | null;
-  } | null;
-  document: Record<string, any>; // Obligatorio para el Reader
+  // Usamos z.infer para garantizar que el tipo TS coincida 100% con Zod
+  style?: z.infer<typeof CONTAINER_STYLE_SCHEMA> | null;
+  props?: z.infer<typeof CONTAINER_INTERNAL_PROPS_SCHEMA> | null;
+  document?: Record<string, any>;
 }

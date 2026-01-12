@@ -23,12 +23,14 @@
         />  
         </div>  
     </div>  
+    
 </template>
 <script setup lang="ts">
 import { computed, inject, nextTick, onMounted, ref, watch } from 'vue';
 import { useInspectorDrawer } from '../../editor/editor.store';
 import { currentBlockIdSymbol } from '../../editor/EditorBlock.vue';
 import InlineTextToolbar from '../../../App/InspectorDrawer/ConfigurationPanel/input-panels/InlineTextToolbar.vue';
+import { getCleanBlockStyle } from '../../../utils/blockStyleUtils';
 
 interface TextFormat {  
   start: number;  
@@ -84,19 +86,22 @@ const currentBlock = computed(() => {
     return block;
 });
 
-const containerStyles = computed(() => {  
-  const blockData = currentBlock.value?.data as { props?: ButtonBlockProps; style?: any };  
+const containerStyles = computed(() => { 
+  const blockData = currentBlock.value?.data as { props?: ButtonBlockProps; style?: any }; 
+   
+  // Usamos el helper para limpiar 'zombis' y calcular shorthands
+  return getCleanBlockStyle(blockData?.style, {
+    // TUS DEFAULTS ORIGINALES:
+    textAlign: 'start', // O 'center' si prefieres
+    backgroundColor: null,
     
-  return {  
-    ...blockData?.style,
-    padding: blockData?.style?.padding  
-      ? `${blockData.style.padding.top}px ${blockData.style.padding.right}px ${blockData.style.padding.bottom}px ${blockData.style.padding.left}px`  
-      : '16px 24px',   
-    textAlign: blockData?.style?.textAlign || 'start', // Alineación del botón  
-    backgroundColor: blockData?.style?.backgroundColor || 'transparent',  
-    width: blockData?.props?.fullWidth ? '100%' : 'auto'  
-  };  
-});  
+    // Si fullWidth es true, forzamos 100%, si no 'auto'
+    width: blockData?.props?.fullWidth ? '100%' : 'auto',
+    
+    // Padding por defecto si el usuario no ha definido ninguno
+    padding: '16px 24px' 
+  });
+}); 
   
 // Estilos del botón (colores, bordes, tamaño)  
 const buttonStyles = computed(() => {  
@@ -161,7 +166,7 @@ const textStyles = computed(() => {
     textAlign: validTextAlign, // Texto siempre centrado en botones  
     outline: 'none',  
     border: 'none',  
-    background: 'transparent'  
+    background: null  
   };  
 });
 
@@ -322,81 +327,6 @@ function processInlineContent(element: HTMLElement): { text: string; formats: Te
   text = text.replace(/[ \t]+\n/g, "\n").trimEnd();  
   return { text: text.trim(), formats };  
 } 
-
-/* function htmlToTextAndFormats(htmlContent: string): { text: string; formats: TextFormat[] } {  
-  const tempDiv = document.createElement('div');  
-  tempDiv.innerHTML = htmlContent;  
-    
-  let text = "";  
-  const formats: TextFormat[] = [];  
-  let post = 0;
-  
-  function processNode(
-    node: Node, 
-    currentFormats: { bold?: boolean; italic?: boolean } = {}, 
-    depth: number = 0
-  ) {  
-    if (node.nodeType === Node.TEXT_NODE) {  
-      const content = node.textContent || "";  
-      if (content) {  
-        const start = text.length;  
-        post = start;  
-        text += content;  
-        const end = text.length;  
-        
-        // Solo crear formato si hay algún estilo activo
-        if (currentFormats.bold || currentFormats.italic) {  
-          formats.push({  
-            start,  
-            end,  
-            ...(currentFormats.bold && { bold: true }),  
-            ...(currentFormats.italic && { italic: true })  
-          });  
-        }  
-      }  
-      return;  
-    }  
-      
-    if (node.nodeType === Node.ELEMENT_NODE) {  
-      const el = node as HTMLElement;  
-      const tag = el.tagName.toLowerCase();  
-
-      if (tag === "a") {  
-        const href = el.getAttribute("href") || "";  
-        const linkText = el.textContent?.trim() || "";  
-        if (href && linkText) {  
-          const markdownLink = `[${linkText}](${href})`;  
-          text += markdownLink;  
-          post += markdownLink.length;  
-          return; // No procesar hijos  
-        }  
-      } 
-        
-      // Crear una copia de los formatos actuales para no mutar el objeto padre
-      const newFormats = { ...currentFormats };  
-      
-      // Manejar etiquetas de formato
-      if (tag === "b" || tag === "strong") {
-        newFormats.bold = true;
-      } else if (tag === "i" || tag === "em") {
-        newFormats.italic = true;
-      }
-      // Ignorar otras etiquetas como div, span, etc. a menos que tengan estilos específicos
-        
-      // Procesar hijos recursivamente
-      Array.from(el.childNodes).forEach(child => {  
-        processNode(child, newFormats, depth + 1);  
-      });  
-    }  
-  }  
-    
-  // Procesar todos los nodos hijos del div temporal
-  Array.from(tempDiv.childNodes).forEach(node => {  
-    processNode(node);  
-  });  
-    
-  return { text, formats };  
-} */
 
 function saveCursorPosition() {  
   if (!editableDiv.value) return;  

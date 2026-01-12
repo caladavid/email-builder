@@ -24,6 +24,7 @@ import { computed, inject, nextTick, onMounted, ref, watch } from 'vue';
 import { useInspectorDrawer } from '../../editor/editor.store';
 import { currentBlockIdSymbol } from '../../editor/EditorBlock.vue';
 import InlineTextToolbar from '../../../App/InspectorDrawer/ConfigurationPanel/input-panels/InlineTextToolbar.vue';
+import { getCleanBlockStyle } from '../../../utils/blockStyleUtils';
 
 interface TextFormat {  
   start: number;  
@@ -84,7 +85,7 @@ const computedStyles = computed(() => {
     ? fontFamilyMap[rawFontFamily]    
     : rawFontFamily || 'inherit';    
     
-  // ✅ AGREGAR: Estilos por defecto según el level  
+  // Estilos base por nivel
   const levelStyles = {  
     h1: { fontSize: '32px', fontWeight: 'bold' },  
     h2: { fontSize: '24px', fontWeight: 'bold' },  
@@ -94,25 +95,27 @@ const computedStyles = computed(() => {
     h6: { fontSize: '12px', fontWeight: 'bold' }  
   };  
     
-  const currentLevel = props.level || 'h1';  
-  const defaultLevelStyle = levelStyles[currentLevel];  
+  const currentLevel = props.level || 'h2'; // h2 es un default más seguro para headings
+  const defaultLevelStyle = levelStyles[currentLevel] || levelStyles.h2;  
     
-  return {    
-    padding: props.style?.padding    
-      ? `${props.style.padding.top}px ${props.style.padding.right}px ${props.style.padding.bottom}px ${props.style.padding.left}px`    
-      : '16px 24px',    
-    fontFamily: mappedFontFamily,    
-    // ✅ Usar fontSize del level como fallback  
-    fontSize: props.style?.fontSize   
-      ? `${props.style.fontSize}px`   
-      : defaultLevelStyle.fontSize,  
-    // ✅ Usar fontWeight del level como fallback    
-    fontWeight: props.style?.fontWeight || defaultLevelStyle.fontWeight,  
-    textAlign: props.style?.textAlign || 'left',    
-    color: props.style?.color || 'inherit',    
-    backgroundColor: props.style?.backgroundColor || 'transparent'    
-  };    
-}); 
+  // 🔥 USAMOS EL HELPER
+  const cleanStyles = getCleanBlockStyle(props.style, {
+    padding: '16px 24px',
+    fontSize: defaultLevelStyle.fontSize,
+    fontWeight: defaultLevelStyle.fontWeight,
+    textAlign: 'left',
+    color: 'inherit',
+    backgroundColor: null,
+    fontFamily: mappedFontFamily // Default inicial
+  });
+
+  // 🔥 SOBRESCRIBIMOS FONT FAMILY MAPEADA
+  // Para asegurar que 'MODERN_SANS' se convierta en 'Helvetica...'
+  return {
+    ...cleanStyles,
+    fontFamily: mappedFontFamily
+  };
+});
 
 const blockProps = computed(() => {
     if (!blockId) return null;

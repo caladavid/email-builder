@@ -27,6 +27,7 @@ import { useInspectorDrawer } from '../../editor/editor.store';
 import { currentBlockIdSymbol } from '../../editor/EditorBlock.vue';  
 import InlineTextToolbar from '../../../App/InspectorDrawer/ConfigurationPanel/input-panels/InlineTextToolbar.vue';  
 import { getFontFamily } from '@flyhub/email-core';
+import { getCleanBlockStyle } from '../../../utils/blockStyleUtils';
 // ============================================  
 // TYPES  
 // ============================================  
@@ -95,24 +96,41 @@ const showToolBar = computed(() => {
   return editorStore.selectedBlockId === blockId;  
 });  
   
-const computedStyles = computed(() => {  
-  const rawFontFamily = props.style?.fontFamily;  
-  const mappedFontFamily = getFontFamily(rawFontFamily) || 'inherit';  
+const computedStyles = computed(() => { 
+  // 1. Lógica de Fuente
+  const rawFontFamily = props.style?.fontFamily; 
+  const mappedFontFamily = getFontFamily(rawFontFamily) || 'inherit'; 
   
-  return {  
-    padding: props.style?.padding  
-      ? `${props.style.padding.top}px ${props.style.padding.right}px ${props.style.padding.bottom}px ${props.style.padding.left}px`  
-      : '16px 24px',  
-    fontFamily: mappedFontFamily,  
-    fontSize: props.style?.fontSize ? `${props.style.fontSize}px` : 'inherit',  
-    fontWeight: props.style?.fontWeight || 'normal',  
-    textAlign: props.style?.textAlign || 'left',  
-    color: props.style?.color || 'inherit',  
-    backgroundColor: props.style?.backgroundColor || 'transparent',
-    fontStyle: props.style?.fontStyle || 'inherit',
-    whiteSpace: 'pre-wrap',       // Hace que los \n se vean como saltos de línea
-  };  
-});  
+  // 2. Limpieza de Estilos (Zombis, Padding, Colores)
+  // Aquí pasamos los defaults visuales
+  const cleanStyles = getCleanBlockStyle(props.style, {
+    padding: '16px 24px', 
+    fontSize: 'inherit', 
+    fontWeight: 'normal',
+    textAlign: 'left',
+    color: 'inherit',
+    backgroundColor: null,
+    fontStyle: 'inherit',
+    lineHeight: '1.5',
+  });
+
+  // 3. 🔥 SOBRESCRIBIR LO CRÍTICO (El Fix)
+  // Al hacer desestructuración (...cleanStyles) primero, y poner nuestras
+  // propiedades después, aseguramos que ESTAS ganen siempre.
+  return {
+    ...cleanStyles,
+    
+    // Forzamos la fuente mapeada (para que no use MODERN_SANS)
+    fontFamily: mappedFontFamily,
+    
+    // Forzamos pre-wrap (para que funcionen los ENTER y espacios)
+    whiteSpace: 'pre-wrap', 
+    lineHeight: '1.5',
+    
+    // Aseguramos que las listas y el texto fluyan bien
+    wordBreak: 'break-word' 
+  };
+});
 
 const variableItems = computed(() => {
   return Object.entries(editorStore.globalVariables || {}).map(

@@ -7,7 +7,7 @@ export const TextElementsMatcher: BlockMatcher = {
 
     isComponent(element: Element, parser: HTMLToBlockParser) {
         const tag = element.tagName.toLowerCase();
-        const textTags = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'li', 'td', 'th', 'div', 'span', 'pre', 'a', 'strong', 'b', 'em', 'i', 'font'];
+        const textTags = ['p', 'blockquote', 'li', 'td', 'th', 'div', 'span', 'pre', 'a', 'strong', 'b', 'em', 'i', 'font'];
         
         if (!textTags.includes(tag)) return false;
 

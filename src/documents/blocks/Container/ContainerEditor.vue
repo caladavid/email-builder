@@ -37,7 +37,7 @@ import type { EditorChildrenChange } from '../helpers/EditorChildrenIds.vue';
 /* import type { ContainerProps } from './ContainerPropsSchema'; */
 import { currentBlockIdSymbol } from '../../editor/EditorBlock.vue';
 import { useInspectorDrawer } from '../../editor/editor.store';
-import { computed, inject } from 'vue';
+import { computed, inject, watch } from 'vue';
 import { useDragAndDrop } from '../../../composables/useDragAndDrop';
 import BaseContainer from '../../../components/BaseContainer.vue';
 import type { ContainerProps } from '../../../lib/email-builder/blocks/Container';
@@ -112,6 +112,7 @@ function handleContainerDrop(event: DragEvent) {
     dragAndDrop.handleDrop(event);  
   }  
 }  
+
 </script>
 
 <style scoped>  

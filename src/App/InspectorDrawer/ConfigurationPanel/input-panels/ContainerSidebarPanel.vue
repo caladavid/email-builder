@@ -9,8 +9,8 @@
 </template>
 
 <script setup lang="ts">
-import ContainerPropsSchema from '../../../../documents/blocks/Container/ContainerPropsSchema';
-import type { ContainerProps } from '../../../../documents/blocks/Container/ContainerPropsSchema';
+import { ContainerPropsSchema } from '../../../../lib/email-builder/blocks/Container'; 
+import type { ContainerProps } from '../../../../lib/email-builder/blocks/Container'; 
 import MultiStylePropertyPanel from './helpers/style-inputs/MultiStylePropertyPanel.vue';
 import BaseSidebarPanel from './helpers/BaseSidebarPanel.vue';
 import { ref } from 'vue';
@@ -33,20 +33,26 @@ const errors = ref<Zod.ZodError | null>(null)
 /** Functions */
 
 function handleUpdateData(data: ContainerProps) {
+  // 1. Validación simple
   const res = ContainerPropsSchema.safeParse(data);
 
   if (res.success) {
-    // Hacer merge de estilos para preservar width y otras propiedades  
-    const mergedData = {  
-      ...res.data,  
-      style: {  
-        ...props.data.style,  // Preservar estilos existentes como width  
-        ...res.data.style     // Agregar nuevos estilos  
-      }  
+    // 2. Fusión simple y segura
+    // Nota: MultiStylePropertyPanel ya se encargó de que los números sean números y no arrays.
+    const mergedData = { 
+      ...props.data,         // Mantiene document, id, tagName
+      ...res.data,           // Mantiene childrenIds nuevos
+      style: { 
+        ...(props.data.style || {}), // Estilos viejos
+        ...(res.data.style || {})    // Estilos nuevos (padding, color, etc.)
+      } 
     };
+
+    // SIN DELETE, SIN UNDEFINED MANUAL. Deja que los datos fluyan.
     emit('update:data', mergedData);
     errors.value = null;
   } else {
+    console.log('Error validación Container:', res.error);
     errors.value = res.error;
   }
 }

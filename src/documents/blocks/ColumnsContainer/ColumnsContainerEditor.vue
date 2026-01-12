@@ -1,6 +1,6 @@
 <template>
   <DynamicColumnsContainer
-    :props="restProps"
+    :props="props.props"
     :style="style"
   >
     <template 

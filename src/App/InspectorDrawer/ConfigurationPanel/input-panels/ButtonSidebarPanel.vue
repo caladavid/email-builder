@@ -43,7 +43,7 @@
     <MultiStylePropertyPanel
       :names="['backgroundColor', 'fontFamily', 'fontSize', 'fontWeight', 'textAlign', 'padding']"
       :model-value="data.style"
-      @update:model-value="handleUpdateData({ ...data, style: $event })"
+      @update:model-value="handleStyleUpdate"
     />
   </BaseSidebarPanel>
 </template>
@@ -53,8 +53,9 @@ import BaseSidebarPanel from './helpers/BaseSidebarPanel.vue';
 import MultiStylePropertyPanel from './helpers/style-inputs/MultiStylePropertyPanel.vue';
 import ColorInput from './helpers/inputs/ColorInput/ColorInput.vue';
 import RadioGroupInput from './helpers/inputs/RadioGroupInput.vue';
-import type { ButtonProps } from '@flyhub/email-block-button';
-import { ButtonPropsSchema, ButtonPropsDefaults } from '@flyhub/email-block-button';
+import type { ButtonProps } from '../../../../documents/blocks/Button/ButtonPropsSchema'; 
+/* import { ButtonPropsSchema, ButtonPropsDefaults } from '@flyhub/email-block-button'; */
+import { ButtonPropsSchema, ButtonPropsDefaults } from '../../../../documents/blocks/Button/ButtonPropsSchema';
 import { computed, ref } from 'vue';
 import RichTextEditor from './RichTextEditor.vue';
 
@@ -84,14 +85,31 @@ const buttonBackgroundColor = computed(() => props.data.props?.buttonBackgroundC
 
 /** Functions */
 
-function handleUpdateData(data: ButtonProps) {
-  const res = ButtonPropsSchema.safeParse(data);
+function handleStyleUpdate(newStyle: any) {
+    console.log('🎨 Sidebar Button - Estilo recibido del Panel:', newStyle);
+    
+    // Combinar con los datos actuales
+    const newData = {
+        ...props.data,
+        style: newStyle
+    };
+    
+    handleUpdateData(newData);
+}
 
+function handleUpdateData(data: ButtonProps) {
+  console.group('🔍 Debug Sidebar ButtonPanel');
+  console.log('📥 Datos crudos a validar:', JSON.parse(JSON.stringify(data)));
+  const res = ButtonPropsSchema.safeParse(data);
+console.log('🛡️ Resultado Zod:', res.success ? '✅ ÉXITO' : '❌ ERROR');
   if (res.success) {
+    console.log('🚀 Emitiendo datos:', res.data);
     emit('update:data', res.data);
     errors.value = null;
   } else {
     errors.value = res.error;
+    console.log('⚠️ Error de Validación:', res.error.format());
   }
+  console.groupEnd();
 }
 </script>

@@ -8,7 +8,7 @@ export class CriticalLogger {
     // Key: "Mensaje::TagName", Value: Cantidad de veces
     private warningCounts: Map<string, number> = new Map();
 
-    private static loggingEnabled: boolean = true;
+    private static loggingEnabled: boolean = false;
 
     private constructor() {}
 

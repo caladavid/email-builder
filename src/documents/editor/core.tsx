@@ -15,7 +15,7 @@ import { buildBlockConfigurationDictionary, buildBlockConfigurationSchema } from
 import ColumnsContainerEditor from '../blocks/ColumnsContainer/ColumnsContainerEditor.vue'
 import ColumnsContainerPropsSchema from '../blocks/ColumnsContainer/ColumnsContainerPropsSchema'
 import ContainerEditor from '../blocks/Container/ContainerEditor.vue'
-import ContainerPropsSchema from '../blocks/Container/ContainerPropsSchema'
+import { ContainerPropsSchema } from '../../lib/email-builder/blocks/Container'; 
 import EmailLayoutEditor from '../blocks/EmailLayout/EmailLayoutEditor.vue';
 import EmailLayoutPropsSchema from '../blocks/EmailLayout/EmailLayoutPropsSchema';
 import EditorBlockWrapper from '../blocks/helpers/block-wrappers/EditorBlockWrapper.vue';

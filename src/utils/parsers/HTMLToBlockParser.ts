@@ -23,6 +23,7 @@ import { TableCellMatcher } from "./matchers/TableCellMatcher";
 import { LayoutTableMatcher } from "./matchers/LayoutTableMatcher";
 import { ComparisonSystem } from "./ComparisonSystem";
 import { CriticalLogger } from "./CriticalLogger";
+import { HeadingMatcher } from "./matchers/HeadingMatcher";
 
 export class HTMLToBlockParser {
 
@@ -51,6 +52,7 @@ export class HTMLToBlockParser {
         TableCellMatcher,
         LayoutTableMatcher,
 
+        HeadingMatcher,
         TextElementsMatcher,
         ContainerMatcher,
         MixedContentMatcher,
@@ -580,7 +582,7 @@ export class HTMLToBlockParser {
             this.processChildren(body, this.childrenIds, {});
 
             // Opcional: Aplanar contenedores redundantes si usas esa función
-            // this.flattenRedundantContainers();
+            this.flattenRedundantContainers();
 
             const configuration = this.buildConfiguration();
 
@@ -863,18 +865,12 @@ export class HTMLToBlockParser {
         const tagName = element.tagName.toLowerCase();
         const id = element.id || 'sin-id';
 
-        if (tagName === 'a') {
-            console.log(`🎯 [TRACE] Evaluando enlace: "${element.textContent?.trim()}"`);
-            console.log(`   - Clases: ${element.className}`);
-            console.log(`   - Style Attr: ${element.getAttribute('style')}`);
-        }
-
         // 🔍 DEBUG LOG: Solo para los elementos problemáticos
         const isProblematic = id === 'iflem' || id === 'irtcdy' || tagName === 'table'; 
         
-        if (isProblematic) {
+        /* if (isProblematic) {
             console.group(`🔍 Analizando <${tagName} id="${id}">`);
-        }
+        } */
 
         // =========================================================
         // ESCENARIO 2 & 3: MODO MATCHERS (con o sin comparación)
@@ -887,22 +883,22 @@ export class HTMLToBlockParser {
         for (const matcher of this.matchers) {
             const isMatch = matcher.isComponent(element, this);
 
-            if (isProblematic) {
+            /* if (isProblematic) {
                 console.log(`   ❓ ${matcher.name}: ${isMatch ? "✅ SÍ" : "❌ NO"}`);
-            }
+            } */
 
             if (isMatch) {
                 matcherResult = matcher.fromElement(element, this, inheritedStyles);
-                if (isProblematic) {
+                /* if (isProblematic) {
                      console.log(`   ✨ Resultado ${matcher.name}:`, matcherResult ? "OK" : "NULL (Falló en fromElement)");
-                }
+                } */
                 if (matcherResult) break; 
             }
         }
 
-        if (isProblematic) {
+        /* if (isProblematic) {
             console.groupEnd();
-        }
+        } */
 
         // 2. Si el modo comparación está activo, obtenemos el resultado legacy "en la sombra"
         if (this.comparisonMode) {
@@ -1060,7 +1056,7 @@ export class HTMLToBlockParser {
                 type: "Html",
                 data: {
                     props: { content: element.outerHTML },
-                    style: { padding: { top: 0, bottom: 0, left: 0, right: 0 }, backgroundColor: "transparent" }
+                    style: { padding: { top: 0, bottom: 0, left: 0, right: 0 }, backgroundColor: null }
                 }
             };
             return id;
@@ -2137,9 +2133,16 @@ export class HTMLToBlockParser {
         const s = StyleUtils.normalizeStyles(styles || {});
 
         // Helpers para extracción segura de valores numéricos
-        const getVal = (v1: any, v2?: any) => {
-            const val = v1 !== undefined ? v1 : v2;
-            return parseInt(String(val || 0).replace(/px/g, '').trim()) || 0;
+        const getVal = (v1: any, v2?: any) => {  
+            let val = v1 !== undefined ? v1 : v2;  
+                
+            // 🔥 FIX: Si es un array, tomar el primer valor  
+            if (Array.isArray(val)) {  
+                console.log('🔍 Padding es array, usando primer valor:', val);  
+                val = val[0];  
+            }  
+                
+            return parseInt(String(val || 0).replace(/px/g, '').trim()) || 0;  
         };
         const getRaw = (v1: any, v2?: any) => v1 !== undefined ? v1 : v2;
 
@@ -2626,7 +2629,10 @@ export class HTMLToBlockParser {
         const heightAttr = htmlElement.getAttribute("height");
         if (heightAttr) styles["height"] = heightAttr;
 
-
+        const bordercolorAttr = htmlElement.getAttribute("bordercolor");  
+        if (bordercolorAttr) {  
+            styles["border-color"] = bordercolorAttr;  
+        } 
 
         for (const prop in styles) {
             const value = styles[prop];
@@ -2637,9 +2643,10 @@ export class HTMLToBlockParser {
 
             switch (prop.toLowerCase()) {
                 case "color":
-                    final.color = StyleUtils.normalizeColor(value);
-                    break;
                 case "background-color":
+                    // Ahora retorna null si no es válido, lo cual es aceptado por COLOR_SCHEMA.nullable()
+                    final[prop === 'color' ? 'color' : 'backgroundColor'] = StyleUtils.normalizeColor(value);
+                    break;
                 case "background":
                     final.backgroundColor = StyleUtils.normalizeColor(value);
                     break;
@@ -2708,15 +2715,27 @@ export class HTMLToBlockParser {
                     final.margin = StyleUtils.parseSpacing(value);
                     break;
                 case "border":
-                    final.border = StyleUtils.parseBorder(value);
+                    const b = StyleUtils.parseBorder(value);
+                    // Solo asignamos si parseBorder devolvió algo válido (no null)
+                    if (b) {
+                        final.border = b; 
+                        final.borderWidth = b.width;
+                        final.borderStyle = b.style;
+                        final.borderColor = b.color;
+                    }
                     break;
-                case "border-radius":
-                    final.borderRadius = StyleUtils.parseBorderRadius(value);
-                    break;
+
                 case "border-width":
+                    // Solo guardamos el ancho. NO creamos el objeto border artificialmente todavía.
+                    final.borderWidth = StyleUtils.parseDimension(value);
+                    break;
+
                 case "border-style":
+                    final.borderStyle = value;
+                    break;
+
                 case "border-color":
-                    final[prop] = value;
+                    final.borderColor = StyleUtils.normalizeColor(value);
                     break;
                 case "background-image":
                     if (value.includes("gradient")) {
@@ -2798,6 +2817,23 @@ export class HTMLToBlockParser {
         if (!final.fontFamily && inheritedStyles.fontFamily) {
             final.fontFamily = inheritedStyles.fontFamily;
         }
+
+        if (!final.border) {
+            const w = final.borderWidth;
+            const s = final.borderStyle;
+            const c = final.borderColor;
+
+            const hasWidth = w && w !== '0px' && w !== '0' && w !== 'none';
+            const hasStyle = s && s !== 'none' && s !== 'hidden';
+            
+            if (hasWidth || hasStyle || (c && c !== 'transparent')) {
+                final.border = {
+                    width: w || '1px',
+                    style: s || 'solid',
+                    color: c || '#000000'
+                };
+            }
+        }   
 
         const normalized = StyleUtils.normalizeStyles(final) || {};
 
@@ -2910,104 +2946,131 @@ export class HTMLToBlockParser {
      * Post-procesamiento: Aplana estructuras de contenedores redundantes.
      * Ejemplo: Div > Div > Div -> Div (con estilos fusionados)
      */
-    private flattenRedundantContainers() {
-        let changed = true;
-        const protectedTypes = ['ColumnsContainer', 'Table', 'TableBody', 'TableRow', 'TableCell'];
+private flattenRedundantContainers() {
+    let changed = true;
+    const protectedGrandchildTypes = ['Table', 'Button', 'Image', 'Timer', 'Divider']; // Agregué Divider por si acaso
 
-        while (changed) {
-            changed = false;
-            const blockIds = Object.keys(this.blocks);
+    while (changed) {
+        changed = false;
+        const blockIds = Object.keys(this.blocks);
 
-            for (const parentId of blockIds) {
-                const parent = this.blocks[parentId];
-                if (!parent) continue;
+        for (const parentId of blockIds) {
+            const parent = this.blocks[parentId];
+            
+            // --- FILTRO 1: Validar Padre ---
+            if (!parent || parent.type !== 'Container') continue;
 
-                // 1. Protección por TIPO
-                if (protectedTypes.includes(parent.type)) continue;
+            const childrenIds = parent.data.props?.childrenIds || [];
+            if (childrenIds.length !== 1) continue; // REGLA: Solo 1 hijo. Si tiene 2 (columnas hermanas), el padre es la Row y no se toca.
 
-                // 2. Protección por ID (Desde GridSystemMatcher) <--- ESTO ES VITAL
-                if (this.protectedBlocks && this.protectedBlocks.has(parentId)) continue; // Nota: cambia el nombre si usaste protectedBlocks o protectedBlockIds
+            const childId = childrenIds[0];
+            const child = this.blocks[childId];
 
-                // 1. Validaciones básicas (Padre Container con 1 Hijo Container)
-                if (!parent || parent.type !== 'Container') continue;
-                if (!parent.data.props.childrenIds || parent.data.props.childrenIds.length !== 1) continue;
+            // --- FILTRO 2: Validar Hijo ---
+            if (!child || child.type !== 'Container') continue;
 
-                if (protectedTypes.includes(parent.type)) continue;
+            // --- FILTRO 3: CHEQUEOS DE SEGURIDAD ---
 
+            // A. Identidad: Si el hijo tiene ID/Clase, no lo matamos
+            if (child.data.props?.id || child.data.props?.className || child.data.props?.tagName === 'table') continue;
 
-                const childId = parent.data.props.childrenIds[0];
-                const child = this.blocks[childId];
-                if (!child || child.type !== 'Container') continue;
+            const pStyle = parent.data.style || {};
+            const cStyle = child.data.style || {};
 
-                if (protectedTypes.includes(child.type)) continue;
-                if (this.protectedBlocks && this.protectedBlocks.has(childId)) continue;
+            // B. [MODIFICADO] Análisis de Estructura (Ancho/Columnas)
+            // Antes abortábamos si el padre no era 100%. Ahora permitimos la fusión,
+            // pero SOLO si el hijo no intenta imponer su propio ancho conflictivo.
+            const pWidth = String(pStyle.width || '100%');
+            const cWidth = String(cStyle.width || '100%');
 
+            // Si el hijo tiene un ancho específico distinto al 100% y distinto al padre, 
+            // es un componente interno con tamaño propio. No fusionar.
+            // Ejemplo: Padre 50%, Hijo 80% -> No tocar.
+            // Ejemplo: Padre 50%, Hijo 100% -> FUSIONAR (El hijo es solo relleno).
+            if (cWidth !== '100%' && cWidth !== 'auto' && cWidth !== pWidth) {
+                continue; 
+            }
 
-                // --- 3. ANÁLISIS ---
-                const pStyle = parent.data.style || {};
-                const cStyle = child.data.style || {};
-
-                // Colores
-                const pBg = pStyle.backgroundColor ? String(pStyle.backgroundColor).toLowerCase() : '';
-                const cBg = cStyle.backgroundColor ? String(cStyle.backgroundColor).toLowerCase() : '';
-
-                const isParentTransparent = !pBg || pBg === 'transparent' || pBg.includes('255, 255, 255') || pBg === '#ffffff' || pBg === '#fff';
-                const isChildTransparent = !cBg || cBg === 'transparent';
-
-                // Conflicto de color
-                const hasColorClash = !isParentTransparent && !isChildTransparent && pBg !== cBg;
-
-                // Fronteras visuales
-                const b = cStyle.border;
-                let childHasBorder = false;
-                if (cStyle.borderWidth && parseInt(String(cStyle.borderWidth)) > 0) childHasBorder = true;
-                else if (typeof b === 'string') childHasBorder = !b.includes('none') && !b.startsWith('0');
-                const hasVisualBoundary = childHasBorder || (cStyle.boxShadow && cStyle.boxShadow !== 'none') || !!cStyle.backgroundImage;
-
-                // === 🔥 NUEVA REGLA: PROTECCIÓN DE ANCHO DE FONDO ===
-                // Si el Padre tiene color (es una banda de color) y el Hijo es angosto,
-                // NO fusionamos, porque el color se encogería al ancho del hijo.
-                const childHasConstrainedWidth = cStyle.width && cStyle.width !== '100%' && cStyle.width !== '100.0%' && cStyle.width !== 'auto';
-
-                if (!isParentTransparent && childHasConstrainedWidth) {
-                    continue; // SALTAR: Necesitamos el padre para mantener el fondo ancho
-                }
-
-                // === FUSIÓN ===
-                if (!hasColorClash && !hasVisualBoundary) {
-
-                    // A. Heredar nietos
-                    parent.data.props.childrenIds = child.data.props.childrenIds;
-
-                    // B. Fusionar Paddings
-                    pStyle.paddingTop = this.mergePx(pStyle.paddingTop, cStyle.paddingTop);
-                    pStyle.paddingBottom = this.mergePx(pStyle.paddingBottom, cStyle.paddingBottom);
-                    pStyle.paddingLeft = this.mergePx(pStyle.paddingLeft, cStyle.paddingLeft);
-                    pStyle.paddingRight = this.mergePx(pStyle.paddingRight, cStyle.paddingRight);
-
-                    pStyle.padding = {
-                        top: pStyle.paddingTop,
-                        bottom: pStyle.paddingBottom,
-                        left: pStyle.paddingLeft,
-                        right: pStyle.paddingRight
-                    };
-
-                    // C. Resolver Fondo
-                    if (!isChildTransparent) {
-                        pStyle.backgroundColor = cBg;
-                    }
-
-                    // D. Resolver Ancho (Solo heredamos si es seguro o si el padre era transparente)
-                    if (childHasConstrainedWidth) {
-                        pStyle.width = cStyle.width;
-                        if (cStyle.maxWidth) pStyle.maxWidth = cStyle.maxWidth;
-                    }
-
-                    delete this.blocks[childId];
-                    changed = true;
+            // C. Nietos Complejos
+            const grandChildrenIds = child.data.props?.childrenIds || [];
+            if (grandChildrenIds.length > 0) {
+                const grandChildId = grandChildrenIds[0];
+                const grandChild = this.blocks[grandChildId];
+                if (grandChild && protectedGrandchildTypes.includes(grandChild.type)) {
+                    continue; 
                 }
             }
+
+            // D. Conflicto Visual
+            const pBg = pStyle.backgroundColor;
+            const cBg = cStyle.backgroundColor;
+            const isParentTrans = !pBg || pBg === 'transparent' || pBg === 'rgba(0, 0, 0, 0)';
+            const isChildTrans = !cBg || cBg === 'transparent' || cBg === 'rgba(0, 0, 0, 0)';
+
+            if (!isParentTrans && !isChildTrans && pBg !== cBg) continue;
+
+            // Borde visual en el hijo impide fusión
+            const hasVisualBoundary = (cStyle.borderWidth && parseInt(cStyle.borderWidth) > 0) || 
+                                      (cStyle.border && cStyle.border !== 'none') ||
+                                      cStyle.backgroundImage;
+            if (hasVisualBoundary) continue;
+
+            // === ¡FUSIÓN APROBADA! ===
+            // console.log(`🔨 Aplanando: ${parentId} absorbe a ${childId}`);
+
+            // 1. Heredar Nietos
+            parent.data.props.childrenIds = child.data.props.childrenIds;
+
+            // 2. Fusionar Estilos
+
+            // Padding: Sumar
+            pStyle.padding = this.mergeSpacings(pStyle.padding, cStyle.padding);
+            
+            // Fondo: Hijo manda
+            if (!isChildTrans) pStyle.backgroundColor = cBg;
+
+            // [MODIFICADO] Lógica de Ancho
+            // El padre MANTIENE su ancho estructural.
+            // Si el padre era 50% y el hijo 100%, el resultado debe ser 50%.
+            // Solo si el padre era "auto" o indefinido, adoptamos el ancho del hijo.
+            if ((!pStyle.width || pStyle.width === 'auto') && cStyle.width) {
+                pStyle.width = cStyle.width;
+            } 
+            // Si el padre ya tiene width (ej: 33.33%), NO lo sobrescribimos con el 100% del hijo.
+            
+            // MaxWidth: Heredar el más restrictivo o el del hijo
+            if (cStyle.maxWidth) pStyle.maxWidth = cStyle.maxWidth;
+
+            // Alineación y Texto
+            if (cStyle.textAlign) pStyle.textAlign = cStyle.textAlign;
+            if (cStyle.verticalAlign) pStyle.verticalAlign = cStyle.verticalAlign; // Importante para columnas
+            if (cStyle.fontFamily) pStyle.fontFamily = cStyle.fontFamily;
+            if (cStyle.fontSize) pStyle.fontSize = cStyle.fontSize;
+            if (cStyle.lineHeight) pStyle.lineHeight = cStyle.lineHeight;
+            if (cStyle.color) pStyle.color = cStyle.color;
+
+            // 3. Matar Hijo
+            delete this.blocks[childId];
+            
+            changed = true;
         }
+    }
+}
+
+    // Helper para sumar objetos de padding/margin
+    private mergeSpacings(p1: any, p2: any) {
+        // 1. Convertimos inputs a objeto {top, right...} numérico
+        // (Ya no necesitamos la variable 'normalize' local)
+        const o1 = StyleUtils.normalizePadding(p1);
+        const o2 = StyleUtils.normalizePadding(p2);
+
+        // 2. Sumamos matemáticamente
+        return {
+            top: o1.top + o2.top,
+            right: o1.right + o2.right,
+            bottom: o1.bottom + o2.bottom,
+            left: o1.left + o2.left
+        };
     }
 
     /**
@@ -3049,46 +3112,54 @@ export class HTMLToBlockParser {
             if (block.data && block.data?.style) {
                 const style = block.data.style;
 
-                ['lineHeight', 'verticalAlign', 'textAlign', 'color', 'backgroundColor'].forEach(prop => {
-                if (typeof style[prop] === 'string') {
-                    style[prop] = style[prop].replace(/!important/gi, '').trim();
-                    if (style[prop] === 'inherit') delete style[prop]; // Evita error de Enum
+                ['lineHeight', 'verticalAlign', 'textAlign', 'color', 'backgroundColor', 'borderColor'].forEach(prop => {
+                    if (typeof style[prop] === 'string') {
+                        style[prop] = style[prop].replace(/!important/gi, '').trim();
+                        
+                        // 🔥 UNIFICACIÓN: Si es transparent o inherit, lo tratamos como null o lo borramos
+                        const valLower = style[prop].toLowerCase();
+                        if (valLower === 'transparent' || valLower.includes('rgba(0,0,0,0)')) {
+                            style[prop] = null;
+                        } else if (valLower === 'inherit') {
+                            delete style[prop];
+                        }
                     }
                 });
 
                 // 2. NORMALIZACIÓN DE PADDING A NÚMEROS (Soluciona el error invalid_type)
-                if (style.padding && typeof style.padding === 'object') {
-                    style.padding = {
-                        top: parseInt(String(style.padding.top || 0)) || 0,
-                        right: parseInt(String(style.padding.right || 0)) || 0,
-                        bottom: parseInt(String(style.padding.bottom || 0)) || 0,
-                        left: parseInt(String(style.padding.left || 0)) || 0
-                    };
+                if (style.padding && typeof style.padding === 'object') {  
+                    // 🔥 FIX: Validar que los valores no sean arrays  
+                    ['top', 'right', 'bottom', 'left'].forEach(side => {  
+                        if (Array.isArray(style.padding[side])) {  
+                        console.warn('🔍 Padding.' + side + ' es array, convirtiendo:', style.padding[side]);  
+                        style.padding[side] = parseInt(String(style.padding[side][0] || 0)) || 0;  
+                        } else {  
+                        style.padding[side] = parseInt(String(style.padding[side] || 0)) || 0;  
+                        }  
+                    });  
                 }
 
                 const colorProps = ['backgroundColor', 'color', 'borderColor'];
                 
-                colorProps.forEach(prop => {
-                    if (style[prop]) {
-                        // 1. Clean string
-                        let val = String(style[prop]).replace(/!important/g, '').trim();
+               colorProps.forEach(prop => {
+                if (style[prop]) {
+                    // Normalize to HEX using the improved util
+                    const hex = StyleUtils.normalizeColor(String(style[prop]));
+                    
+                    // Final Regex Check para cumplir con el Schema
+                    if (hex && /^#[0-9a-f]{6}$/i.test(hex)) {
+                        style[prop] = hex;
+                    } else {
+                        // 🔥 Si no es un Hex válido (y ya filtramos transparent arriba), lo hacemos null
+                        style[prop] = null; 
                         
-                        // 2. Normalize to HEX using the improved util
-                        let hex = StyleUtils.normalizeColor(val);
-                        
-                        // 3. Final Regex Check (Safety Net)
-                        if (hex && /^#[0-9a-f]{6}$/i.test(hex)) {
-                            style[prop] = hex;
-                        } else {
-                            // If invalid, DELETE IT. Better to have no color than a crash.
-                            delete style[prop]; 
-                            
-                            // Optional: Set defaults if critical
-                            if (prop === 'color' && !style[prop]) style.color = '#000000';
-                            // Background usually defaults to transparent if missing
-                        }
+                        // Fallback opcional solo para el texto base si quedó vacío
+                        if (prop === 'color' && !style[prop]) style.color = '#000000';
                     }
-                });
+                } else {
+                    style[prop] = null; // Asegura consistencia si la prop no existe
+                }
+            });
 
                 // 3. Fallback para verticalAlign (Enum 'top' | 'middle' | 'bottom')
                 const validVA = ['top', 'middle', 'bottom'];
@@ -3117,27 +3188,6 @@ export class HTMLToBlockParser {
                     style.textAlign = block.data.props?.align || 'left';
                 }
 
-                // 🔥 CORRECCIÓN AQUÍ: No borramos el color si no es hex perfecto.
-                // Solo normalizamos y confiamos en el valor.
-                if (style.backgroundColor) {
-                    let color = String(style.backgroundColor).replace(/!important/g, '').trim();
-                    color = StyleUtils.normalizeColor(color); // Debe devolver un #HEX
-                    // Si no es un hex válido (ej. "transparent"), poner "transparent" o eliminar si el regex falla
-                    style.backgroundColor = /^#[0-9A-F]{6}$/i.test(color) ? color : "transparent";
-                } else {
-                    style.backgroundColor = "transparent";
-                }
-
-
-                if (style.color) {
-                    const color = StyleUtils.normalizeColor(style.color);
-
-                    if (!/^#[0-9A-F]{6}$/i.test(color)) {
-                        delete style.color;
-                    } else {
-                        style.color = color;
-                    }
-                }
 
                 if (style.borderRadius) {
                     const radius = parseInt(String(style.borderRadius));

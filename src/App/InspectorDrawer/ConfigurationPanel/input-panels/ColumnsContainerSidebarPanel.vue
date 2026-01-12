@@ -38,6 +38,17 @@
       @update:model-value="handleUpdateData({ ...data, props: { ...data.props, contentAlignment: $event } })"
     />
 
+    <RadioGroupInput  
+      label="Alineación horizontal"  
+      :model-value="data.props?.horizontalAlignment ?? 'left'"  
+      :items="[  
+        { icon: 'material-symbols:align-horizontal-left', value: 'left' },  
+        { icon: 'material-symbols:align-horizontal-center', value: 'center' },  
+        { icon: 'material-symbols:align-horizontal-right', value: 'right' }  
+      ]"  
+      @update:model-value="handleUpdateData({ ...data, props: { ...data.props, horizontalAlignment: $event } })"  
+    />
+
     <MultiStylePropertyPanel
       :names="['backgroundColor', 'padding']"
       :model-value="data.style"

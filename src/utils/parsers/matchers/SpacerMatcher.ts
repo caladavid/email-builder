@@ -44,7 +44,7 @@ export const SpacerMatcher: BlockMatcher = {
             data: {
                 style: {
                     // El espaciador suele ser transparente
-                    backgroundColor: styles.backgroundColor || 'transparent',
+                    backgroundColor: styles.backgroundColor || null,
                     display: 'block',
                     width: '100%'
                 },

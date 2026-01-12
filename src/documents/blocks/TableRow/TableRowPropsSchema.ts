@@ -5,9 +5,11 @@ export const TableRowPropsSchema = z.object({
     backgroundColor: z.string().optional(),  
     height: z.string().optional(),  
     width: z.string().optional(),
+    textAlign: z.enum(['left', 'center', 'right']).optional().nullable(),
   }).passthrough().optional().nullable(),  
   props: z.object({  
-    childrenIds: z.array(z.string()).optional().default([])  
+    childrenIds: z.array(z.string()).optional().default([]),
+    tagName: z.string().optional(), 
   }).passthrough().optional().nullable()  
 });  
   
@@ -21,3 +23,7 @@ export type TableRowProps = {
     childrenIds?: string[] | null;  
   } | null;  
 };
+
+export const TableRowPropsDefaults = {
+  textAlign: 'center', // Default centrado
+} as const;

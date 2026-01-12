@@ -31,15 +31,21 @@ import { getPadding } from '@flyhub/email-core';
 //    This object contains the runtime default values like { columnsCount: 2, ... }
 import { ColumnsContainerPropsDefaults } from '../documents/blocks/ColumnsContainer/ColumnsContainerPropsSchema';
 import type { ColumnsContainerProps } from '../documents/blocks/ColumnsContainer/ColumnsContainerPropsSchema'; 
+import { getCleanBlockStyle } from '../utils/blockStyleUtils';
 
 const props = defineProps<ColumnsContainerProps>();
 
 // --- Main Container Styles ---
-const wStyle = computed(() => ({
-    ...props.style,
-    backgroundColor: props.style?.backgroundColor ?? undefined,
-    padding: getPadding(props.style?.padding),
-}));
+const wStyle = computed(() => {
+
+  return getCleanBlockStyle(props.style, {
+    display: 'block',
+    width: '100%',
+    // Aseguramos que el contenedor se comporte bien
+    tableLayout: 'fixed', 
+    backgroundColor: null // Default si no hay color
+  });
+});
 
 const tableStyle = computed(() => {
   // 1. FILTRO DE SEGURIDAD

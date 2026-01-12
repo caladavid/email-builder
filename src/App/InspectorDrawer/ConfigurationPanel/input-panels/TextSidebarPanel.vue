@@ -78,7 +78,7 @@
       :names="['color', 'backgroundColor', 'fontFamily', 'fontSize', 'fontWeight', 'textAlign', 'padding']"
       :model-value="data.style"
 
-      @update:model-value="handleUpdateData({ ...data, style: $event })"
+      @update:model-value="handleStyleUpdate"
     />
   </BaseSidebarPanel>
 </template>
@@ -86,12 +86,12 @@
 <script setup lang="ts">
 import BaseSidebarPanel from './helpers/BaseSidebarPanel.vue';
 import MultiStylePropertyPanel from './helpers/style-inputs/MultiStylePropertyPanel.vue';
-import type { TextProps } from '@flyhub/email-block-text';
-import { TextPropsSchema } from '@flyhub/email-block-text';
+import type { TextProps } from '../../../../documents/blocks/Text/TextPropsSchema';
 import { ref, watch } from 'vue';
 import { useInspectorDrawer } from '../../../../documents/editor/editor.store';
 import RichTextEditor from '../input-panels/RichTextEditor.vue';
 import BooleanInput from './helpers/inputs/BooleanInput.vue';
+import TextPropsSchema from '../../../../documents/blocks/Text/TextPropsSchema';
 
 type TextSidebarPanelProps = {
   data: TextProps
@@ -115,6 +115,28 @@ const inspectorDrawer = useInspectorDrawer();
 
 /** Functions */
 
+function handleStyleUpdate(newStyle: any) {
+  // 1. Clonamos el estilo para no mutar directamente
+  const cleanStyle = { ...newStyle };
+
+  // 2. REGLA ANTI-ARRAY: Si fontSize viene como array, extraemos el primer valor
+  if (Array.isArray(cleanStyle.fontSize)) {
+    console.log('⚠️ Detectado fontSize como Array, aplanando...', cleanStyle.fontSize);
+    cleanStyle.fontSize = cleanStyle.fontSize[0];
+  }
+  
+  // Hacemos lo mismo para fontFamily por seguridad, suele pasar lo mismo
+  if (Array.isArray(cleanStyle.fontFamily)) {
+    cleanStyle.fontFamily = cleanStyle.fontFamily[0];
+  }
+
+  // 3. Enviamos los datos limpios a la validación
+  handleUpdateData({ 
+    ...props.data, 
+    style: cleanStyle 
+  });
+}
+
 function handleUpdateData(data: unknown) {
   const res = TextPropsSchema.safeParse(data);
 
@@ -133,6 +155,7 @@ function handleUpdateData(data: unknown) {
     /* emit('update:data', res.data); */
     errors.value = null;
   } else {
+    console.log('❌ Error Zod Texto:', res.error);
     errors.value = res.error;
   }
 }

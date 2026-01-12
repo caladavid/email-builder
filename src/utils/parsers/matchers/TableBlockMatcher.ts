@@ -22,10 +22,8 @@ export const TableBlockMatcher: BlockMatcher = {
             }
         }
         
-        
         // A. Detección básica
         if (tag === 'table') return true;
-
         
         if (!element.getAttribute('style')?.includes('display: table')) return false;
 
@@ -170,7 +168,7 @@ function processAsWrapperContainer(tableEl: Element, cellEl: Element, parser: HT
     const childrenIds: string[] = [];
     // Limpiamos estilos peligrosos para herencia
     const stylesForKids = { ...mergedStyle };
-    ['padding', 'border', 'backgroundColor', 'width', 'height', 'margin'].forEach(p => delete stylesForKids[p]);
+    ['padding', 'backgroundColor', 'width', 'height', 'margin'].forEach(p => delete stylesForKids[p]);
 
     // Limpieza de nodos vacíos
     Array.from(cellEl.childNodes).forEach(node => {
@@ -262,13 +260,38 @@ function processAsColumnsContainer(tableEl: Element, rowEl: Element, cells: Elem
 function processAsLayoutTable(element: Element, rows: Element[], areVirtual: boolean, parser: HTMLToBlockParser, inheritedStyles: any): MatcherResult {
     const tableId = uuidv4();
     const styles = parser.extractStyles(element, inheritedStyles);
+
+    if (styles.backgroundColor === 'transparent' || styles.backgroundColor === 'rgba(0, 0, 0, 0)') {
+        styles.backgroundColor = null;
+    }
+    if (styles.color === 'transparent') {
+        styles.color = null;
+    }
     
+    // --- NUEVO FIX: Capturar atributos legacy para centrado y layout ---
+    const align = element.getAttribute('align');
+    if (align === 'center' && !styles.marginLeft) {
+        styles.marginLeft = 'auto';
+        styles.marginRight = 'auto';
+    }
+
+    const widthAttr = element.getAttribute('width');
+    if (widthAttr && !styles.width) {
+        styles.width = widthAttr.endsWith('%') ? widthAttr : `${widthAttr}px`;
+    }
+
+    const bgcolor = element.getAttribute('bgcolor');
+    if (bgcolor && !styles.backgroundColor) {
+        styles.backgroundColor = bgcolor;
+    }
+    // -------------------------------------------------------------
+
     styles.display = 'table';
     if (!styles.width || styles.width === 'auto') styles.width = '100%';
     styles.borderCollapse = 'collapse';
 
     parser.addBlock(tableId, {
-        type: "Table",
+        type: "Table", // Asegúrate que tu renderer soporta 'Table', si no usa 'Container'
         data: {
             style: styles,
             props: { childrenIds: [], tagName: element.tagName.toLowerCase(), align: element.getAttribute('align') }
