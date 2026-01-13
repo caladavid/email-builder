@@ -709,9 +709,9 @@ export class HTMLToBlockParser {
         if (!src) return PLACEHOLDER_IMG;
         src.trim();
 
-        const httpIndex = src.indexOf("http");
-        if (httpIndex > 0) {
-            src = src.substring(httpIndex);
+        const urlMatch = src.match(/https?:\/\/.+/i);
+        if (urlMatch) {
+            src = urlMatch[0];
         }
 
         if (src.startsWith("http") || src.startsWith("//")) {
