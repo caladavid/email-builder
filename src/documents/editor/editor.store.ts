@@ -378,7 +378,17 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
 
       if (result.response === "200") {  
         // Cargar el template procesado en el editor  
-        const htmlContent = result.data;
+        let htmlContent = result.data;
+
+        // 1. FIX: Corregir etiquetas <img src="..."> (Tu solución)
+        htmlContent = htmlContent.replace(/src="images\/(https?:\/\/)/g, 'src="$1');
+
+        // 2. FIX: Corregir estilos background-image: url('...')
+        // El HTML que enviaste usa comillas simples dentro de url()
+        htmlContent = htmlContent.replace(/url\('images\/(https?:\/\/)/g, "url('$1");
+        
+        // Opcional: Si a veces viene con comillas dobles en el CSS
+        htmlContent = htmlContent.replace(/url\("images\/(https?:\/\/)/g, 'url("$1');
         
         const parser = new HTMLToBlockParser();
         const parseResult = await parser.parseHtmlStringToBlocks(htmlContent);  
