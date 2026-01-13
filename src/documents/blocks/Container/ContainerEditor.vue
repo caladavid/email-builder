@@ -5,12 +5,18 @@
       // Forzamos que el contenedor sea un bloque de ancho completo
       width: props.style?.width || '100%',
       // Aseguramos que la alineación de texto afecte a los bloques hijos inline
-      textAlign: props.style?.textAlign || 'inherit'
+      textAlign: props.style?.textAlign || 'inherit',
+      ...(IS_DEBUG ? debugStyles : {})
+
     }"
     class="container-drop-zone"  
     @dragover="handleContainerDragOver"  
     @drop="handleContainerDrop" 
   >
+
+  <div v-if="IS_DEBUG" class="debug-id-label" :title="currentBlockId">
+      <span style="opacity: 0.7">ID:</span> {{ currentBlockId }}
+    </div>
 
     <!-- <div class="debug-overlay"> 
       W: {{ props.style?.width || 'Auto' }}
@@ -45,7 +51,7 @@ import type { ContainerProps } from '../../../lib/email-builder/blocks/Container
 /* defineProps<ContainerProps>() */
   const props = defineProps<ContainerProps>()
     /* console.log("props.style", props.style); */
-
+const IS_DEBUG = false;
 const inspectorDrawer = useInspectorDrawer();
 const dragAndDrop = useDragAndDrop(() => currentBlockId);  
 
@@ -113,6 +119,14 @@ function handleContainerDrop(event: DragEvent) {
   }  
 }  
 
+const debugStyles = {
+  outline: '2px solid red',
+  outlineOffset: '-2px', // Para que el borde sea interior y no rompa layout
+  position: 'relative',   // Necesario para que la etiqueta se posicione absoluta a este bloque
+  minHeight: '20px',      // TRUCO: Si el bloque está vacío (0px), esto lo fuerza a verse para que lo encuentres
+  zIndex: 999
+};
+
 </script>
 
 <style scoped>  
@@ -121,6 +135,21 @@ function handleContainerDrop(event: DragEvent) {
     
     outline: 4px dashed rgba(0,0,0,0.1); 
 } */
+
+.debug-id-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background-color: rgba(255, 0, 0, 0.9);
+  color: white;
+  font-family: monospace;
+  font-size: 11px;
+  padding: 2px 5px;
+  z-index: 9999;
+  pointer-events: none; /* CRÍTICO: Permite hacer click a través de la etiqueta */
+  white-space: nowrap;
+  box-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+}
 
 .container-debug {  
   position: relative;  

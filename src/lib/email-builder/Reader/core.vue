@@ -5,7 +5,7 @@
 
 <script setup lang="ts">
 import Avatar, { AvatarPropsSchema } from '@flyhub/email-block-avatar';
-import Button, { ButtonPropsSchema } from '@flyhub/email-block-button';
+import ButtonReader, { ButtonPropsSchema } from '../blocks/Button/ButtonReader.vue';
 import Divider, { DividerPropsSchema } from '@flyhub/email-block-divider';
 import Heading, { HeadingPropsSchema } from '@flyhub/email-block-heading';
 import Html, { HtmlPropsSchema } from '@flyhub/email-block-html';
@@ -26,6 +26,7 @@ import TableRowReader, { TableRowPropsSchema } from '../blocks/TableRow';
 import TableCellReader, { TableCellPropsSchema } from '../blocks/TableCell';
 import TableSectionReader from '../blocks/TableSection/TableSectionReader.vue';
 import { TableSectionPropsSchema } from '../../../documents/blocks/TableSection/TableSectionPropsSchema';
+
 
 defineProps<TReaderProps>()
 
@@ -51,7 +52,7 @@ const READER_DICTIONARY = {
   },
   Button: {
     schema: ButtonPropsSchema,
-    Component: Button,
+    Component: ButtonReader,
   },
   Divider: {
     schema: DividerPropsSchema,

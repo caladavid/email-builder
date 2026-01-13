@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import Heading, { HeadingPropsSchema } from '@flyhub/email-block-heading';
 import Text, { TextPropsSchema } from '@flyhub/email-block-text';
-import Button, { ButtonPropsSchema } from '@flyhub/email-block-button';
+import Button, { ButtonPropsSchema } from '../blocks/Button/ButtonPropsSchema';
 /* import Image, { ImagePropsSchema } from '@flyhub/email-block-image'; */
 import ImageReader, { ImagePropsSchema } from '../blocks/Image/ImageReader.vue'; 
 import Avatar, { AvatarPropsSchema } from '@flyhub/email-block-avatar';

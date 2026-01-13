@@ -197,18 +197,60 @@ function processAsWrapperContainer(tableEl: Element, cellEl: Element, parser: HT
     return { id };
 }
 
+function applyGenericCentering(element: Element, styles: any): any {
+    const styleStr = element.getAttribute('style')?.toLowerCase() || '';
+    const alignAttr = element.getAttribute('align')?.toLowerCase();
+    const parentAlign = element.parentElement?.getAttribute('align')?.toLowerCase();
+
+    // 1. Detectamos si es un bloque con ancho restringido (ej: 187px)
+    const isFixedBlock = styles.maxWidth && styles.maxWidth !== '100%';
+
+    // 2. Buscamos intención de centrado (en el elemento o su padre inmediato)
+    const hasCenterIntent = alignAttr === 'center' || 
+                            parentAlign === 'center' || 
+                            styleStr.includes('margin:0 auto') || 
+                            styleStr.includes('margin: 0 auto');
+
+    // 3. Si es pequeño y quiere centrarse, forzamos márgenes automáticos
+    if (isFixedBlock && hasCenterIntent) {
+        return {
+            ...styles,
+            textAlign: 'center',     // Corrige la alineación de texto
+            marginLeft: 'auto',      // Centra el bloque
+            marginRight: 'auto',     // Centra el bloque
+            display: 'block'         // Necesario para que margin:auto funcione
+        };
+    }
+    return styles;
+}
+
 function processAsColumnsContainer(tableEl: Element, rowEl: Element, cells: Element[], parser: HTMLToBlockParser, inheritedStyles: any): MatcherResult {
     const id = uuidv4();
-    const tableStyles = parser.extractStyles(tableEl, inheritedStyles);
+    let tableStyles = parser.extractStyles(tableEl, inheritedStyles);
+
+    tableStyles = applyGenericCentering(tableEl, tableStyles);
+
+    const alignAttr = tableEl.getAttribute('align')?.toLowerCase();
+    const parentAlign = tableEl.parentElement?.getAttribute('align')?.toLowerCase();
+    const styleStr = tableEl.getAttribute('style')?.toLowerCase() || '';
+
+    // Si explícitamente pide centro, o tiene margin auto en inline styles
+    if (alignAttr === 'center' || parentAlign === 'center' || styleStr.includes('margin: 0 auto') || styleStr.includes('margin:0 auto')) {
+        tableStyles.marginLeft = 'auto';
+        tableStyles.marginRight = 'auto';
+        tableStyles.textAlign = 'center';
+        tableStyles.display = 'block';
+    
+    }
     
     // Configuración Flexbox
     const containerStyle = {
         ...tableStyles,
-        display: 'flex',
-        flexWrap: 'wrap',
+        display: 'block',
         width: '100%',
         boxSizing: 'border-box',
         // Aseguramos que el padding de la tabla se mantenga
+        maxWidth: tableStyles.maxWidth,
         padding: tableStyles.padding || { top: 0, bottom: 0, left: 0, right: 0 }
     };
 
@@ -231,9 +273,8 @@ function processAsColumnsContainer(tableEl: Element, rowEl: Element, cells: Elem
             width: width,
             style: {
                 ...cellStyles,
-                flexBasis: width,
-                flexGrow: 1,
-                minWidth: '150px', // Responsive fallback
+                display: 'inline-block', // Para que los iconos se alineen horizontalmente
+                width: width || 'auto',
                 boxSizing: 'border-box'
             }
         };
@@ -245,7 +286,8 @@ function processAsColumnsContainer(tableEl: Element, rowEl: Element, cells: Elem
             style: containerStyle,
             props: {
                 columnsCount: cells.length,
-                columns: columnsData
+                columns: columnsData,
+                layout: 'auto'
             }
         }
     });
@@ -284,6 +326,18 @@ function processAsLayoutTable(element: Element, rows: Element[], areVirtual: boo
     if (bgcolor && !styles.backgroundColor) {
         styles.backgroundColor = bgcolor;
     }
+
+    const styleStr = element.getAttribute('style')?.toLowerCase() || '';
+    
+    if (align === 'center' || styleStr.includes('margin:0 auto') || styleStr.includes('margin: 0 auto')) {
+        styles.marginLeft = 'auto';
+        styles.marginRight = 'auto';
+        styles.textAlign = 'center';
+    }
+
+    // ... (el resto de la función queda igual)
+    styles.display = 'table';
+    if (!styles.width || styles.width === 'auto') styles.width = '100%';
     // -------------------------------------------------------------
 
     styles.display = 'table';

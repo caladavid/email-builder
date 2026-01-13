@@ -102,7 +102,10 @@ export const InlineIconsMatcher: BlockMatcher = {
             ...styles, 
             padding: {top:10, right:10, bottom:10, left:10}, // Un poco de padding safe
             border: 'none',
-            display: 'block' // El contenedor de columnas es un bloque
+            display: 'block', // El contenedor de columnas es un bloque
+            marginLeft: 'auto',
+            marginRight: 'auto',
+            textAlign: 'center'
         };
         
         if (containerStyle.width === '100%') delete containerStyle.width;

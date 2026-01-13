@@ -2634,6 +2634,17 @@ export class HTMLToBlockParser {
             styles["border-color"] = bordercolorAttr;  
         } 
 
+        if (element.textContent?.includes('Order Now')) {
+            console.log('--------------------------------');
+            console.log('🕵️‍♂️ PARSEANDO BOTÓN "Order Now"');
+            console.log('Estilo Inline Original:', element.getAttribute('style'));
+            
+            // Verifica si StyleUtils está matando el color
+            const rawBorderColor = "rgb(224, 62, 45)";
+            const normalized = StyleUtils.normalizeColor(rawBorderColor);
+            console.log(`Prueba Normalize RGB: '${rawBorderColor}' ->`, normalized);
+        }
+
         for (const prop in styles) {
             const value = styles[prop];
             if (typeof value === "object" && value !== null) {
@@ -2915,6 +2926,11 @@ export class HTMLToBlockParser {
             filteredFinal.mobileStyle = mobileStyles;
         }
 
+        if (element.textContent?.includes('Order Now')) {
+        console.log('✅ ESTILOS FINALES EXTRAÍDOS:', final);
+        console.log('--------------------------------');
+    }
+
         return filteredFinal;
     }
 
@@ -2946,116 +2962,156 @@ export class HTMLToBlockParser {
      * Post-procesamiento: Aplana estructuras de contenedores redundantes.
      * Ejemplo: Div > Div > Div -> Div (con estilos fusionados)
      */
-private flattenRedundantContainers() {
-    let changed = true;
-    const protectedGrandchildTypes = ['Table', 'Button', 'Image', 'Timer', 'Divider']; // Agregué Divider por si acaso
+    private flattenRedundantContainers() {
+        let changed = true;
+        const protectedGrandchildTypes = ['Button', 'Image', 'Timer', 'Divider'];
 
-    while (changed) {
-        changed = false;
-        const blockIds = Object.keys(this.blocks);
+        while (changed) {
+            changed = false;
+            const blockIds = Object.keys(this.blocks);
 
-        for (const parentId of blockIds) {
-            const parent = this.blocks[parentId];
-            
-            // --- FILTRO 1: Validar Padre ---
-            if (!parent || parent.type !== 'Container') continue;
+            for (const parentId of blockIds) {
+                const parent = this.blocks[parentId];
+                if (!parent) continue;
 
-            const childrenIds = parent.data.props?.childrenIds || [];
-            if (childrenIds.length !== 1) continue; // REGLA: Solo 1 hijo. Si tiene 2 (columnas hermanas), el padre es la Row y no se toca.
+                // =================================================================
+                // 🧹 FASE 1: RECOLECTOR DE BASURA (GARBAGE COLLECTOR)
+                // =================================================================
+                if (parent.data.props?.childrenIds) {
+                    const cleanChildrenIds: string[] = [];
+                    let childrenChanged = false;
 
-            const childId = childrenIds[0];
-            const child = this.blocks[childId];
+                    for (const childId of parent.data.props.childrenIds) {
+                        const child = this.blocks[childId];
+                        
+                        // Si el hijo no existe, lo saltamos
+                        if (!child) { childrenChanged = true; continue; }
 
-            // --- FILTRO 2: Validar Hijo ---
-            if (!child || child.type !== 'Container') continue;
+                        let shouldDelete = false;
+                        const grandKids = child.data.props?.childrenIds || [];
+                        const isEmpty = grandKids.length === 0;
 
-            // --- FILTRO 3: CHEQUEOS DE SEGURIDAD ---
+                        // --- CASO A: TableRow o Table vacíos ---
+                        // 🔥 NUEVO: Si es una fila o tabla y no tiene hijos, es basura inmediata.
+                        if ((child.type === 'TableRow' || child.type === 'Table') && isEmpty) {
+                            shouldDelete = true;
+                        }
 
-            // A. Identidad: Si el hijo tiene ID/Clase, no lo matamos
-            if (child.data.props?.id || child.data.props?.className || child.data.props?.tagName === 'table') continue;
+                        // --- CASO B: Container vacío ---
+                        else if (child.type === 'Container' && isEmpty) {
+                            const s = child.data.style || {};
+                            
+                            // Análisis de Invisibilidad
+                            const isTrans = !s.backgroundColor || s.backgroundColor === 'transparent' || s.backgroundColor === null;
+                            const hasImage = s.backgroundImage && s.backgroundImage !== 'none';
+                            
+                            // Borde
+                            const bW = parseInt(String(s.borderWidth || s.border?.width || 0));
+                            const hasBorder = bW > 0 && !String(s.borderColor).includes('transparent');
+                            
+                            // Altura: 🔥 FIX DEL PORCENTAJE (Ignorar 100%)
+                            const hStr = String(s.height || s.minHeight || '0');
+                            const hVal = parseInt(hStr);
+                            const isPxHeight = !hStr.includes('%') && !isNaN(hVal) && hVal > 1;
 
-            const pStyle = parent.data.style || {};
-            const cStyle = child.data.style || {};
+                            // Contenido de texto
+                            const hasContent = child.data.props.content || child.data.props.text;
 
-            // B. [MODIFICADO] Análisis de Estructura (Ancho/Columnas)
-            // Antes abortábamos si el padre no era 100%. Ahora permitimos la fusión,
-            // pero SOLO si el hijo no intenta imponer su propio ancho conflictivo.
-            const pWidth = String(pStyle.width || '100%');
-            const cWidth = String(cStyle.width || '100%');
+                            if (isTrans && !hasBorder && !hasImage && !isPxHeight && !hasContent) {
+                                shouldDelete = true;
+                            }
+                        }
 
-            // Si el hijo tiene un ancho específico distinto al 100% y distinto al padre, 
-            // es un componente interno con tamaño propio. No fusionar.
-            // Ejemplo: Padre 50%, Hijo 80% -> No tocar.
-            // Ejemplo: Padre 50%, Hijo 100% -> FUSIONAR (El hijo es solo relleno).
-            if (cWidth !== '100%' && cWidth !== 'auto' && cWidth !== pWidth) {
-                continue; 
-            }
+                        // --- EJECUCIÓN DE BORRADO ---
+                        if (shouldDelete) {
+                            // console.log(`🗑️ Eliminando ${child.type} vacío: ${childId}`);
+                            delete this.blocks[childId];
+                            childrenChanged = true;
+                            changed = true; 
+                            continue; // No lo agregamos a cleanChildrenIds
+                        }
 
-            // C. Nietos Complejos
-            const grandChildrenIds = child.data.props?.childrenIds || [];
-            if (grandChildrenIds.length > 0) {
-                const grandChildId = grandChildrenIds[0];
-                const grandChild = this.blocks[grandChildId];
-                if (grandChild && protectedGrandchildTypes.includes(grandChild.type)) {
-                    continue; 
+                        cleanChildrenIds.push(childId);
+                    }
+
+                    if (childrenChanged) {
+                        parent.data.props.childrenIds = cleanChildrenIds;
+                        if (childrenChanged) changed = true;
+                    }
                 }
+
+                // =================================================================
+                // 🔨 FASE 2: FUSIÓN DE CONTENEDORES (Solo Parent = Container)
+                // =================================================================
+                
+                if (parent.type !== 'Container') continue;
+
+                const childrenIds = parent.data.props?.childrenIds || [];
+                if (childrenIds.length !== 1) continue; 
+
+                const childId = childrenIds[0];
+                const child = this.blocks[childId];
+
+                if (!child || child.type !== 'Container') continue;
+
+                // A. Identidad
+                if (child.data.props?.id || child.data.props?.className || child.data.props?.tagName === 'table') continue;
+
+                const pStyle = parent.data.style || {};
+                const cStyle = child.data.style || {};
+
+                // B. Estructura (Ancho)
+                const pWidth = String(pStyle.width || '100%');
+                const cWidth = String(cStyle.width || '100%');
+
+                if (cWidth !== '100%' && cWidth !== 'auto' && cWidth !== pWidth) continue; 
+
+                // C. Nietos Complejos
+                const grandChildrenIds = child.data.props?.childrenIds || [];
+                if (grandChildrenIds.length > 0) {
+                    const grandChildId = grandChildrenIds[0];
+                    const grandChild = this.blocks[grandChildId];
+                    if (grandChild && protectedGrandchildTypes.includes(grandChild.type)) continue; 
+                }
+
+                // D. Conflicto Visual
+                const pBg = pStyle.backgroundColor;
+                const cBg = cStyle.backgroundColor;
+                const isParentTrans = !pBg || pBg === 'transparent' || pBg === 'rgba(0, 0, 0, 0)' || pBg === null;
+                const isChildTrans = !cBg || cBg === 'transparent' || cBg === 'rgba(0, 0, 0, 0)' || cBg === null;
+
+                if (!isParentTrans && !isChildTrans && pBg !== cBg) continue;
+
+                const hasVisualBoundary = (cStyle.borderWidth && parseInt(String(cStyle.borderWidth)) > 0) || 
+                                          (cStyle.border && cStyle.border !== 'none') ||
+                                          cStyle.backgroundImage;
+                if (hasVisualBoundary) continue;
+
+                // === ¡FUSIÓN APROBADA! ===
+
+                // 1. Heredar Nietos
+                parent.data.props.childrenIds = child.data.props.childrenIds;
+
+                // 2. Fusionar Estilos
+                pStyle.padding = this.mergeSpacings(pStyle.padding, cStyle.padding);
+                
+                if (!isChildTrans) pStyle.backgroundColor = cBg;
+
+                if ((!pStyle.width || pStyle.width === 'auto') && cStyle.width) {
+                    pStyle.width = cStyle.width;
+                } 
+                if (cStyle.maxWidth) pStyle.maxWidth = cStyle.maxWidth;
+
+                ['textAlign', 'verticalAlign', 'fontFamily', 'fontSize', 'lineHeight', 'color'].forEach(k => {
+                    if (cStyle[k]) pStyle[k] = cStyle[k];
+                });
+
+                // 3. Matar Hijo
+                delete this.blocks[childId];
+                changed = true;
             }
-
-            // D. Conflicto Visual
-            const pBg = pStyle.backgroundColor;
-            const cBg = cStyle.backgroundColor;
-            const isParentTrans = !pBg || pBg === 'transparent' || pBg === 'rgba(0, 0, 0, 0)';
-            const isChildTrans = !cBg || cBg === 'transparent' || cBg === 'rgba(0, 0, 0, 0)';
-
-            if (!isParentTrans && !isChildTrans && pBg !== cBg) continue;
-
-            // Borde visual en el hijo impide fusión
-            const hasVisualBoundary = (cStyle.borderWidth && parseInt(cStyle.borderWidth) > 0) || 
-                                      (cStyle.border && cStyle.border !== 'none') ||
-                                      cStyle.backgroundImage;
-            if (hasVisualBoundary) continue;
-
-            // === ¡FUSIÓN APROBADA! ===
-            // console.log(`🔨 Aplanando: ${parentId} absorbe a ${childId}`);
-
-            // 1. Heredar Nietos
-            parent.data.props.childrenIds = child.data.props.childrenIds;
-
-            // 2. Fusionar Estilos
-
-            // Padding: Sumar
-            pStyle.padding = this.mergeSpacings(pStyle.padding, cStyle.padding);
-            
-            // Fondo: Hijo manda
-            if (!isChildTrans) pStyle.backgroundColor = cBg;
-
-            // [MODIFICADO] Lógica de Ancho
-            // El padre MANTIENE su ancho estructural.
-            // Si el padre era 50% y el hijo 100%, el resultado debe ser 50%.
-            // Solo si el padre era "auto" o indefinido, adoptamos el ancho del hijo.
-            if ((!pStyle.width || pStyle.width === 'auto') && cStyle.width) {
-                pStyle.width = cStyle.width;
-            } 
-            // Si el padre ya tiene width (ej: 33.33%), NO lo sobrescribimos con el 100% del hijo.
-            
-            // MaxWidth: Heredar el más restrictivo o el del hijo
-            if (cStyle.maxWidth) pStyle.maxWidth = cStyle.maxWidth;
-
-            // Alineación y Texto
-            if (cStyle.textAlign) pStyle.textAlign = cStyle.textAlign;
-            if (cStyle.verticalAlign) pStyle.verticalAlign = cStyle.verticalAlign; // Importante para columnas
-            if (cStyle.fontFamily) pStyle.fontFamily = cStyle.fontFamily;
-            if (cStyle.fontSize) pStyle.fontSize = cStyle.fontSize;
-            if (cStyle.lineHeight) pStyle.lineHeight = cStyle.lineHeight;
-            if (cStyle.color) pStyle.color = cStyle.color;
-
-            // 3. Matar Hijo
-            delete this.blocks[childId];
-            
-            changed = true;
         }
     }
-}
 
     // Helper para sumar objetos de padding/margin
     private mergeSpacings(p1: any, p2: any) {

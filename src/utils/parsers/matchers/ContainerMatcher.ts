@@ -34,9 +34,19 @@ export const ContainerMatcher: BlockMatcher = {
             const hasImage = element.querySelector('img') !== null;
             const hasVisibleContent = checkVisibleContent(element);
             
-            // Safe style check
-            const styleAttr = element.getAttribute('style');
-            const hasVisuals = styleAttr ? (styleAttr.includes('background') || styleAttr.includes('border') || styleAttr.includes('height')) : false;
+            // --- 🔥 FIX 1: Detección estricta de visuales (Ignorar Transparent) ---
+            const styleAttr = (element.getAttribute('style') || '').toLowerCase();
+            
+            // Verificamos si es realmente transparente para NO contarlo como visual
+            const isTransparent = styleAttr.includes('transparent') || styleAttr.includes('rgba(0, 0, 0, 0)') || styleAttr.includes('rgba(0,0,0,0)');
+            
+            // Solo tiene fondo si incluye 'background' Y NO es transparente
+            const hasBg = styleAttr.includes('background') && !isTransparent;
+            const hasBorder = styleAttr.includes('border') && !styleAttr.includes('border: 0px') && !styleAttr.includes('border: none');
+            const hasHeight = styleAttr.includes('height') && !styleAttr.includes('height: auto');
+            
+            const hasVisuals = hasBg || hasBorder || hasHeight;
+            // -----------------------------------------------------------------------
             
             return hasVisibleContent || hasVisuals || hasImage;
         }
@@ -48,8 +58,8 @@ export const ContainerMatcher: BlockMatcher = {
         const tag = element.tagName.toLowerCase();
         if (tag === 'a') {
             const hasButtonVisuals = styleAttr.includes('background') || 
-                                    styleAttr.includes('border') || 
-                                    element.classList.contains('v-button');
+                                     styleAttr.includes('border') || 
+                                     element.classList.contains('v-button');
             
             // Si tiene aspecto de botón, no lo procesamos como contenedor simple
             if (hasButtonVisuals) return null; 
@@ -112,25 +122,45 @@ export const ContainerMatcher: BlockMatcher = {
             if (!isLink && childBlock && ['Container', 'Text', 'Image'].includes(childBlock.type)) {
                 const childStyle = childBlock.data.style || {};
                 const hasConflict = StyleManager.checkLayoutConflict(currentStyles, childStyle);
-                const pHasBg = hasVisuals;
+                
+                // --- 🔥 FIX 2: Lógica de Fusión Inteligente ---
+                // Recalculamos si el padre tiene un fondo REAL (visible)
+                const pBg = currentStyles.backgroundColor;
+                const pIsTransparent = !pBg || pBg === 'transparent' || pBg === 'rgba(0,0,0,0)' || pBg === null;
+                const pHasRealBg = !pIsTransparent; 
+
                 const cHasBg = StyleManager.hasVisualStyles(childStyle);
 
-                if (!hasConflict && (!pHasBg || !cHasBg)) {
+                // Permitimos fusión si no hay conflicto Y (el padre es transparente O el hijo es transparente)
+                if (!hasConflict && (!pHasRealBg || !cHasBg)) {
+                    
                     const mergedStyle = { ...childStyle };
-                    // Merge logic (copy visuals from parent)
-                    if (pHasBg) {
+                    
+                    // Merge logic (copy visuals from parent if visible)
+                    if (pHasRealBg) {
                         StyleManager.PROPS.VISUAL.forEach(prop => {
                             if (currentStyles[prop]) mergedStyle[prop] = currentStyles[prop];
                         });
+                    } else {
+                        // Fallback manual por si PROPS.VISUAL no está disponible o falla
+                        if (currentStyles.backgroundImage) mergedStyle.backgroundImage = currentStyles.backgroundImage;
+                        if (currentStyles.border) mergedStyle.border = currentStyles.border;
                     }
+
                     if (currentStyles.maxWidth) mergedStyle.maxWidth = currentStyles.maxWidth;
                     if (currentStyles.width && currentStyles.width !== '100%') mergedStyle.width = currentStyles.width;
                     if (currentStyles.textAlign) mergedStyle.textAlign = currentStyles.textAlign;
                     if (!mergedStyle.padding && currentStyles.padding) mergedStyle.padding = currentStyles.padding;
 
+                    // IMPORTANTE: Si el padre era transparente, asegurarnos de no borrar el color del hijo
+                    if (pIsTransparent && cHasBg) {
+                        mergedStyle.backgroundColor = childStyle.backgroundColor;
+                    }
+
                     parser.blocks[childrenIds[0]].data.style = mergedStyle;
                     return { id: childrenIds[0] };
                 }
+                // ----------------------------------------------------
             }
         }
 
@@ -170,6 +200,14 @@ export const ContainerMatcher: BlockMatcher = {
             if (!finalStyles.width || finalStyles.width === 'auto') {
                 finalStyles.width = '100%';
             }
+        }
+
+        if (finalStyles.backgroundImage && finalStyles.backgroundImage !== 'none') {
+             finalStyles.backgroundSize = finalStyles.backgroundSize || 'cover';
+             finalStyles.backgroundPosition = finalStyles.backgroundPosition || 'center';
+             finalStyles.backgroundRepeat = 'no-repeat';
+             // Forzar ancho completo para que la imagen tenga donde estirarse
+             finalStyles.width = '100%'; 
         }
 
         parser.addBlock(id, {

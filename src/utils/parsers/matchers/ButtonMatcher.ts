@@ -8,31 +8,17 @@ export const ButtonMatcher: BlockMatcher = {
 
     isComponent(element: Element) {
         const tag = element.tagName.toLowerCase();
-
-        // Focus on <a> tags for standard buttons
-        if (tag !== "a") {
-            return false;
-        };
-
-        // If it contains images, it is an Image Link, not a Text Button.
-        if (element.querySelector("img")) {
-            return false;
-        }
+        if (tag !== "a") return false;
+        if (element.querySelector("img")) return false;
 
         const styles = StyleUtils.extractUnifiedStyles(element);
 
-        // Heuristic: Does it look like a button?
-        // 1. Has background color (not transparent/white)
         const hasBackground = styles.backgroundColor && 
                               styles.backgroundColor !== 'transparent' && 
-                              styles.backgroundColor !== 'rgba(0, 0, 0, 0)' &&
-                              styles.backgroundColor !== '#ffffff' && 
-                              styles.backgroundColor !== 'white';
+                              styles.backgroundColor !== 'rgba(0, 0, 0, 0)';
 
-        // 2. Has visible border
         const hasBorder = styles.border && styles.border !== "none" && styles.border !== "0px";
 
-        // 3. Has significant padding
         const hasPadding = styles.padding && (
             (typeof styles.padding === 'object' && (styles.padding.top > 2 || styles.padding.left > 2)) ||
             (typeof styles.padding === 'string' && parseInt(styles.padding) > 2)
@@ -43,39 +29,32 @@ export const ButtonMatcher: BlockMatcher = {
 
     fromElement: (element: Element, parser: HTMLToBlockParser, inheritedStyles: any): MatcherResult | null => {
         const id = uuidv4();
-        const styles = StyleUtils.extractUnifiedStyles(element, inheritedStyles);
+        const styles = parser.extractStyles(element, inheritedStyles);
 
         const text = element.textContent?.trim() || "Button";
         const href = element.getAttribute("href") || "#";
 
-        // Background color safety for Zod schema
-        let safeBgColor = styles.backgroundColor;
-        if (!safeBgColor || safeBgColor === 'transparent' || safeBgColor === 'rgba(0, 0, 0, 0)') {
-             if (styles.border && styles.border !== 'none') {
-                 safeBgColor = undefined; // Ghost/Outline button
-             } else {
-                 safeBgColor = "#000000"; // Default fallback
-             }
-        }
-
+        // Mapeo de alineación
         let alignment = "center";
         if (inheritedStyles.textAlign) {
-            if (inheritedStyles.textAlign === 'left') alignment = "left";
-            if (inheritedStyles.textAlign === 'right') alignment = "right";
+            alignment = inheritedStyles.textAlign;
         }
+
+        // Extraemos los colores para las props específicas
+        const btnBgColor = styles.backgroundColor;
+        const btnTextColor = styles.color || "#ffffff";
 
         const finalStyles: any = {
             ...styles,
-            backgroundColor: undefined, // Handled via specific prop
-            display: "inline-block", // Force inline-block to respect padding/width
+            // 🔥 CLAVE: Eliminamos el backgroundColor del style principal
+            // para que el div wrapper no se pinte de ese color.
+            backgroundColor: undefined, 
+            display: undefined, 
             textDecoration: "none",
             boxSizing: "border-box", 
-            width: styles.width === '100%' ? undefined : styles.width,
+            width: styles.width === '100%' ? '100%' : undefined,
             cursor: "pointer"
         };
-
-        if (!finalStyles.color) finalStyles.color = "#ffffff";
-        if (finalStyles.lineHeight) delete finalStyles.lineHeight; 
 
         parser.addBlock(id, {
             type: "Button",
@@ -85,7 +64,9 @@ export const ButtonMatcher: BlockMatcher = {
                     text: text,
                     url: href,
                     align: alignment,
-                    buttonBackgroundColor: safeBgColor,
+                    // 🔥 Pasamos los colores aquí. El Reader los aplicará solo al <a>
+                    buttonTextColor: btnTextColor,
+                    buttonBackgroundColor: btnBgColor,
                     fullWidth: styles.width === '100%'
                 }
             }

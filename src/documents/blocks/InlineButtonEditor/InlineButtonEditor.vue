@@ -7,20 +7,21 @@
         :variable-items="variableItems"
         :show-format-buttons="false"
     />
-  <!-- Contenedor exterior con padding y alineación -->  
-    <div :style="containerStyles">  
-        <!-- Botón con estilos visuales -->  
+    <div :style="containerStyles">
+        <!-- <div v-if="IS_DEBUG" class="debug-label" :title="blockId">
+            BTN: {{ blockId }}
+        </div> -->
+
         <div :style="buttonStyles">  
-        <!-- Texto editable -->  
-        <div   
-            ref="editableDiv"  
-            contenteditable="true"  
-            @input="handleInput"  
-            @focus="handleFocus"  
-            @blur="handleBlur"  
-            @keydown="handleKeydown"
-            :style="textStyles"  
-        />  
+          <div   
+              ref="editableDiv"  
+              contenteditable="true"  
+              @input="handleInput"  
+              @focus="handleFocus"  
+              @blur="handleBlur"  
+              @keydown="handleKeydown"
+              :style="textStyles"  
+          />  
         </div>  
     </div>  
     
@@ -32,6 +33,10 @@ import { currentBlockIdSymbol } from '../../editor/EditorBlock.vue';
 import InlineTextToolbar from '../../../App/InspectorDrawer/ConfigurationPanel/input-panels/InlineTextToolbar.vue';
 import { getCleanBlockStyle } from '../../../utils/blockStyleUtils';
 
+// 🔥 DEBUG: ACTIVA ESTO PARA VER LOS BORDES
+const IS_DEBUG = false;
+
+// ... (Interfaces se mantienen igual) ...
 interface TextFormat {  
   start: number;  
   end: number;  
@@ -49,10 +54,7 @@ interface ButtonBlockProps {
   fullWidth?: boolean;
 }
 
-// ============================================  
-// STATE  
-// ============================================  
-  
+// ... (State y Props se mantienen igual) ...
 const editorStore = useInspectorDrawer();
 const blockId = inject(currentBlockIdSymbol);
 const editableDiv = ref<HTMLDivElement | null>(null);
@@ -61,23 +63,19 @@ const isInternalUpdate = ref(false);
 const isActivelyEditing = ref(false);
 const lastCursorPosition = ref(0);
 
-// ============================================  
-// PROPS & EMITS  
-// ============================================  
-
-const props = defineProps<{    
-  text: string;    
-  style?: Record<string, any>;    
-  buttonTextColor?: string;    
-  buttonBackgroundColor?: string;    
-  buttonStyle?: 'rectangle' | 'rounded' | 'pill';    
+const props = defineProps<{     
+  text: string;     
+  style?: Record<string, any>;     
+  buttonTextColor?: string;     
+  buttonBackgroundColor?: string;     
+  buttonStyle?: 'rectangle' | 'rounded' | 'pill';     
   size?: 'x-small' | 'small' | 'medium' | 'large';  
-  url?: string;  // ✅ Agregar  
-  fullWidth?: boolean;  // ✅ Agregar  
+  url?: string;   
+  fullWidth?: boolean;   
 }>();
 
 // ============================================  
-// COMPUTED  
+// COMPUTED (MODIFICADOS PARA DEBUG)
 // ============================================  
  
 const currentBlock = computed(() => {
@@ -89,108 +87,143 @@ const currentBlock = computed(() => {
 const containerStyles = computed(() => { 
   const blockData = currentBlock.value?.data as { props?: ButtonBlockProps; style?: any }; 
    
-  // Usamos el helper para limpiar 'zombis' y calcular shorthands
-  return getCleanBlockStyle(blockData?.style, {
-    // TUS DEFAULTS ORIGINALES:
-    textAlign: 'start', // O 'center' si prefieres
+  // 1. Copiamos los estilos del bloque
+  const styleForContainer = { ...(blockData?.style || {}) };
+
+  // 🔥 FIX GENÉRICO: El contenedor de un botón NO debe renderizar bordes.
+  // Los bordes definidos en el JSON pertenecen al botón interno, no a este wrapper.
+  delete styleForContainer.border;
+  delete styleForContainer.borderWidth;
+  delete styleForContainer.borderColor;
+  delete styleForContainer.borderStyle;
+
+  return getCleanBlockStyle(styleForContainer, {
+    display: 'block', 
+    width: '100%',
+    textAlign: "center", 
     backgroundColor: null,
+    maxWidth: '100%',
+    padding: '16px 24px',
+    boxSizing: 'border-box',
     
-    // Si fullWidth es true, forzamos 100%, si no 'auto'
-    width: blockData?.props?.fullWidth ? '100%' : 'auto',
-    
-    // Padding por defecto si el usuario no ha definido ninguno
-    padding: '16px 24px' 
+    // Debug
+    ...(IS_DEBUG ? { outline: '2px dashed red', outlineOffset: '-2px', position: 'relative' } : {})
   });
-}); 
+});
   
 // Estilos del botón (colores, bordes, tamaño)  
-const buttonStyles = computed(() => {  
-  const blockData = currentBlock.value?.data as { props?: ButtonBlockProps; style?: any };  
-  const fontSizePx = "16px" 
-  const sizeStyles = {  
-    'x-small': { fontSize: fontSizePx, padding: '4px 8px' },  
-    'small': { fontSize: fontSizePx, padding: '8px 12px' },  
-    'medium': { fontSize: fontSizePx, padding: '12px 20px' },  
-    'large': { fontSize: fontSizePx, padding: '16px 32px' }  
-  };  
+const buttonStyles = computed(() => {
+  const blockData = currentBlock.value?.data as { props?: ButtonBlockProps; style?: any };
+  const styles = blockData?.style || {}; // Acceso rápido a estilos
+  const fontSizePx = "16px";
+  const isFullWidth = blockData?.props?.fullWidth;
+
+  const sizeStyles = {
+    'x-small': { fontSize: fontSizePx, padding: '4px 8px' },
+    'small': { fontSize: fontSizePx, padding: '8px 12px' },
+    'medium': { fontSize: fontSizePx, padding: '12px 20px' },
+    'large': { fontSize: fontSizePx, padding: '16px 32px' }
+  };
+
+  const currentSize = blockData?.props?.size || 'medium';
+  const borderRadiusMap = {
+    'rectangle': '0px',
+    'rounded': '4px',
+    'pill': '9999px'
+  };
+
+  // Prioridad de color de fondo: Propiedad específica > Estilo CSS > Default gris
+  const bgColor = blockData?.props?.buttonBackgroundColor || styles.backgroundColor || '#999999';
+
+  return {
+    display: isFullWidth ? 'block' : 'inline-block',
+    // Si no es fullWidth, eliminamos márgenes que puedan interferir
+    margin: isFullWidth ? '0' : '0 auto', 
+    width: isFullWidth ? '100%' : 'auto',
+    padding: sizeStyles[currentSize].padding,
+    backgroundColor: bgColor,
+    borderRadius: borderRadiusMap[blockData?.props?.buttonStyle || 'rounded'],
     
-  const currentSize = blockData?.props?.size || 'medium';  
-  const borderRadius = {  
-    'rectangle': '0px',  
-    'rounded': '4px',  
-    'pill': '9999px'  
-  };  
+    // 🔥 FIX 1: Permitir bordes si vienen del parser
+    border: styles.border || styles.borderWidth ? undefined : 'none', // Si hay borde en estilo, dejamos que getCleanBlockStyle o el style object lo aplique. Si lo definimos aquí, sobrescribimos.
+    // MEJOR AÚN: Fusionar explícitamente
+    borderWidth: styles.borderWidth,
+    borderStyle: styles.borderStyle,
+    borderColor: styles.borderColor,
     
-  return {  
-    display: 'inline-block',  
-    padding: sizeStyles[currentSize].padding, // Padding interno del botón  
-    backgroundColor: blockData?.props?.buttonBackgroundColor || '#999999',  
-    borderRadius: borderRadius[blockData?.props?.buttonStyle || 'rounded'],  
-    border: 'none',  
-    cursor: 'pointer',  
-    width: blockData?.props?.fullWidth ? '100%' : 'auto'  
-  };  
-});  
+    cursor: 'pointer',
+    boxSizing: 'border-box', // 🔥 Fix layout
+
+    // Debug visual
+    ...(IS_DEBUG ? { outline: '2px dashed blue', outlineOffset: '-2px' } : {})
+  };
+});
   
 // Estilos del texto editable  
-const textStyles = computed(() => {  
-  const blockData = currentBlock.value?.data as { props?: ButtonBlockProps; style?: any };  
-  const fontSizePx = "16px"
-  const fontFamilyMap: Record<string, string> = {  
-    'MODERN_SANS': 'Helvetica, Arial, sans-serif',  
-    'BOOK_ANTIQUA': 'Georgia, "Times New Roman", serif',  
-    'MONOSPACE': '"Courier New", Courier, monospace'  
-  };  
-    
-  const sizeStyles = {  
-    'x-small': { fontSize: fontSizePx },  
-    'small': { fontSize: fontSizePx },  
-    'medium': { fontSize: fontSizePx },  
-    'large': { fontSize: fontSizePx }  
-  };  
-
-  // Validar textAlign  
-  const rawTextAlign = blockData?.style?.textAlign || props.style?.textAlign || 'left';  
-  const validTextAlign: 'left' | 'center' | 'right' | 'justify' =   
-    ['left', 'center', 'right', 'justify'].includes(rawTextAlign)   
-      ? rawTextAlign as 'left' | 'center' | 'right' | 'justify'  
-      : 'left';  
-    
-  return {  
-    color: blockData?.props?.buttonTextColor || '#ffffff',  
-    fontSize: blockData?.style?.fontSize   
-        ? `${blockData.style.fontSize}px`   
-        : sizeStyles[blockData?.props?.size || 'medium'].fontSize,
-    fontFamily: fontFamilyMap[blockData?.style?.fontFamily] || 'inherit',  
-    fontWeight: blockData?.style?.fontWeight || 'bold',  
-    textAlign: validTextAlign, // Texto siempre centrado en botones  
-    outline: 'none',  
-    border: 'none',  
-    background: null  
-  };  
-});
-
-const blockProps = computed(() => {  
-  if (!blockId) return null;  
-  const block = editorStore.document[blockId];  
-  const blockData = block.data as { props?: ButtonBlockProps; style?: any };  
+const textStyles = computed(() => {
+  const blockData = currentBlock.value?.data as { props?: ButtonBlockProps; style?: any };
+  const styles = blockData?.style || {};
+  const fontSizePx = "16px";
   
-  return {  
-    text: blockData.props?.text || "",  
-    buttonTextColor: blockData.props?.buttonTextColor,  
-    buttonBackgroundColor: blockData.props?.buttonBackgroundColor,  
-    buttonStyle: blockData.props?.buttonStyle,  
-    size: blockData.props?.size,  
-    url: blockData.props?.url,  // ✅ Agregar  
-    fullWidth: blockData.props?.fullWidth,  // ✅ Agregar  
-    style: blockData.style  // ✅ Incluir estilos completos  
-  };  
+  const fontFamilyMap: Record<string, string> = {
+    'MODERN_SANS': 'Helvetica, Arial, sans-serif',
+    'BOOK_ANTIQUA': 'Georgia, "Times New Roman", serif',
+    'MONOSPACE': '"Courier New", Courier, monospace'
+  };
+
+  const sizeStyles = {
+    'x-small': { fontSize: fontSizePx },
+    'small': { fontSize: fontSizePx },
+    'medium': { fontSize: fontSizePx },
+    'large': { fontSize: fontSizePx }
+  };
+
+  const rawTextAlign = styles.textAlign || props.style?.textAlign || 'left';
+  const validTextAlign = ['left', 'center', 'right', 'justify'].includes(rawTextAlign) 
+      ? rawTextAlign 
+      : 'left';
+
+  // 🔥 FIX 2: Prioridad de color de texto: Propiedad > Estilo CSS > Default blanco
+  const textColor = blockData?.props?.buttonTextColor || styles.color || '#ffffff';
+
+  return {
+    color: textColor,
+    fontSize: styles.fontSize ? `${styles.fontSize}px` : sizeStyles[blockData?.props?.size || 'medium'].fontSize,
+    fontFamily: fontFamilyMap[styles.fontFamily] || 'inherit',
+    fontWeight: styles.fontWeight || 'bold',
+    textAlign: validTextAlign as any,
+    outline: 'none',
+    border: 'none',
+    background: 'transparent', // Asegurar transparencia
+    width: '100%',
+    
+    // Debug visual
+    ...(IS_DEBUG ? { outline: '1px dotted green' } : {})
+  };
+});
+
+// ... (Resto del código: blockProps, functions, watchers, hooks SE MANTIENE IGUAL) ...
+const blockProps = computed(() => {   
+  if (!blockId) return null;   
+  const block = editorStore.document[blockId];   
+  const blockData = block.data as { props?: ButtonBlockProps; style?: any };   
+  
+  return {   
+    text: blockData.props?.text || "",   
+    buttonTextColor: blockData.props?.buttonTextColor,   
+    buttonBackgroundColor: blockData.props?.buttonBackgroundColor,   
+    buttonStyle: blockData.props?.buttonStyle,   
+    size: blockData.props?.size,   
+    url: blockData.props?.url,   
+    fullWidth: blockData.props?.fullWidth,   
+    style: blockData.style   
+  };   
 });
 
 
-const showToolBar = computed(() => {  
-  return editorStore.selectedBlockId === blockId;  
-});  
+const showToolBar = computed(() => {   
+  return editorStore.selectedBlockId === blockId;   
+});   
 
 const variableItems = computed(() => {
   return Object.entries(editorStore.globalVariables || {}).map(
@@ -202,144 +235,144 @@ const variableItems = computed(() => {
   );
 });
 
-// ============================================================================  
+// ============================================================================   
 // FUNCTIONS 
-// ============================================================================  
+// ============================================================================   
 
-function textWithFormatsToHtml(text: string, formats: TextFormat[]): string {  
-  if (!formats || formats.length === 0) return text;  
-  
-  const events: Array<{ position: number; type: 'start' | 'end'; format: Partial<TextFormat> }> = [];
-  formats.forEach(format => {
-    if (format.bold) {
-      events.push({ position: format.start, type: 'start', format: { bold: true } });
-      events.push({ position: format.end, type: 'end', format: { bold: true } });
-    }
-    if (format.italic) {
-      events.push({ position: format.start, type: 'start', format: { italic: true } });
-      events.push({ position: format.end, type: 'end', format: { italic: true } });
-    }
-  });
-  
-  events.sort((a, b) => {
-    if (a.position !== b.position) return a.position - b.position;
-    return a.type === 'end' ? -1 : 1; 
-  });
-  
-  let result = '';
-  let currentPosition = 0;
-  let boldCount = 0;
-  let italicCount = 0;
-  
-  events.forEach(event => {
-    if (event.position > currentPosition) {
-      result += text.substring(currentPosition, event.position);
-    }
-    currentPosition = event.position;
-    
-    if (event.type === 'start') {
-      if (event.format.bold) {
-        if (boldCount === 0) result += '<b>'; 
-        boldCount++;
-      }
-      if (event.format.italic) {
-        if (italicCount === 0) result += '<i>'; 
-        italicCount++;
-      }
-    } else { // event.type === 'end'
-      if (event.format.italic) {
-        italicCount--;
-        if (italicCount === 0) result += '</i>'; 
-      }
-      if (event.format.bold) {
-        boldCount--;
-        if (boldCount === 0) result += '</b>'; 
-      }
-    }
-  });
-  
-  if (currentPosition < text.length) {
-    result += text.substring(currentPosition);
-  }
-  
-  return result;
+function textWithFormatsToHtml(text: string, formats: TextFormat[]): string {   
+  if (!formats || formats.length === 0) return text;   
+  
+  const events: Array<{ position: number; type: 'start' | 'end'; format: Partial<TextFormat> }> = [];
+  formats.forEach(format => {
+    if (format.bold) {
+      events.push({ position: format.start, type: 'start', format: { bold: true } });
+      events.push({ position: format.end, type: 'end', format: { bold: true } });
+    }
+    if (format.italic) {
+      events.push({ position: format.start, type: 'start', format: { italic: true } });
+      events.push({ position: format.end, type: 'end', format: { italic: true } });
+    }
+  });
+  
+  events.sort((a, b) => {
+    if (a.position !== b.position) return a.position - b.position;
+    return a.type === 'end' ? -1 : 1; 
+  });
+  
+  let result = '';
+  let currentPosition = 0;
+  let boldCount = 0;
+  let italicCount = 0;
+  
+  events.forEach(event => {
+    if (event.position > currentPosition) {
+      result += text.substring(currentPosition, event.position);
+    }
+    currentPosition = event.position;
+    
+    if (event.type === 'start') {
+      if (event.format.bold) {
+        if (boldCount === 0) result += '<b>'; 
+        boldCount++;
+      }
+      if (event.format.italic) {
+        if (italicCount === 0) result += '<i>'; 
+        italicCount++;
+      }
+    } else { // event.type === 'end'
+      if (event.format.italic) {
+        italicCount--;
+        if (italicCount === 0) result += '</i>'; 
+      }
+      if (event.format.bold) {
+        boldCount--;
+        if (boldCount === 0) result += '</b>'; 
+      }
+    }
+  });
+  
+  if (currentPosition < text.length) {
+    result += text.substring(currentPosition);
+  }
+  
+  return result;
 }
 
-function processInlineContent(element: HTMLElement): { text: string; formats: TextFormat[] } {  
-  let text = "";  
-  const formats: TextFormat[] = [];  
-  let pos = 0;  
+function processInlineContent(element: HTMLElement): { text: string; formats: TextFormat[] } {   
+  let text = "";   
+  const formats: TextFormat[] = [];   
+  let pos = 0;   
   
-  const append = (t: string) => {  
-    if (!t) return;  
-    text += t;  
-    pos += t.length;  
-  };  
+  const append = (t: string) => {   
+    if (!t) return;   
+    text += t;   
+    pos += t.length;   
+  };   
   
-  const processNode = (node: Node, inheritedFormats: { bold?: boolean; italic?: boolean } = {}) => {  
-    if (node.nodeType === Node.TEXT_NODE) {  
-      const content = (node.textContent || "").replace(/\s+/g, " ");  
-      if (content) {  
-        const start = pos;  
-        append(content);  
-        const end = pos;  
+  const processNode = (node: Node, inheritedFormats: { bold?: boolean; italic?: boolean } = {}) => {   
+    if (node.nodeType === Node.TEXT_NODE) {   
+      const content = (node.textContent || "").replace(/\s+/g, " ");   
+      if (content) {   
+        const start = pos;   
+        append(content);   
+        const end = pos;   
   
-        // Si hay formatos heredados, crear un formato para este texto  
-        if (inheritedFormats.bold || inheritedFormats.italic) {  
-          formats.push({  
-            start,  
-            end,  
-            ...inheritedFormats  
-          });  
-        }  
-      }  
-      return;  
-    }  
+        // Si hay formatos heredados, crear un formato para este texto   
+        if (inheritedFormats.bold || inheritedFormats.italic) {   
+          formats.push({   
+            start,   
+            end,   
+            ...inheritedFormats   
+          });   
+        }   
+      }   
+      return;   
+    }   
   
-    if (node.nodeType === Node.ELEMENT_NODE) {  
-      const el = node as HTMLElement;  
-      const tag = el.tagName.toLowerCase();  
+    if (node.nodeType === Node.ELEMENT_NODE) {   
+      const el = node as HTMLElement;   
+      const tag = el.tagName.toLowerCase();   
   
-      // Detectar formatos del elemento actual  
-      const computedStyle = window.getComputedStyle(el);  
-      const fw = computedStyle.fontWeight;  
-      const isBoldTag = tag === "strong" || tag === "b";  
-      const isBoldStyle = fw === "bold" || (!isNaN(parseInt(fw)) && parseInt(fw) >= 600);  
-      const isItalicTag = tag === "em" || tag === "i";  
-      const isItalicStyle = computedStyle.fontStyle === "italic";  
+      // Detectar formatos del elemento actual   
+      const computedStyle = window.getComputedStyle(el);   
+      const fw = computedStyle.fontWeight;   
+      const isBoldTag = tag === "strong" || tag === "b";   
+      const isBoldStyle = fw === "bold" || (!isNaN(parseInt(fw)) && parseInt(fw) >= 600);   
+      const isItalicTag = tag === "em" || tag === "i";   
+      const isItalicStyle = computedStyle.fontStyle === "italic";   
   
-      // Combinar formatos heredados con los del elemento actual  
-      const currentFormats = { ...inheritedFormats };  
-      if (isBoldTag || isBoldStyle) currentFormats.bold = true;  
-      if (isItalicTag || isItalicStyle) currentFormats.italic = true;  
+      // Combinar formatos heredados con los del elemento actual   
+      const currentFormats = { ...inheritedFormats };   
+      if (isBoldTag || isBoldStyle) currentFormats.bold = true;   
+      if (isItalicTag || isItalicStyle) currentFormats.italic = true;   
   
-      // Procesar hijos con los formatos actuales  
-      Array.from(el.childNodes).forEach(child => {  
-        processNode(child, currentFormats);  
-      });  
-    }  
-  };  
+      // Procesar hijos con los formatos actuales   
+      Array.from(el.childNodes).forEach(child => {   
+        processNode(child, currentFormats);   
+      });   
+    }   
+  };   
   
-  Array.from(element.childNodes).forEach(node => {  
-    processNode(node);  
-  });  
+  Array.from(element.childNodes).forEach(node => {   
+    processNode(node);   
+  });   
   
-  text = text.replace(/[ \t]+\n/g, "\n").trimEnd();  
-  return { text: text.trim(), formats };  
+  text = text.replace(/[ \t]+\n/g, "\n").trimEnd();   
+  return { text: text.trim(), formats };   
 } 
 
-function saveCursorPosition() {  
-  if (!editableDiv.value) return;  
+function saveCursorPosition() {   
+  if (!editableDiv.value) return;   
   
-  const selection = window.getSelection();  
-  if (!selection || selection.rangeCount === 0) return;  
+  const selection = window.getSelection();   
+  if (!selection || selection.rangeCount === 0) return;   
   
-  const range = selection.getRangeAt(0);  
-  const preCaretRange = range.cloneRange();  
-  preCaretRange.selectNodeContents(editableDiv.value);  
-  preCaretRange.setEnd(range.endContainer, range.endOffset);  
-  lastCursorPosition.value = preCaretRange.toString().length;  
-}  
+  const range = selection.getRangeAt(0);   
+  const preCaretRange = range.cloneRange();   
+  preCaretRange.selectNodeContents(editableDiv.value);   
+  preCaretRange.setEnd(range.endContainer, range.endOffset);   
+  lastCursorPosition.value = preCaretRange.toString().length;   
+}   
 
 function restoreCursorPosition() {
   if (!editableDiv.value) return;
@@ -494,7 +527,7 @@ function insertVariable(variableKey: string) {
   }
 
   const range = selection.getRangeAt(0);
-/*   console.log('🎯 Current range for insertion:', {
+/* console.log('🎯 Current range for insertion:', {
     collapsed: range.collapsed,
     startOffset: range.startOffset,
     endOffset: range.endOffset,
@@ -597,7 +630,7 @@ saveCursorPosition();
 watch(blockProps, (newProps, oldProps) => {
     if (!editableDiv.value || isInternalUpdate.value  || isActivelyEditing.value || !newProps)  return;
 
-/*     // Evitar actualizaciones innecesarias
+/* // Evitar actualizaciones innecesarias
     const oldText = oldProps?.text || '';
     const oldFormats = oldProps?.formats || [];
     const newText = newProps.text;
@@ -609,7 +642,7 @@ watch(blockProps, (newProps, oldProps) => {
 
     const htmlContent = textWithFormatsToHtml(newText, newFormats); */
 
-    /*     if (editableDiv.value.innerHTML !== htmlContent){
+    /* if (editableDiv.value.innerHTML !== htmlContent){
             const wasFocused = document.activeElement === editableDiv.value;
             if (wasFocused) saveCursorPosition();
     
@@ -662,3 +695,21 @@ onMounted(() => {
 })
 
 </script>
+
+<style scoped>
+/* 🔥 Estilos para la etiqueta de debug */
+.debug-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background-color: blue;
+  color: white;
+  font-family: monospace;
+  font-size: 10px;
+  padding: 1px 4px;
+  z-index: 9999;
+  pointer-events: none;
+  white-space: nowrap;
+  opacity: 0.8;
+}
+</style>
