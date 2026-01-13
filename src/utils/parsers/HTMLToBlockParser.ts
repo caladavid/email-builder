@@ -707,55 +707,6 @@ export class HTMLToBlockParser {
     public resolveAssetUrl(src: string): string {
         const PLACEHOLDER_IMG = 'https://placehold.net/default.png';
         if (!src) return PLACEHOLDER_IMG;
-        src.trim();
-
-        const httpIndex = src.indexOf("http");
-        if (httpIndex > 0) {
-            src = src.substring(httpIndex);
-        }
-
-        if (src.startsWith("http") || src.startsWith("//")) {
-            // Normalizar protocolo relativo (//google.com -> https://google.com)
-            return src.startsWith("//") ? `https:${src}` : src;
-        }
-
-        console.log(`⚠️ [Image Fallback] No es URL de servicio: "${src}". Buscando alternativa local...`);
-
-        if (src.startsWith("data:")) {
-            return src;
-        }
-
-        src = src.replace(/\\/g, '/');
-
-        // Tu lógica existente para buscar en imageMap
-        let fileName = src.split('/').pop() || src;
-        try {
-            fileName = decodeURIComponent(fileName);
-        } catch (error) {}
-
-        const cleanName = fileName.split("?")[0].toLowerCase();
-        let dataUrl: string | undefined;
-
-        dataUrl = this.imageMap.get(cleanName);
-
-        if (!dataUrl) {
-            const nameWithoutExt = cleanName.replace(/\.[^/.]+$/, "");
-            if (nameWithoutExt.length > 3){
-                const matchingKey = Array.from(this.imageMap.keys()).find(key => 
-                    key.toLowerCase().includes(nameWithoutExt)
-                );
-                if (matchingKey) dataUrl = this.imageMap.get(matchingKey);
-            }
-        }
-
-
-        // Si se encontró en el ZIP, devolvemos el Base64 local. Si no, Placeholder.
-        return dataUrl || PLACEHOLDER_IMG;
-    }
-
-    /* public resolveAssetUrl(src: string): string {
-        const PLACEHOLDER_IMG = 'https://placehold.net/default.png';
-        if (!src) return PLACEHOLDER_IMG;
 
         // Tu lógica existente para buscar en imageMap
         let dataUrl: string | undefined;
@@ -784,7 +735,7 @@ export class HTMLToBlockParser {
             }
         }
         return dataUrl || PLACEHOLDER_IMG;
-    } */
+    }
 
     private debugMatch(element: Element, matcherName: string, matched: boolean) {
         try {
@@ -3168,7 +3119,7 @@ private flattenRedundantContainers() {
                         // 🔥 UNIFICACIÓN: Si es transparent o inherit, lo tratamos como null o lo borramos
                         const valLower = style[prop].toLowerCase();
                         if (valLower === 'transparent' || valLower.includes('rgba(0,0,0,0)')) {
-                            style[prop] = 'transparent'; 
+                            style[prop] = null;
                         } else if (valLower === 'inherit') {
                             delete style[prop];
                         }
@@ -3200,13 +3151,13 @@ private flattenRedundantContainers() {
                         style[prop] = hex;
                     } else {
                         // 🔥 Si no es un Hex válido (y ya filtramos transparent arriba), lo hacemos null
-                        style[prop] = 'transparent'; 
+                        style[prop] = null; 
                         
                         // Fallback opcional solo para el texto base si quedó vacío
                         if (prop === 'color' && !style[prop]) style.color = '#000000';
                     }
                 } else {
-                    style[prop] = 'transparent';  // Asegura consistencia si la prop no existe
+                    style[prop] = null; // Asegura consistencia si la prop no existe
                 }
             });
 

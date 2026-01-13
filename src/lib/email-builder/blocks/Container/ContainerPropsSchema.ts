@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 // --- DEFINICIONES BÁSICAS ---
-const COLOR_SCHEMA = z.string().regex(/^#[0-9a-fA-F]{6}$|^transparent$/).optional().nullable();
+const COLOR_SCHEMA = z.string().optional().nullable();
 
 const PADDING_SCHEMA = z.object({
   top: z.number(),

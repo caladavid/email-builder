@@ -66,7 +66,7 @@ export const ButtonMatcher: BlockMatcher = {
 
         const finalStyles: any = {
             ...styles,
-            backgroundColor: null, // Handled via specific prop
+            backgroundColor: undefined, // Handled via specific prop
             display: "inline-block", // Force inline-block to respect padding/width
             textDecoration: "none",
             boxSizing: "border-box", 
