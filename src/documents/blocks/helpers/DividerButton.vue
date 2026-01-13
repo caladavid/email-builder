@@ -14,7 +14,7 @@
         height: 48,
         width: '100%',
         padding: 0,
-        backgroundColor: null,
+        backgroundColor: 'transparent',
         borderRadius: 0,
         cursor: 'pointer',
       }"

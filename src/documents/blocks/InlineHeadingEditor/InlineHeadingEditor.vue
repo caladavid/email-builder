@@ -270,81 +270,6 @@ function processInlineContent(element: HTMLElement): { text: string; formats: Te
   return { text: text.trim(), formats };  
 } 
 
-/* function htmlToTextAndFormats(htmlContent: string): { text: string; formats: TextFormat[] } {  
-  const tempDiv = document.createElement('div');  
-  tempDiv.innerHTML = htmlContent;  
-    
-  let text = "";  
-  const formats: TextFormat[] = [];  
-  let post = 0;
-  
-  function processNode(
-    node: Node, 
-    currentFormats: { bold?: boolean; italic?: boolean } = {}, 
-    depth: number = 0
-  ) {  
-    if (node.nodeType === Node.TEXT_NODE) {  
-      const content = node.textContent || "";  
-      if (content) {  
-        const start = text.length;  
-        post = start;  
-        text += content;  
-        const end = text.length;  
-        
-        // Solo crear formato si hay algún estilo activo
-        if (currentFormats.bold || currentFormats.italic) {  
-          formats.push({  
-            start,  
-            end,  
-            ...(currentFormats.bold && { bold: true }),  
-            ...(currentFormats.italic && { italic: true })  
-          });  
-        }  
-      }  
-      return;  
-    }  
-      
-    if (node.nodeType === Node.ELEMENT_NODE) {  
-      const el = node as HTMLElement;  
-      const tag = el.tagName.toLowerCase();  
-
-      if (tag === "a") {  
-        const href = el.getAttribute("href") || "";  
-        const linkText = el.textContent?.trim() || "";  
-        if (href && linkText) {  
-          const markdownLink = `[${linkText}](${href})`;  
-          text += markdownLink;  
-          post += markdownLink.length;  
-          return; // No procesar hijos  
-        }  
-      } 
-        
-      // Crear una copia de los formatos actuales para no mutar el objeto padre
-      const newFormats = { ...currentFormats };  
-      
-      // Manejar etiquetas de formato
-      if (tag === "b" || tag === "strong") {
-        newFormats.bold = true;
-      } else if (tag === "i" || tag === "em") {
-        newFormats.italic = true;
-      }
-      // Ignorar otras etiquetas como div, span, etc. a menos que tengan estilos específicos
-        
-      // Procesar hijos recursivamente
-      Array.from(el.childNodes).forEach(child => {  
-        processNode(child, newFormats, depth + 1);  
-      });  
-    }  
-  }  
-    
-  // Procesar todos los nodos hijos del div temporal
-  Array.from(tempDiv.childNodes).forEach(node => {  
-    processNode(node);  
-  });  
-    
-  return { text, formats };  
-} */
-
 function saveCursorPosition() {  
   if (!editableDiv.value) return;  
   
@@ -473,46 +398,6 @@ function handleFocus(){
         editorStore.setSelectedBlockId(blockId)
     }
 }
-/* 
-function toggleBold() {    
-  if (!editableDiv.value) return;    
-      
-  isInternalUpdate.value = true;    
-      
-  document.execCommand('bold', false, undefined);    
-      
-  nextTick(() => {    
-    const htmlContent = editableDiv.value!.innerHTML;    
-    const { text, formats } = htmlToTextAndFormats(htmlContent);
-
-    
-    updateBlockInStore(text, formats);
-        
-    setTimeout(() => {    
-      isInternalUpdate.value = false;    
-    }, 100);    
-  });    
-} 
-
-function toggleItalic() {    
-  if (!editableDiv.value) return;    
-      
-  isInternalUpdate.value = true;    
-      
-  document.execCommand('italic', false, undefined);    
-      
-  nextTick(() => {    
-    const htmlContent = editableDiv.value!.innerHTML;   
-    const { text, formats } = htmlToTextAndFormats(htmlContent); 
-
-    
-    updateBlockInStore(text, formats);
-        
-    setTimeout(() => {    
-      isInternalUpdate.value = false;    
-    }, 100);    
-  });    
-}   */
 
 function insertVariable(variableKey: string) {
   /* console.log('🔧 InlineTextEditor - insertVariable called with:', variableKey); */

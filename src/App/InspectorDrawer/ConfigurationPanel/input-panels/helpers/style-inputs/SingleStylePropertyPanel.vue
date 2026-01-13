@@ -43,14 +43,23 @@ const emit = defineEmits<{
 
 /** Computed */
 
-const defaultValue = computed(() => props.modelValue[props.name] ?? null)
+const defaultValue = computed(() => {
+  const value = props.modelValue[props.name];
+
+  if (value === "transparent") {
+    return null
+  } 
+
+  return value ?? null;
+})
 
 /** Functions */
 
 function handleChange(newValue: unknown) {
+  const finalValue = newValue === null ? "transparent" : newValue;
   emit('update:model-value', {
     ...props.modelValue,
-    [props.name]: newValue,
+    [props.name]: finalValue,
   })
 }
 </script>

@@ -64,8 +64,6 @@ export const ImageMatcher: BlockMatcher = {
     },
 
     fromElement: (element: Element, parser: HTMLToBlockParser, inheritedStyles: any): MatcherResult | null => {
-        // ... (Tu código fromElement existente, que ya funciona bien con la escalada de estilos) ...
-        // ... (Solo asegúrate de usar la versión que te pasé antes que tiene la lógica de "Subir" en el DOM) ...
         
         // REPETICIÓN DEL fromElement POR SEGURIDAD (Copia esto dentro de tu archivo):
         

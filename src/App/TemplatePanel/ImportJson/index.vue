@@ -163,7 +163,7 @@ function handleCancel() {
   activeTab.value = 'json';  
 }
 
-async function handleZipUpload(event: Event) {    
+/* async function handleZipUpload(event: Event) {    
   const file = (event.target as HTMLInputElement).files?.[0];    
   if (!file) return;  
  
@@ -225,9 +225,9 @@ async function handleZipUpload(event: Event) {
   } finally {    
     zipProcessing.value = false;    
   }    
-}
+} */
 
-/* async function handleZipUpload(event: Event) {    
+async function handleZipUpload(event: Event) {    
   const file = (event.target as HTMLInputElement).files?.[0];    
   if (!file) return;  
   await inspectorDrawer.sendZip(file);    
@@ -276,7 +276,7 @@ async function handleZipUpload(event: Event) {
   } finally {    
     zipProcessing.value = false;    
   }    
-} */
+}
 
 function isImageFile(filename: string): boolean {  
   const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];  

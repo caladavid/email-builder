@@ -383,7 +383,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
         const parser = new HTMLToBlockParser();
         const parseResult = await parser.parseHtmlStringToBlocks(htmlContent);  
         
-        console.log(parseResult);
+        /* console.log(parseResult); */
 
       // Manejar errores críticos  
       const criticalErrors = parseResult.errors.filter(e => !e.recoverable);  
