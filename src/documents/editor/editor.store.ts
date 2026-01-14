@@ -156,9 +156,9 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     selectedSidebarTab.value = 'styles'
     selectedBlockId.value = null
 
-    // Limpiar variables globales  
+    /* // Limpiar variables globales  
     globalVariables.value = {}  
-    saveVariablesToStorage({})
+    saveVariablesToStorage({}) */
 
     // Inicializar historial con el primer estado  
     history.value = [JSON.parse(JSON.stringify(newDocument))];  
