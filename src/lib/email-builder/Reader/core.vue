@@ -7,12 +7,13 @@
 import Avatar, { AvatarPropsSchema } from '@flyhub/email-block-avatar';
 import ButtonReader, { ButtonPropsSchema } from '../blocks/Button/ButtonReader.vue';
 import Divider, { DividerPropsSchema } from '@flyhub/email-block-divider';
-import Heading, { HeadingPropsSchema } from '@flyhub/email-block-heading';
+import HeadingReader, { HeadingPropsSchema } from '../blocks/Heading/HeadingReader.vue';
 import Html, { HtmlPropsSchema } from '@flyhub/email-block-html';
 /* import Image, { ImagePropsSchema } from '@flyhub/email-block-image'; */
 import ImageReader, { ImagePropsSchema } from '../../../documents/blocks/Image/ImageReader.vue'; 
 
-import Spacer, { SpacerPropsSchema } from '@flyhub/email-block-spacer';
+import SpacerReader, { SpacerPropsSchema } from '../blocks/Space/SpacerReader.vue';
+/* import Spacer, { SpacerPropsSchema } from '@flyhub/email-block-spacer'; */
 import Text, { TextPropsSchema } from '@flyhub/email-block-text';
 
 import EmailLayoutReader, { EmailLayoutPropsSchema } from '../blocks/EmailLayout';
@@ -26,6 +27,8 @@ import TableRowReader, { TableRowPropsSchema } from '../blocks/TableRow';
 import TableCellReader, { TableCellPropsSchema } from '../blocks/TableCell';
 import TableSectionReader from '../blocks/TableSection/TableSectionReader.vue';
 import { TableSectionPropsSchema } from '../../../documents/blocks/TableSection/TableSectionPropsSchema';
+import TextReader from '../blocks/Text/TextReader.vue';
+
 
 
 defineProps<TReaderProps>()
@@ -60,7 +63,7 @@ const READER_DICTIONARY = {
   },
   Heading: {
     schema: HeadingPropsSchema,
-    Component: Heading,
+    Component: HeadingReader,
   },
   Html: {
     schema: HtmlPropsSchema,
@@ -72,11 +75,11 @@ const READER_DICTIONARY = {
   },
   Spacer: {
     schema: SpacerPropsSchema,
-    Component: Spacer,
+    Component: SpacerReader,
   },
   Text: {
     schema: TextPropsSchema,
-    Component: Text,
+    Component: TextReader,
   },
    Table: {  
     schema: TablePropsSchema,  

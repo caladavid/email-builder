@@ -12,23 +12,33 @@
 }
 
 :root {
+  --color-primary: var(--color-blue);
+  /* --color-primary: #0033a0; */
+  --color-secondary: #ff9900;
+  --color-secondary: #ff9900;
+  --color-blue: #0033a0;
+
+  /* --ui-text: var(--color-blue); */
   --ui-primary: #ff9900;
-  --ui-bg: #0033a0;
+  --ui-bg: var(--color-primary);
   --tw-ring-color: rgb(29, 41, 61);
   --ui-bg-accented: rgb(29, 41, 61);
   --ui-border-accented: rgb(29, 41, 61);
   --ui-border: rgb(29, 41, 61);
   --ui-bg-hover: #ff9900;
+  /* --ui-bg-elevated: #0033a0; */
 }
 
 .dark {
   --ui-primary: #ff9900; 
-  --ui-bg: #0033a0;
+  /* --ui-text: var(--color-blue); */
+  --ui-bg: var(--color-primary);
   --tw-ring-color: rgb(29, 41, 61);
   --ui-bg-accented: rgb(29, 41, 61);
   --ui-border-accented: rgb(29, 41, 61);
   --ui-border: rgb(29, 41, 61);
 /*   --ui-bg-hover: #ff9900; */
+/* --ui-bg-elevated: #0033a0; */
 }
 
 /* z index for import template modal */

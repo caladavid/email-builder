@@ -22,7 +22,7 @@ const sx: HTMLAttributes['style'] = {
   left: '-56px',
   borderRadius: '256px',
   padding: '8px 4px',
-  zIndex: 10,
+  zIndex: 1000,
   boxShadow: 'rgba(33, 36, 67, 0.04) 0px 10px 20px, rgba(33, 36, 67, 0.04) 0px 2px 6px, rgba(33, 36, 67, 0.04) 0px 0px 1px',
 }
 

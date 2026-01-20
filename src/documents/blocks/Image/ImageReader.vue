@@ -26,8 +26,8 @@ export const ImagePropsSchema = z.object({
   .nullable(),
   
   props: z.object({
-    width: z.number().optional().nullable(),
-    height: z.number().optional().nullable(),
+    width: z.union([z.string(), z.number()]).optional().nullable(),
+    height: z.union([z.string(), z.number()]).optional().nullable(),
     url: z.string().optional().nullable(),
     alt: z.string().optional().nullable(),
     linkHref: z.string().optional().nullable(),
@@ -46,8 +46,8 @@ export type ImageProps = {
     [key: string]: any, // Permite props extra en TS
   } | null,
   props?: {
-    width?: number | null,
-    height?: number | null,
+    width?: number  | string| null,
+    height?: number | string | null,
     url?: string | null,
     alt?: string | null,
     linkHref?: string | null,
@@ -74,6 +74,13 @@ const sectionStyle = computed(() => ({
     fontSize: '0px',
 }))
 
+const formatDimension = (val: string | number | undefined | null) => {
+    if (val === null || val === undefined || val === '') return undefined;
+    if (typeof val === 'number') return `${val}px`;
+    // Si es un string numérico puro ("500"), agregamos px. Si ya tiene unidad ("50%"), lo dejamos.
+    return !isNaN(Number(val)) ? `${val}px` : val;
+}
+
 
 // --- LÓGICA DE LA IMAGEN ---
 const imgAttrs = computed(() => ({
@@ -82,8 +89,8 @@ const imgAttrs = computed(() => ({
   width: width.value,
   height: height.value,
   style: {
-    width: width.value,
-    height: height.value,
+    width: formatDimension(width.value),
+    height: formatDimension(height.value),
     outline: 'none',
     border: 'none',
     textDecoration: 'none',

@@ -40,10 +40,21 @@ export const ColumnsContainerPropsSchema = z.object({
         z.literal(6), z.literal(7), z.literal(8)
       ]).optional().nullable(),
       
+      fixedWidths: z.array(z.string()).optional().nullable(),
       // Define columns array structure
-      columns: z.array(z.object({ childrenIds: z.array(z.string()) }))
-        .min(2)
-        .max(8),
+      columns: z.array(z.object({   
+      childrenIds: z.array(z.string()),  
+      width: z.string().optional(),  
+      style: z.object({  
+        flexBasis: z.string().optional(),  
+        flexGrow: z.number().optional(),  
+        flexShrink: z.number().optional(),  
+        minWidth: z.string().optional(),  
+        maxWidth: z.string().optional()  
+      }).optional()  
+    }))  
+      .min(2)  
+      .max(8),
     })
     .optional()
     .nullable(),
@@ -60,7 +71,18 @@ export type ColumnsContainerProps = Omit<BaseColumnsContainerProps, 'props'> & {
   props?: (Omit<BaseInnerProps, 'columnsCount'> & {
     columnsCount?: 2 | 3 | 4 | 5 | 6 | 7 | 8 | null;
     horizontalAlignment?: 'left' | 'center' | 'right' | null;
-    columns: Array<{ childrenIds: string[] }>;
+    columns: Array<{   
+    childrenIds: string[];  
+    width?: string;  
+    style?: {  
+      flexBasis?: string;  
+      flexGrow?: number;  
+      flexShrink?: number;  
+      minWidth?: string;  
+      maxWidth?: string;  
+    };  
+  }>;
+    fixedWidths?: string[] | null;
   }) | null;
 }
 

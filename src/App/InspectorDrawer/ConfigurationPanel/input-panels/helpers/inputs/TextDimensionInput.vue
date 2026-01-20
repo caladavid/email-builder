@@ -15,19 +15,33 @@
 <script setup lang="ts">
 type TextDimensionInputProps = {
   label: string,
-  modelValue: number | null | undefined,
+  modelValue: string | null | undefined,
 }
 
 defineProps<TextDimensionInputProps>()
 
+// 🔥 CORRECCIÓN: El evento debe llamarse 'update:model-value' para que el padre lo escuche correctamente
 const emit = defineEmits<{
-  (e: 'change', args: number | null): void
+  (e: 'update:model-value', args: string | null): void
 }>()
 
-/** Functions */
-
 function handleChange(newValue: string) {
+  // Si está vacío o es "auto", devolver null
+  if (!newValue || newValue.trim() === 'auto') {
+    emit('update:model-value', null);
+    return;
+  }
+  
+  // Si ya tiene unidades (px, %, em, etc.), usarlo directamente
+  if (/\d+(px|%|em|rem|vw|vh)$/.test(newValue.trim())) {
+    emit('update:model-value', newValue.trim());
+    return;
+  }
+  
+  // Si es solo un número, agregar px
   const value = parseInt(newValue);
-  emit('change', isNaN(value) ? null : value);
+  const finalValue = isNaN(value) ? null : `${value}px`;
+  
+  emit('update:model-value', finalValue);
 }
 </script>

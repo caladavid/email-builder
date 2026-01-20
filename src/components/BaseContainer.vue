@@ -93,6 +93,7 @@ const props = defineProps<{
 const wStyle = computed(() => {
   // Llamamos al helper pasando los estilos crudos y los DEFAULTS específicos de Container
   return getCleanBlockStyle(props.style, {
+    ...props.style,
     // Estos son los valores que se usarán si props.style no trae nada
     display: 'block',         // Equivale a: s.display || 'block'
     width: '100%',            // Equivale a: s.width || '100%'

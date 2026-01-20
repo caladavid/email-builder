@@ -29,7 +29,7 @@ import { getCleanBlockStyle } from '../../../utils/blockStyleUtils';
 import { currentBlockIdSymbol } from '../../editor/EditorBlock.vue'; // 🔥 Importar Symbol
 
 // 🔥 DEBUG: Activar/Desactivar
-const IS_DEBUG = false; 
+const IS_DEBUG = true; 
 
 // 🔥 DEBUG: Obtener ID actual
 const currentBlockId = inject(currentBlockIdSymbol) as string;

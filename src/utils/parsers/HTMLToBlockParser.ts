@@ -2634,17 +2634,6 @@ export class HTMLToBlockParser {
             styles["border-color"] = bordercolorAttr;  
         } 
 
-        if (element.textContent?.includes('Order Now')) {
-            console.log('--------------------------------');
-            console.log('🕵️‍♂️ PARSEANDO BOTÓN "Order Now"');
-            console.log('Estilo Inline Original:', element.getAttribute('style'));
-            
-            // Verifica si StyleUtils está matando el color
-            const rawBorderColor = "rgb(224, 62, 45)";
-            const normalized = StyleUtils.normalizeColor(rawBorderColor);
-            console.log(`Prueba Normalize RGB: '${rawBorderColor}' ->`, normalized);
-        }
-
         for (const prop in styles) {
             const value = styles[prop];
             if (typeof value === "object" && value !== null) {
@@ -2925,11 +2914,6 @@ export class HTMLToBlockParser {
             // o mezclarse condicionalmente. Lo estándar es una propiedad separada.
             filteredFinal.mobileStyle = mobileStyles;
         }
-
-        if (element.textContent?.includes('Order Now')) {
-        console.log('✅ ESTILOS FINALES EXTRAÍDOS:', final);
-        console.log('--------------------------------');
-    }
 
         return filteredFinal;
     }

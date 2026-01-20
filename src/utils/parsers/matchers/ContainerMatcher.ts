@@ -55,6 +55,13 @@ export const ContainerMatcher: BlockMatcher = {
 
     fromElement: (element: Element, parser: HTMLToBlockParser, inheritedStyles: any): MatcherResult | null => {
         const styleAttr = element.getAttribute('style') || '';
+        const hasText = element.textContent?.trim().length || 0;
+        const hasImg = element.querySelector('img');
+
+        if (!hasText && !hasImg) {
+            return null; 
+        }
+
         const tag = element.tagName.toLowerCase();
         if (tag === 'a') {
             const hasButtonVisuals = styleAttr.includes('background') || 
@@ -230,7 +237,6 @@ export const ContainerMatcher: BlockMatcher = {
     }
 };
 
-// ... Helpers ...
 function checkVisibleContent(element: Element): boolean {
     const clone = element.cloneNode(true) as Element;
     const clean = (node: Node) => {

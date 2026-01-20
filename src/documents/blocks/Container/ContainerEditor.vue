@@ -51,7 +51,10 @@ import type { ContainerProps } from '../../../lib/email-builder/blocks/Container
 /* defineProps<ContainerProps>() */
   const props = defineProps<ContainerProps>()
     /* console.log("props.style", props.style); */
+
 const IS_DEBUG = false;
+
+
 const inspectorDrawer = useInspectorDrawer();
 const dragAndDrop = useDragAndDrop(() => currentBlockId);  
 

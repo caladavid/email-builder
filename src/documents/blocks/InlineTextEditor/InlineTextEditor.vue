@@ -99,13 +99,12 @@ const showToolBar = computed(() => {
 const computedStyles = computed(() => { 
   // 1. Lógica de Fuente
   const rawFontFamily = props.style?.fontFamily; 
-  const mappedFontFamily = getFontFamily(rawFontFamily) || 'inherit'; 
+  const mappedFontFamily = getFontFamily(rawFontFamily) || 'MODERN_SANS'; 
   
   // 2. Limpieza de Estilos (Zombis, Padding, Colores)
   // Aquí pasamos los defaults visuales
   const cleanStyles = getCleanBlockStyle(props.style, {
     padding: '16px 24px', 
-    fontSize: 'inherit', 
     fontWeight: 'normal',
     textAlign: 'left',
     color: 'inherit',

@@ -1,5 +1,5 @@
 <template>
-  <UTabs :items="tabs" variant="link" class="h-full " :ui="tabsUi"
+  <UTabs :items="tabs" variant="link" class="h-full" :ui="tabsUi"
 >
    
     <template #list-leading >  
@@ -163,6 +163,27 @@ const mainBoxStyle = computed(() => {
 
   return baseStyle
 }) */
+
+/* const tabsUi = computed(() => ({  
+  list: {  
+    base: 'relative w-full inline-flex items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-800 p-1',  
+    tab: {  
+      base: 'relative inline-flex items-center justify-center font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:cursor-not-allowed disabled:opacity-75',  
+      padding: 'px-3 py-1.5',  
+      size: { sm: 'px-2 py-1 text-xs', md: 'px-3 py-1.5 text-sm', lg: 'px-4 py-2 text-base' },  
+      variant: {  
+        pill: {  
+          base: 'bg-white text-gray-900 shadow-sm border border-gray-200',  
+          active: 'bg-white text-gray-900 shadow-sm',  
+          inactive: 'bg-gray-100 text-gray-600 hover:bg-gray-200'  
+        }  
+      }  
+    }  
+  },  
+  content: inspectorDrawer.selectedScreenSize === 'mobile'   
+    ? 'bg-gray-100 h-full w-full overflow-x-hidden'   
+    : 'bg-gray-100 h-full overflow-x-hidden'  
+})) */
 
 const tabsUi = computed(() => {
   if (inspectorDrawer.selectedScreenSize === 'mobile') {

@@ -8,6 +8,7 @@
       :placeholder="placeholder"
       @input="onInput"
       @mouseup="handleTextSelection"
+      :style="style"
     />
 
     <!-- Tooltip para convertir a enlace -->
@@ -48,8 +49,9 @@
 import { ref, watch, nextTick, onMounted } from 'vue';
 
 type Props = {
-  modelValue: string
-  placeholder?: string
+  modelValue: string;
+  style?: any;
+  placeholder?: string;
   rows?: number
 }
 

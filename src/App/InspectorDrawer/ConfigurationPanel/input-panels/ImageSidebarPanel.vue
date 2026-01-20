@@ -46,12 +46,22 @@
       <TextDimensionInput
         label="Ancho (Width)"
         :model-value="data.props?.width"
-        @change="handleUpdateData({ ...data, props: { ...data.props, width: $event } })"
+        @change="(e: Event) => {
+            // 🔥 CORRECCIÓN: Extraer el valor del input del evento
+            const target = e.target as HTMLInputElement;
+            const val = target.value; 
+            handleUpdateData({ ...data, props: { ...data.props, width: val } })
+        }"
       />
       <TextDimensionInput
         label="	Alto (Height)"
         :model-value="data.props?.height"
-        @change="handleUpdateData({ ...data, props: { ...data.props, height: $event } })"
+        @change="(e: Event) => {
+            // 🔥 CORRECCIÓN: Lo mismo para la altura
+            const target = e.target as HTMLInputElement;
+            const val = target.value;
+            handleUpdateData({ ...data, props: { ...data.props, height: val } })
+        }"
       />
     </div>
 
@@ -84,6 +94,7 @@ import type { ImageProps } from '../../../../documents/blocks/Image/ImageReader.
 import { ImagePropsSchema } from '../../../../documents/blocks/Image/ImageReader.vue'; 
 import { ref } from 'vue';
 import { z } from 'zod';
+import { useInspectorDrawer } from '../../../../documents/editor/editor.store';
 const file = ref<File | null>(null);
 
 type ImageSidebarPanelProps = {
@@ -91,6 +102,7 @@ type ImageSidebarPanelProps = {
 }
 
 const props = defineProps<ImageSidebarPanelProps>()
+const inspectorDrawer = useInspectorDrawer()
 
 const emit = defineEmits<{
   (e: 'update:data', args: ImageProps): void

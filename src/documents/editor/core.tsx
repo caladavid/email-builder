@@ -7,7 +7,8 @@ import Button, { ButtonPropsSchema } from '../blocks/Button/ButtonPropsSchema';
 import ImageReader, { ImagePropsSchema } from '../blocks/Image/ImageReader.vue'; 
 import Avatar, { AvatarPropsSchema } from '@flyhub/email-block-avatar';
 import Divider, { DividerPropsSchema } from '@flyhub/email-block-divider';
-import Spacer, { SpacerPropsSchema } from '@flyhub/email-block-spacer';
+import Spacer, { SpacerPropsSchema } from '../../lib/email-builder/blocks/Space/SpacerReader.vue';
+/* import Spacer, { SpacerPropsSchema } from '@flyhub/email-block-spacer'; */
 import Html, { HtmlPropsSchema } from '@flyhub/email-block-html';
 
 import { buildBlockConfigurationDictionary, buildBlockConfigurationSchema } from '@flyhub/email-document-core/builders';
@@ -35,6 +36,7 @@ import { TableCellPropsSchema } from '../blocks/TableCell/TableCellPropsSchema';
 import TableCellEditor from '../blocks/TableCell/TableCellEditor.vue';
 import { TableSectionPropsSchema } from '../blocks/TableSection/TableSectionPropsSchema';
 import TableSectionEditor from '../blocks/TableSection/TableSectionEditor.vue';
+
 
 
 /* const globalVariables = ref<Record<string, string>>({

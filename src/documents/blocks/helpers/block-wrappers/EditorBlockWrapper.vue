@@ -6,7 +6,6 @@
       maxWidth: '100%',  
       outlineOffset: '-1px',  
       outline,  
-      marginBottom: '4px',
       opacity: dragAndDrop.isDragging.value ? 0.5 : 1,  
       transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)', // ✅ Transición suave  
       transform: getBlockTransform() ,  
@@ -83,6 +82,9 @@ const dragAndDrop = useDragAndDrop(() => currentBlockId);
   
 /** Computed */  
 const outline = computed(() => {  
+  /* const block = inspectorDrawer.document[currentBlockId];
+  if (!block || !isLeafBlock(block)) return undefined */
+  
   if (inspectorDrawer.selectedBlockId === currentBlockId) return '2px solid rgba(0, 121, 204, 1)';  
   if (mouseInside.value) return '2px solid rgba(0, 121, 204, 0.3)';  
   return undefined;  
@@ -437,6 +439,28 @@ function handleMouseMove(event: MouseEvent) {
   } else {  
     isNearDragEdge.value = false;  
   }  
+}
+
+function isLeafBlock(block: TEditorBlock): boolean{
+  // Los bloques de contenido siempre son hojas  
+  const contentTypes = ['Text', 'Heading', 'Button', 'Image', 'Avatar', 'Divider', 'Spacer', 'Html'];  
+  if (!contentTypes.includes(block.type)) return true;
+
+  // Los contenedores son hojas solo si no tienen hijos  
+  if (block.type === 'Container') {  
+    return !block.data.props?.childrenIds || block.data.props.childrenIds.length === 0;  
+  }  
+    
+  if (block.type === 'ColumnsContainer') {  
+    return !block.data.props?.columns ||   
+           block.data.props.columns.every(col => !col.childrenIds || col.childrenIds.length === 0);  
+  }  
+    
+  if (block.type === 'EmailLayout') {  
+    return !block.data.childrenIds || block.data.childrenIds.length === 0;  
+  }  
+
+  return false;
 }
   
 defineOptions({  

@@ -33,7 +33,7 @@ import { currentBlockIdSymbol } from '../../editor/EditorBlock.vue';
 import InlineTextToolbar from '../../../App/InspectorDrawer/ConfigurationPanel/input-panels/InlineTextToolbar.vue';
 import { getCleanBlockStyle } from '../../../utils/blockStyleUtils';
 
-// 🔥 DEBUG: ACTIVA ESTO PARA VER LOS BORDES
+// DEBUG PARA VER LOS BORDES
 const IS_DEBUG = false;
 
 // ... (Interfaces se mantienen igual) ...

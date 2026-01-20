@@ -12,6 +12,7 @@
       padding: isMobile ? '0' : '32px 0',
       width: '100%',
       minHeight: '100%',
+      boxSizing: 'border-box'
     }"
     @click.self="handleClick"
   >

@@ -82,6 +82,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   let debounceTimer: NodeJS.Timeout | null = null;
 
   /* const globalVariables = ref<TValue['globalVariables']>(loadVariablesFromStorage()); */
+  // Limpiar variables
   const globalVariables = ref<TValue['globalVariables']>({}); 
 
   function initializeGlobalVariables(variables: Record<string, string>) {
@@ -295,7 +296,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
 
   function setAuthToken(token: string){
     authToken.value = token;
-    console.log('📊 Valor actual de authToken:', authToken.value);  
+    /* console.log('📊 Valor actual de authToken:', authToken.value);  */ 
   }
 
   
@@ -417,6 +418,35 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     } catch (error) {
       console.error('❌ Error en sendZip:', error);  
     }
+  }
+
+    async function uploadImage(file: File) {  
+      const token = authToken.value;  
+      if (!token) {  
+        console.error('❌ No hay token disponible');  
+        return null;  
+      }  
+      
+      const formData = new FormData();  
+      formData.append('TOKEN', token);  
+      formData.append('image', file);  
+      
+      try {  
+        const response = await fetch("https://services.celcom.cl/rest/protected/flex_email/uploadImage", {  
+          method: "POST",  
+          body: formData  
+        });  
+      
+        if (!response.ok) {  
+          throw new Error(`Error HTTP: ${response.status}`);  
+        }  
+      
+        const result = await response.json();  
+        return result.imageUrl; // URL retornada por el servicio  
+      } catch (error) {  
+        console.error('❌ Error subiendo imagen:', error);  
+        return null;  
+      }  
   }
 
   if (typeof window !== 'undefined') {  

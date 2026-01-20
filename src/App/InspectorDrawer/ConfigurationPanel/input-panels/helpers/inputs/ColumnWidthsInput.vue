@@ -2,6 +2,7 @@
   <div class="flex gap-1">
     <TextDimensionInput
       v-for="index in columnsCount"
+      :key="index" 
       :label="`Column ${index}`"
       :model-value="currentValue?.[index - 1]"
       @update:model-value="setIndex(index - 1, $event)"
@@ -13,7 +14,7 @@
 import TextDimensionInput from './TextDimensionInput.vue';
 import { computed } from 'vue';
 
-type TWidthValue = number | null | undefined;
+type TWidthValue = string | null | undefined;
 type FixedWidths = TWidthValue[]; 
 
 type ColumnsLayoutInputProps = {
@@ -28,19 +29,24 @@ const emit = defineEmits<{
 }>()
 
 /** Computed */
-
-const currentValue = computed(() => {  
-  console.log('🔍 ColumnWidthsInput - columnsCount:', props.columnsCount);  
-  const defaultValue = Array.from({ length: props.columnsCount }, () => null);  
-  return props.modelValue ?? defaultValue;  
+const currentValue = computed(() => {
+  // Aseguramos que el array tenga el largo correcto llenando con null lo que falte
+  const current = props.modelValue || [];
+  if (current.length < props.columnsCount) {
+     return [...current, ...Array(props.columnsCount - current.length).fill(null)];
+  }
+  return current.slice(0, props.columnsCount);
 })
 
 /** Functions */
-
 function setIndex(index: number, value: TWidthValue) {
-  const nValue: FixedWidths = [...currentValue.value]
+  console.log('🔧 ColumnWidthsInput - setIndex:', { index, value });
+  
+  // Creamos una copia del array actual (o uno nuevo si es null)
+  const nValue: FixedWidths = [...currentValue.value];
   nValue[index] = value;
 
+  console.log('📤 ColumnWidthsInput - Emitiendo Array:', nValue);
   emit('update:model-value', nValue);
 }
 </script>

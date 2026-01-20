@@ -126,17 +126,26 @@ function getColumnWidth(index: number) {
  * Simulates 'gap' using padding on cells.
  */
 function getCellStyle(index: number) {
+  // 1. RECUPERAR DATOS
+  const gapValue = props.props?.columnsGap || 0;
   const totalColumns = columnsCount.value;
-  const gapValue = gap.value;
+
+  // 2. LÓGICA DE ALINEACIÓN (Lo nuevo)
+  // Vertical
+  const vAlign = props.props?.contentAlignment || 'top';
   
+  // Horizontal (Prioridad: Sidebar > Estilo heredado > Default)
+  const hAlign = props.props?.horizontalAlignment || props.style?.textAlign || 'left';
+
   const styles: any = {
-    verticalAlign: contentAlignment.value === 'middle' ? 'middle' : 
-                   contentAlignment.value === 'bottom' ? 'bottom' : 'top',
-        
+    verticalAlign: vAlign,
+    textAlign: hAlign,
+    height: '100%', // Asegura que la celda llene la altura para que el vAlign funcione
   };
 
-  // Simple logic to simulate GAP in email tables:
-  // Add padding-right to all columns except the last one.
+  // 3. LÓGICA DE GAP (Restaurada)
+  // Añadimos padding-right a todas las columnas MENOS la última.
+  // Esto simula el espacio vacío entre columnas de forma compatible con emails.
   if (gapValue > 0 && index < totalColumns - 1) {
     styles.paddingRight = `${gapValue}px`;
   }

@@ -139,7 +139,7 @@ export const BUTTONS: TButtonProps[] = [
       },
     }),
   },
-   /* {  
+   {  
     label: 'Table',  
     icon: 'material-symbols:table',  
     block: () => ({  
@@ -169,6 +169,6 @@ export const BUTTONS: TButtonProps[] = [
         }  
       }  
     })  
-  }, */  
+  },  
 ];
 

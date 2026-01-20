@@ -106,19 +106,26 @@ export const ImageMatcher: BlockMatcher = {
         const isSmallIcon = widthVal <= 60;
 
         const finalStyles = { ...inheritedStyles, ...combinedStyles };
+
+        finalStyles.display = 'block'; 
+        finalStyles.width = '100%';
+
+        delete finalStyles.maxWidth;
         
         // Reset padding/align por defecto
         if (!finalStyles.padding) finalStyles.padding = {top:0, right:0, bottom:0, left:0};
         if (!finalStyles.textAlign) finalStyles.textAlign = 'center';
 
-        if (isSmallIcon) {
+        /* if (isSmallIcon) {
             finalStyles.display = 'inline-block';
             if (!finalStyles.margin) finalStyles.margin = {top:0, right:0, bottom:0, left:0}; // Sin auto margin
         } else {
             if (!finalStyles.display) finalStyles.display = 'block';
             if (!finalStyles.margin) finalStyles.margin = '0 auto';
             if (!widthAttr) finalStyles.maxWidth = '100%';
-        }
+        } */
+
+        finalStyles.margin = '0';
 
         // Limpieza final
         delete finalStyles.width; // Dejamos que el atributo width del img mande o el css
@@ -129,12 +136,13 @@ export const ImageMatcher: BlockMatcher = {
             data: {
                 style: finalStyles,
                 props: {
+                    /* url: "test", */
                     url: parser.resolveAssetUrl(src),
                     alt: imgEl.getAttribute("alt") || "Image",
                     linkHref: linkHref,
                     width: widthAttr ? parseInt(widthAttr) : undefined,
                     height: imgEl.getAttribute("height") ? parseInt(imgEl.getAttribute("height")!) : undefined,
-                    contentAlignment: "middle"
+                    contentAlignment: finalStyles.textAlign === 'center' ? 'middle' : (finalStyles.textAlign === 'right' ? 'bottom' : 'top')
                 }
             }
         });
