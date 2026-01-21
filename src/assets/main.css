@@ -12,11 +12,17 @@
 }
 
 :root {
-  --color-primary: var(--color-blue);
-  /* --color-primary: #0033a0; */
-  --color-secondary: #ff9900;
+ /*  --color-primary: var(--color-blue); */
+  --color-primary: #0033a0;
   --color-secondary: #ff9900;
   --color-blue: #0033a0;
+  --color-white: #fff;
+
+/*  --sidebar-primary: #ff9900;   */
+  --sidebar-bg: var(--color-white);  
+/*   --sidebar-border: #1a2951;  */ 
+  --sidebar-text: var(--color-primary); 
+  
 
   /* --ui-text: var(--color-blue); */
   --ui-primary: #ff9900;
@@ -27,10 +33,23 @@
   --ui-border: rgb(29, 41, 61);
   --ui-bg-hover: #ff9900;
   /* --ui-bg-elevated: #0033a0; */
+  
 }
 
+
+
 .dark {
-  --ui-primary: #ff9900; 
+  /* --ui-bg: var(--color-primary);
+  --ui-primary: var(--color-blue); 
+  --ui-text: var(--color-blue); */ 
+  /* --ui-text-inverted: var(--color-white); */
+
+/*   --sidebar-primary: #ff9900;   */
+  --sidebar-bg: var(--color-primary);  
+/*   --sidebar-border: #1a2951;  */ 
+  --sidebar-text: var(--color-primary);  
+
+  --ui-primary: var(--color-secondary); 
   /* --ui-text: var(--color-blue); */
   --ui-bg: var(--color-primary);
   --tw-ring-color: rgb(29, 41, 61);
@@ -78,4 +97,8 @@ input:focus {
 /* z index for popover add blocks */
 [data-reka-popper-content-wrapper] {
   z-index: 20 !important;
+}
+
+.bg-elevated[role="tablist"] { 
+  background-color: var(--color-primary) !important; 
 }

@@ -32,7 +32,7 @@
               icon="material-symbols:variable-insert"
               variant="ghost"
               size="sm"
-              class="absolute right-2 -top-6"
+              class="absolute right-2 -top-6 text-[var(--color-primary)]"
             />
           </UTooltip>
           
@@ -58,13 +58,14 @@
             text="Colocar negritas" 
             arrow 
             :delay-duration="0" 
-            :content="{ side: 'top', align: 'center' }"
+            :content="{ side: 'top', align: 'center' }
+            "
           >
             <UButton
               icon="material-symbols:format-bold"
               variant="ghost"
               size="sm"
-              class="absolute right-10 -top-6"
+              class="absolute right-10 -top-6 text-[var(--color-primary)] "
               @click="toggleBold"
             />
           </UTooltip>
@@ -79,7 +80,7 @@
               icon="material-symbols:format-italic"
               variant="ghost"
               size="sm"
-              class="absolute right-18 -top-6"
+              class="absolute right-18 -top-6 text-[var(--color-primary)]"
               @click="toggleItalic"
             />
           </UTooltip>
@@ -818,7 +819,8 @@ defineExpose({
   color: black;
   background-color: white;
   padding: 0.5rem 0.75rem;  
-  border: 1px solid #d1d5db;  
+  /* border: 1px solid #d1d5db;   */
+  border: 1px solid var(--color-blue);   
   border-radius: 0.375rem;  
   font-family: inherit;  
   font-size: 0.875rem;  

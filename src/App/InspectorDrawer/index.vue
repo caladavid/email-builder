@@ -7,6 +7,7 @@
     :dismissible="false"
     :modal="false"
     fixed
+    :ui="drawerUi"  
   >
     <template #body>
       <UTabs
@@ -30,7 +31,7 @@
 
 <script setup lang="ts">
 import { useInspectorDrawer } from '../../documents/editor/editor.store';
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import StylesPanel from './StylesPanel.vue';
 import ConfigurationPanel from './ConfigurationPanel/index.vue';
 
@@ -53,10 +54,34 @@ const inspectorDrawer = useInspectorDrawer()
 const activeTab = ref<string>('0')
 const samplerRef = ref<HTMLElement | null>(null);
 
+const drawerUi = computed(() => ({
+  content: 'bg-[var(--color-white)] text-[var(--color-primary)]',     // elemento principal del drawer
+  container: 'text-[var(--color-primary)]',
+}))
+
+const tabsUi = computed(() => ({  
+  list: {  
+    tab: {  
+      active: 'text-[var(--color-primary)] ',  
+      inactive: 'text-[var(--color-primary)] '  
+    }  
+  }  
+}))
+
 /** Watch */
 
 watch(() => inspectorDrawer.selectedSidebarTab, (value) => {
   activeTab.value = value === 'styles' ? '0' : '1'
 })
 
+
+
+
 </script>
+
+<style>
+  
+:deep(.bg-elevated) {  
+  background-color: red !important;  
+}
+</style>

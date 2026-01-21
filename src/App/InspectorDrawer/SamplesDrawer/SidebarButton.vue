@@ -3,7 +3,7 @@
     size="sm"  
     variant="ghost"  
     @click="handleClick"  
-    class="text-white"
+    class="text-[var(--color-blue)]"
   >  
     <slot />  
   </UButton>  

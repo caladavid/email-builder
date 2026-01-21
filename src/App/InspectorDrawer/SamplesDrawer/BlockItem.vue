@@ -2,14 +2,14 @@
     <div
         draggable="true"
         @dragstart="handleDragStart" 
-        class="block-item cursor-grab bg-[var(--ui-bg)] hover:bg-[var(--ui-bg-accented)] rounded-lg p-3 border border-gray-200 transition-colors"  
+        class="block-item cursor-grab bg-[var(--color-blue)] hover:bg-[var(--color-secondary)] rounded-lg p-3 border border-gray-200 transition-colors"  
         :style="{   
-            borderColor: 'var(--ui-border)',  
-            color: 'var(--ui-text)'  
+            borderColor: 'var(--ui-border) hover:bg-[var(--color-secondary)]',  
+            color: 'var(--color-white)'  
         }" 
     >
         <div class="block-preview  mb-2 flex justify-center">    
-            <div class="text-2xl" :style="{ color: 'var(--ui-primary, #0079cc)' }">    
+            <div class="text-2xl" :style="{ color: 'var(--color-white, #0079cc)' }">    
                 <UIcon v-if="isMaterialIcon" :name="props.icon" />  
                 <span v-else>{{ getIcon() }}</span>  
             </div>    

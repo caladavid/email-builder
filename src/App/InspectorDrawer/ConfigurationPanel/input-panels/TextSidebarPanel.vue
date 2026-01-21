@@ -39,7 +39,7 @@
     </div>
 
     <!-- Nueva sección de enlaces -->  
-    <div v-if="showLinkPanel" class="mt-4 p-3 border border-gray-200 rounded-lg ">  
+    <div v-if="showLinkPanel" class="mt-4 p-3 border border-var(--color-blue) rounded-lg ">  
       <h4 class="text-sm font-medium mb-3">Opciones de Link</h4>  
         
       <UFormField label="Texto seleccionado">  

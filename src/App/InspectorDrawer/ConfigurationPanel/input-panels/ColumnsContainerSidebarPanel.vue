@@ -84,7 +84,6 @@ const errors = ref<Zod.ZodError | null>(null)
 /** Functions */  
   
 function handleUpdateColumnsWidths(widths: string[]) {
-  console.log('🔧 handleUpdateColumnsWidths llamado con:', widths);
   
   if (!props.data.props) return;
 
@@ -119,22 +118,17 @@ function handleUpdateColumnsWidths(widths: string[]) {
     }
   };
   
-  console.log('📋 Enviando a handleUpdateData:', updatedData);
   handleUpdateData(updatedData);
 }
   
 function handleUpdateData(data: unknown) {  
-  console.log('⚙️ handleUpdateData - Datos recibidos:', data);  
   const res = ColumnsContainerPropsSchema.safeParse(data);  
   
   if (res.success) {  
-    console.log('✅ Validación exitosa:', res.data);  
-      
     // Verificar que props exista  
     if (res.data.props) {  
       // Si hay fixedWidths, asegurar que las columnas tengan los mismos anchos    
       if (res.data.props.fixedWidths) {    
-        console.log('🔄 Sincronizando fixedWidths con columnas:', res.data.props.fixedWidths);    
             
         const updatedColumns = res.data.props.columns.map((column, index) => ({    
           ...column,    
@@ -149,11 +143,9 @@ function handleUpdateData(data: unknown) {
       }  
     }  
       
-    console.log('🚀 Emitiendo datos finales:', res.data);    
     emit('update:data', res.data);    
     errors.value = null;    
   } else {    
-    console.log('❌ Error de validación:', res.error);    
     errors.value = res.error;    
   }    
 }  

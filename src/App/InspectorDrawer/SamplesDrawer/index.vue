@@ -5,30 +5,20 @@
     class="fixed left-0 top-0 h-full border-r 0 w-32 md:w-60 overflow-y-auto celcomflex:overflow-hidden"  
     :style="{ 
         width: `${editorStore.SAMPLES_DRAWER_WIDTH}px`,
-        backgroundColor: 'var(--ui-bg)',
+        backgroundColor: 'var(--color-white)',
         color: 'var(--ui-text)',
         borderColor: 'var(--ui-border)',
         }"  
   >  
-        <h1 class="text-lg font-semibold px-3 py-4 text-center" :style="{color: 'var(--ui-text)'}">  
+        <h1 class="text-lg font-semibold px-3 py-4 text-center" :style="{color: 'var(--color-blue)'}">  
           EmailBuilder  
         </h1> 
 
       <div>
-        <h2 class="text-lg text-center font-semibold px-3" :style="{color: 'var(--ui-text)'}">
+        <h2 class="text-lg text-center font-semibold px-3" :style="{color: 'var(--color-blue)'}">
           Bloques
         </h2>
         <div class="grid celcomflex:grid-cols-2 gap-4 p-4">
-<!--           <BlockItem type="Encabezado" displayName="Título" icon="H1" />    
-          <BlockItem type="Texto" displayName="Texto" icon="T" />    
-          <BlockItem type="Botón" displayName="Botón" icon="Btn" />    
-          <BlockItem type="Imagen" displayName="Imagen" icon="Img" />    
-          <BlockItem type="Avatar" displayName="Avatar" icon="Av" />    
-          <BlockItem type="Separador" displayName="Separador" icon="Div" />    
-          <BlockItem type="Espaciador" displayName="Espaciador" icon="Space" />    
-          <BlockItem type="Html" displayName="HTML" icon="Code" />    
-          <BlockItem type="Columnas" displayName="Columnas" icon="Cols" />    
-          <BlockItem type="Contenedor" displayName="Contenedor" icon="Cont" /> --> 
           <BlockItem     
               v-for="button in BUTTONS"     
               :key="button.label"    
@@ -45,19 +35,10 @@
           <UButton   
             :icon="showTemplates ? 'material-symbols:arrow-drop-up' : 'material-symbols:arrow-drop-down'"  
             @click="showTemplates = !showTemplates" 
-            class="w-full text-left flex flex-row-reverse items-center justify-between transition-all"  
+            class="w-full text-[var(--color-white)] bg-[var(--color-blue)] text-left flex flex-row-reverse items-center justify-between transition-all"  
           >
           <h2>Plantillas</h2>
         </UButton>
-          <!-- <button
-            @click="showTemplates = !showTemplates"
-            class="w-full text-left flex items-center justify-between"  
-            :style="{color: 'var(--ui-text)'}"  
-          >
-            <h2>Plantillas</h2>
-            <span class="text-xs">{{ showTemplates ? '▼' : '▶' }}</span>  
-          </button> -->
-    
           <div v-if="showTemplates" class="flex flex-col items-start space-y-1">              
             <div v-if="showTemplates" class="flex flex-col items-start space-y-1">  
               <SidebarButton href="#">Nueva plantilla</SidebarButton>  

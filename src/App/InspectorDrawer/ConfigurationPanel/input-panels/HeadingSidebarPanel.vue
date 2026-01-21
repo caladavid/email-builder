@@ -88,7 +88,6 @@ function handleUpdateData(data: unknown) {
   }
 }
 function handleTextUpdate(newText: string) {  
-   console.log('📝 handleTextUpdate called with:', newText); 
   handleUpdateData({   
     ...props.data,   
     props: {   
