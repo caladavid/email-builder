@@ -217,8 +217,6 @@ const processedDocument = computed(() => {
   pointer-events: none
 }
 
-
-
 </style>
 
 

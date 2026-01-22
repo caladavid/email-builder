@@ -347,6 +347,13 @@ function processAsWrapperContainer(tableEl: Element, cellEl: Element, parser: HT
     const tableStyles = parser.extractStyles(tableEl, inheritedStyles);
     const cellStyles = parser.extractStyles(cellEl, tableStyles);
 
+    if ((tableStyles.borderWidth === 'medium' || tableStyles.border === 'medium') && !tableStyles.borderColor) {
+        delete tableStyles.border;
+        delete tableStyles.borderWidth;
+        delete tableStyles.borderStyle;
+        delete tableStyles.borderColor;
+    }
+
     const mergedStyle = {
         ...tableStyles,
         ...cellStyles,
@@ -365,7 +372,10 @@ function processAsWrapperContainer(tableEl: Element, cellEl: Element, parser: HT
     const childrenIds: string[] = [];
     const stylesForKids = { ...mergedStyle };
     // Limpiamos estilos peligrosos para los hijos
-    ['padding', 'backgroundColor', 'width', 'height', 'margin', 'minHeight'].forEach(p => delete stylesForKids[p]);
+    [
+        'padding', 'backgroundColor', 'width', 'height', 'margin', 'minHeight',
+        'border', 'borderWidth', 'borderColor', 'borderStyle', 'borderRadius'
+    ].forEach(p => delete stylesForKids[p]);
 
     // Limpieza de nodos vacíos
     Array.from(cellEl.childNodes).forEach(node => {
@@ -647,6 +657,13 @@ function processAsColumnsContainer(tableEl: Element, rowEl: Element, cells: Elem
 function processAsLayoutTable(element: Element, rows: Element[], areVirtual: boolean, parser: HTMLToBlockParser, inheritedStyles: any): MatcherResult {
     const tableId = uuidv4();
     const styles = parser.extractStyles(element, inheritedStyles);
+
+    if ((styles.borderWidth === 'medium' || styles.border === 'medium') && !styles.borderColor) {
+        delete styles.border;
+        delete styles.borderWidth;
+        delete styles.borderStyle;
+        delete styles.borderColor;
+    }
 
     if (styles.backgroundColor === 'transparent' || styles.backgroundColor === 'rgba(0, 0, 0, 0)') {
         styles.backgroundColor = null;
