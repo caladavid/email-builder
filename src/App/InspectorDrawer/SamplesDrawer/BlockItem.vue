@@ -2,7 +2,7 @@
     <div
         draggable="true"
         @dragstart="handleDragStart" 
-        class="block-item cursor-grab bg-[var(--color-blue)] hover:bg-[var(--color-secondary)] rounded-lg p-3 border border-gray-200 transition-colors"  
+        class="block-item cursor-grab bg-[var(--color-blue)] hover:bg-[var(--ui-bg-elevated)] rounded-lg p-3 border border-gray-200 transition-colors"  
         :style="{   
             borderColor: 'var(--ui-border) hover:bg-[var(--color-secondary)]',  
             color: 'var(--color-white)'  

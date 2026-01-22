@@ -113,7 +113,6 @@ const computedStyles = computed(() => {
     lineHeight: '1.5',
   });
 
-  // 3. 🔥 SOBRESCRIBIR LO CRÍTICO (El Fix)
   // Al hacer desestructuración (...cleanStyles) primero, y poner nuestras
   // propiedades después, aseguramos que ESTAS ganen siempre.
   return {

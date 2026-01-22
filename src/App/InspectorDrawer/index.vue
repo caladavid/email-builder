@@ -8,6 +8,7 @@
     :modal="false"
     fixed
     :ui="drawerUi"  
+    class="!rounded-none" 
   >
     <template #body>
       <UTabs
@@ -52,20 +53,10 @@ const tabs = [
 
 const inspectorDrawer = useInspectorDrawer()
 const activeTab = ref<string>('0')
-const samplerRef = ref<HTMLElement | null>(null);
 
 const drawerUi = computed(() => ({
   content: 'bg-[var(--color-white)] text-[var(--color-primary)]',     // elemento principal del drawer
   container: 'text-[var(--color-primary)]',
-}))
-
-const tabsUi = computed(() => ({  
-  list: {  
-    tab: {  
-      active: 'text-[var(--color-primary)] ',  
-      inactive: 'text-[var(--color-primary)] '  
-    }  
-  }  
 }))
 
 /** Watch */
@@ -78,10 +69,3 @@ watch(() => inspectorDrawer.selectedSidebarTab, (value) => {
 
 
 </script>
-
-<style>
-  
-:deep(.bg-elevated) {  
-  background-color: red !important;  
-}
-</style>

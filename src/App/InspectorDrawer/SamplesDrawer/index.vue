@@ -35,7 +35,7 @@
           <UButton   
             :icon="showTemplates ? 'material-symbols:arrow-drop-up' : 'material-symbols:arrow-drop-down'"  
             @click="showTemplates = !showTemplates" 
-            class="w-full text-[var(--color-white)] bg-[var(--color-blue)] text-left flex flex-row-reverse items-center justify-between transition-all"  
+            class="w-full text-[var(--color-white)] bg-[var(--color-blue)] hover:bg-[var(--ui-bg-elevated)]  text-left flex flex-row-reverse items-center justify-between transition-all"  
           >
           <h2>Plantillas</h2>
         </UButton>

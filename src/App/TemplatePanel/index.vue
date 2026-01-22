@@ -212,6 +212,13 @@ const processedDocument = computed(() => {
   background-color: white !important;
 }
 
+:deep(.tabs-list > [role="tab"][data-state="active"]) {
+  color: black !important;
+  pointer-events: none
+}
+
+
+
 </style>
 
 

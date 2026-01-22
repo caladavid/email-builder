@@ -33,6 +33,7 @@
         size="sm"
         icon="material-symbols:add-link"
         @click="toggleLinkPanel"
+        class="text-[var(--color-white)] bg-[var(--color-primary)] hover:bg-[var(--color-dark-gray)]"
       >
         Agregar Link
       </UButton>

@@ -13,10 +13,15 @@
 
 :root {
  /*  --color-primary: var(--color-blue); */
+ --color-blue: #0033a0;
+ --color-white: #fff;
+ --color-orange: #ff9900;
+ --color-gray: rgb(211, 213, 215);
+ --color-dark-gray: rgb(29, 41, 61);
+
+
   --color-primary: #0033a0;
-  --color-secondary: #ff9900;
-  --color-blue: #0033a0;
-  --color-white: #fff;
+  --color-secondary: var(--color-gray);
 
 /*  --sidebar-primary: #ff9900;   */
   --sidebar-bg: var(--color-white);  
@@ -29,10 +34,11 @@
   --ui-bg: var(--color-primary);
   --tw-ring-color: rgb(29, 41, 61);
   --ui-bg-accented: rgb(29, 41, 61);
-  --ui-border-accented: rgb(29, 41, 61);
+  --ui-border-accented: var(--color-secondary);
   --ui-border: rgb(29, 41, 61);
   --ui-bg-hover: #ff9900;
   /* --ui-bg-elevated: #0033a0; */
+  
   
 }
 

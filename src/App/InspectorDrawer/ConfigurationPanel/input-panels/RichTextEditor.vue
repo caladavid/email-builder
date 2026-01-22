@@ -47,7 +47,7 @@
               >
                 <span>{{ item.value }}</span>
               </div>
-              <div v-if="Object.keys(variableItems).length === 0" class="px-3 py-2 text-gray-500">  
+              <div v-if="Object.keys(variableItems).length === 0" class="px-3 py-2 text-white">  
                 No hay variables disponibles  
               </div>  
             </div>

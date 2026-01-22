@@ -38,10 +38,18 @@ defineProps<{ title: string }>()
 :deep(.bg-primary) {  
   background-color: var(--sidebar-bg) !important;  
 }  
-  
+
+:deep(span[data-state="checked"]),
+:deep(span[data-state="unchecked"])  { 
+  background-color: var(--color-white) !important; 
+}
+
+:deep(button[data-state="checked"]) { 
+  background-color: var(--color-blue) !important; 
+}
 
 :deep(button[data-state="unchecked"]) { 
-  background-color: rgb(211,213,215) !important; 
+  background-color: var(--color-gray) !important; 
 }
   
 
@@ -58,6 +66,10 @@ defineProps<{ title: string }>()
 
 :deep(span.ring-primary) { 
   --tw-ring-color: var(--color-white) !important; 
+}
+
+:deep(span.bg-accented) { 
+  --ui-bg-accented: var(--color-gray) !important; 
 }
 
 
