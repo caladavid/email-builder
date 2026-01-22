@@ -233,22 +233,21 @@ export function debugFormats(text: string, formats: TextFormat[]): void {
 /**
  * Utilidad para validar formatos (útil en desarrollo)
  */
-export function validateFormats(text: string, formats: TextFormat[]): { isValid: boolean; errors: string[] } {
+export function validateFormats(text: string, formats: any[]): { isValid: boolean; errors: string[] } {
   const errors: string[] = [];
   
   formats.forEach((format, index) => {
-    if (format.start < 0) {
-      errors.push(`Formato ${index}: start negativo (${format.start})`);
+
+    const validateFormatKeys = ['bold', 'italic', 'underline', 'strike', 'code', 'sub', 'sup', 'color', 'background', "fontSize"];
+    const hasValidFormat = validateFormatKeys.some(key => format[key] !== undefined);
+    
+    if (!hasValidFormat) {
+      errors.push(`Formato ${index}: sin formato válido`);  
     }
-    if (format.end > text.length) {
-      errors.push(`Formato ${index}: end (${format.end}) excede longitud del texto (${text.length})`);
-    }
-    if (format.start >= format.end) {
-      errors.push(`Formato ${index}: start (${format.start}) >= end (${format.end})`);
-    }
-    if (!format.bold && !format.italic) {
-      errors.push(`Formato ${index}: sin formato (ni bold ni italic)`);
-    }
+
+    if (format.start < 0 || format.end > text.length || format.start >= format.end) {  
+      errors.push(`Formato ${index}: rango inválido (${format.start}-${format.end})`);  
+    }  
   });
   
   return {

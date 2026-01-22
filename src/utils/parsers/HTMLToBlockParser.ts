@@ -1207,6 +1207,17 @@ export class HTMLToBlockParser {
                         hasFormat = true;
                     }
 
+                    if (tag === 'strike' || tag === 's' || tag === 'del' || childStyles.textDecoration === 'line-through') {  
+                        fmt.strike = true;  
+                        hasFormat = true;  
+                    }  
+                    
+                    // Asegúrate que el color se detecte correctamente  
+                    if (childStyles.color && childStyles.color !== '#000000' && childStyles.color !== 'inherit') {  
+                        fmt.color = childStyles.color;  
+                        hasFormat = true;  
+                    }
+
                     if (childStyles.color && childStyles.color !== '#000000' && childStyles.color !== 'inherit') {
                         fmt.color = childStyles.color;
                         hasFormat = true;

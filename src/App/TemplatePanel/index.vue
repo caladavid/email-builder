@@ -11,8 +11,8 @@
       />  
     </template> 
 
-    <template #list-trailing class="bg-red-300">
-      <div :class="['flex w-full justify-end md:gap-x-2', inspectorDrawer.inspectorDrawerOpen ? 'mr-6' : '']">
+    <template #list-trailing>
+      <div :class="['flex w-full justify-end md:gap-x-2', inspectorDrawer.inspectorDrawerOpen ? 'mr-8' : '']">
         <UTooltip text="Deshacer">
           <UButton   
             icon="material-symbols:undo"  

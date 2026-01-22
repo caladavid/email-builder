@@ -46,11 +46,30 @@ export const TableBlockMatcher: BlockMatcher = {
     fromElement(element: Element, parser: HTMLToBlockParser, inheritedStyles: any): MatcherResult | null {
         const tag = element.tagName.toLowerCase();
         const children = Array.from(element.children);
+        const styleAttr = (element.getAttribute('style') || '').toLowerCase();
+        const attrHeight = element.getAttribute('height');
+
+        const hasHeight = (attrHeight && parseInt(attrHeight) > 0) || 
+                          (styleAttr.includes('height') && !styleAttr.includes('height: auto') && !styleAttr.includes('height:auto'));
+
+        const childrenHaveHeight = children.some(c => {
+            const cHeight = c.getAttribute('height');
+            const cStyle = (c.getAttribute('style') || '').toLowerCase();
+            return (cHeight && parseInt(cHeight) > 0) || (cStyle.includes('height') && !cStyle.includes('auto'));
+        });
+
         const hasText = element.textContent?.trim().length || 0;
         const hasImg = element.querySelector('img');
 
-        if (!hasText && !hasImg) {
+        // Si no tiene texto, ni imagen, NI ALTURA, entonces sí es basura y se borra.
+        if (!hasText && !hasImg && !hasHeight && !childrenHaveHeight) {
             return null; 
+        }
+
+        // i es puramente un espaciador (sin texto/img pero con altura),
+        // lo mandamos directo al procesador que sabe crear bloques Spacer.
+        if (!hasText && !hasImg && hasHeight) {
+            return processCorruptStructure(element, parser, inheritedStyles);
         }
 
         let needsRescue = false;
