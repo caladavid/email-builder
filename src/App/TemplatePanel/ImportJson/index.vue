@@ -1,6 +1,6 @@
 <template class="z-50">  
   <UModal 
-      class="z-50"
+      class="z-10"
       v-model:open="open" 
       title="Importar plantilla" 
       :ui="{ 
