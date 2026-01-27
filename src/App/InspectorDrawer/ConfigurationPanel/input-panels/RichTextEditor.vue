@@ -228,6 +228,8 @@ function handleKeydown(event: KeyboardEvent) {
 // ============================================  
   
 function handleTextSelection() {  
+  saveCursorPosition();
+  
   const selection = window.getSelection(); 
   if (!selection || selection.rangeCount === 0) return;
 
@@ -480,7 +482,7 @@ function saveCursorPosition() {
   }
   
   const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0) {
+  if (!selection || selection.rangeCount === 0 || !editableDiv.value.contains(selection.anchorNode)) {
     console.log('❌ saveCursorPosition: no selection');
     return;
   }
