@@ -275,9 +275,12 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     })
   }
 
-  function loadTemplateFromParent(template: TEditorConfiguration) {
+  async function loadTemplateFromParent(template: TEditorConfiguration) {
     // Usar resetDocument para reemplazar completamente el documento actual  
     resetDocument(template);
+
+    // Convertir imágenes base64 existentes  
+    await convertAllBase64Images(template);
 
     // Abrir el inspector drawer para que el usuario vea que está en modo edición  
     inspectorDrawerOpen.value = true;
@@ -482,6 +485,24 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
       return base64Url;
     }
   }
+
+  async function convertAllBase64Images(config: TEditorConfiguration) {  
+  for (const blockId in config) {  
+    const block = config[blockId];  
+    if (block.type === 'Image' && block.data.props?.url?.startsWith('data:image/')) {  
+      const convertedUrl = await convertBase64ToService(block.data.props.url);  
+      if (convertedUrl !== block.data.props.url) {  
+        block.data.props.url = convertedUrl;  
+      }  
+    }  
+    if (block.type === 'Avatar' && block.data.props?.imageUrl?.startsWith('data:image/')) {  
+      const convertedUrl = await convertBase64ToService(block.data.props.imageUrl);  
+      if (convertedUrl !== block.data.props.imageUrl) {  
+        block.data.props.imageUrl = convertedUrl;  
+      }  
+    }  
+  }  
+}
 
   if (typeof window !== 'undefined') {  
     window.addEventListener('resize', () => {  
