@@ -433,7 +433,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
       formData.append('TOKEN', token);  
       formData.append('image', file);  
       
-      const response = await fetch('http://localhost:8080/sms_services/rest/protected/flex_email/addFileImage' , {  
+      const response = await fetch("https://services.celcom.cl/rest/protected/flex_email/addFileImage", {  
         method: "POST",  
         body: formData  
       });  
