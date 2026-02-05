@@ -460,6 +460,29 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     }  
   }
 
+  async function convertBase64ToService(base64Url: string): Promise<string> {
+    try {
+      
+      if (!base64Url.startsWith("data:image/")){
+        return base64Url;
+      }
+
+      const response = await fetch(base64Url);
+      const blob = await response.blob();
+      const file = new File([blob], 'image.png', { type: blob.type });
+
+      const serviceUrl = await uploadImage(file);
+
+      if (serviceUrl) return serviceUrl;
+
+      return base64Url;
+
+    } catch (error) {
+      console.error('❌ Error convirtiendo base64:', error);  
+      return base64Url;
+    }
+  }
+
   if (typeof window !== 'undefined') {  
     window.addEventListener('resize', () => {  
       viewportWidth.value = window.innerWidth  
@@ -505,6 +528,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     setAuthToken,
     sendZip,
     getHtmlFromDocument,
-    uploadImage
+    uploadImage,
+    convertBase64ToService
   }
 });

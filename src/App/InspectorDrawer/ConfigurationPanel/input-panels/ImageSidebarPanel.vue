@@ -92,7 +92,7 @@ import RadioGroupInput from './helpers/inputs/RadioGroupInput.vue';
 import TextDimensionInput from './helpers/inputs/TextDimensionInput.vue';
 import type { ImageProps } from '../../../../documents/blocks/Image/ImageReader.vue'; 
 import { ImagePropsSchema } from '../../../../documents/blocks/Image/ImageReader.vue'; 
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { z } from 'zod';
 import { useInspectorDrawer } from '../../../../documents/editor/editor.store';
 const file = ref<File | null>(null);
@@ -159,8 +159,33 @@ async function onFileChange(event: Event) {
         props: { ...props.data.props, url: imageUrl }  
       });  
     } else {  
-      console.error('❌ No se pudo subir la imagen');  
+      const reader = new FileReader();  
+      reader.onload = (e) => {  
+        const base64Url = e.target?.result as string;  
+        handleUpdateData({  
+          ...props.data,  
+          props: { ...props.data.props, url: base64Url }  
+        });  
+      };   
+      reader.readAsDataURL(file); 
     }  
   }  
 }
+
+watch(  
+  () => props.data.props?.url,  
+  async (newUrl) => {  
+    if (newUrl && newUrl.startsWith('data:image/')) {  
+      const convertedUrl = await inspectorDrawer.convertBase64ToService(newUrl);  
+      if (convertedUrl !== newUrl) {  
+        // Solo actualizar si cambió (servicio funcionó)  
+        handleUpdateData({  
+          ...props.data,  
+          props: { ...props.data.props, url: convertedUrl }  
+        });  
+      }  
+    }  
+  },  
+  { immediate: false }  
+);
 </script>

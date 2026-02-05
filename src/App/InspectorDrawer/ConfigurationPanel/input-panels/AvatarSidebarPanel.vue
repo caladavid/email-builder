@@ -57,6 +57,8 @@ import type { AvatarProps } from '@flyhub/email-block-avatar';
 import { AvatarPropsDefaults, AvatarPropsSchema } from '@flyhub/email-block-avatar';
 import { ref, computed } from 'vue';
 import { z } from 'zod';
+import { watch } from 'vue';
+import { useInspectorDrawer } from '../../../../documents/editor/editor.store';
 
 const file = ref<File | null>(null);
 
@@ -65,6 +67,7 @@ type AvatarSidebarPanelProps = {
 }
 
 const props = defineProps<AvatarSidebarPanelProps>()
+const inspectorDrawer = useInspectorDrawer()
 const emit = defineEmits<{
   (e: 'update:data', args: AvatarProps): void
 }>()
@@ -94,7 +97,7 @@ function handleUpdateData(data: AvatarProps) {
   }
 }
 
-function onFileChange(event: Event) {
+/* function onFileChange(event: Event) {
   const target = event.target as HTMLInputElement;
   const files = target.files
   if (files && files.length > 0) {
@@ -113,5 +116,48 @@ function onFileChange(event: Event) {
 
     reader.readAsDataURL(files[0]);
   };
+} */
+
+async function onFileChange(event: Event) {  
+  const target = event.target as HTMLInputElement;  
+  const files = target.files;  
+  if (files && files.length > 0) {  
+    const file = files[0];  
+    // Llama a tu función uploadImage (debe estar expuesta en el store)  
+    const imageUrl = await inspectorDrawer.uploadImage(file);  
+    if (imageUrl) {  
+      handleUpdateData({  
+        ...props.data,  
+        props: { ...props.data.props, imageUrl: imageUrl }  
+      });  
+    } else {  
+      const reader = new FileReader();  
+      reader.onload = (e) => {  
+        const base64Url = e.target?.result as string;  
+        handleUpdateData({  
+          ...props.data,  
+          props: { ...props.data.props, imageUrl: base64Url }  
+        });  
+      };   
+      reader.readAsDataURL(file); 
+    }  
+  }  
 }
+
+watch(  
+  () => props.data.props?.imageUrl,  
+  async (newUrl) => {  
+    if (newUrl && newUrl.startsWith('data:image/')) {  
+      const convertedUrl = await inspectorDrawer.convertBase64ToService(newUrl);  
+      if (convertedUrl !== newUrl) {  
+        // Solo actualizar si cambió (servicio funcionó)  
+        handleUpdateData({  
+          ...props.data,  
+          props: { ...props.data.props, imageUrl: convertedUrl }  
+        });  
+      }  
+    }  
+  },  
+  { immediate: false }  
+);
 </script>
