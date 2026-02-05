@@ -125,7 +125,7 @@ function handleUpdateData(data: unknown) {
   }
 }
 
-function onFileChange(event: Event){
+/* function onFileChange(event: Event){
   const target = event.target as HTMLInputElement;
   const files = target.files
   if (files && files.length > 0) {
@@ -144,5 +144,23 @@ function onFileChange(event: Event){
 
     reader.readAsDataURL(files[0]);
   };
+} */
+
+async function onFileChange(event: Event) {  
+  const target = event.target as HTMLInputElement;  
+  const files = target.files;  
+  if (files && files.length > 0) {  
+    const file = files[0];  
+    // Llama a tu función uploadImage (debe estar expuesta en el store)  
+    const imageUrl = await inspectorDrawer.uploadImage(file);  
+    if (imageUrl) {  
+      handleUpdateData({  
+        ...props.data,  
+        props: { ...props.data.props, url: imageUrl }  
+      });  
+    } else {  
+      console.error('❌ No se pudo subir la imagen');  
+    }  
+  }  
 }
 </script>

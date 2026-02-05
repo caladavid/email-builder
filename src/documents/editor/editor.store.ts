@@ -420,8 +420,10 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     }
   }
 
-    async function uploadImage(file: File) {  
+  async function uploadImage(file: File): Promise<string | null>{  
+    try {  
       const token = authToken.value;  
+
       if (!token) {  
         console.error('❌ No hay token disponible');  
         return null;  
@@ -431,22 +433,31 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
       formData.append('TOKEN', token);  
       formData.append('image', file);  
       
-      try {  
-        const response = await fetch("https://services.celcom.cl/rest/protected/flex_email/uploadImage", {  
-          method: "POST",  
-          body: formData  
-        });  
-      
-        if (!response.ok) {  
-          throw new Error(`Error HTTP: ${response.status}`);  
-        }  
-      
-        const result = await response.json();  
-        return result.imageUrl; // URL retornada por el servicio  
-      } catch (error) {  
-        console.error('❌ Error subiendo imagen:', error);  
-        return null;  
+      const response = await fetch('http://localhost:8080/sms_services/rest/protected/flex_email/addFileImage' , {  
+        method: "POST",  
+        body: formData  
+      });  
+    
+      if (!response.ok) {  
+        throw new Error(`Error HTTP: ${response.status}`);  
       }  
+    
+      const result = await response.json();  
+
+
+      if (result.response === "200") {
+        const imageUrl = result.data; // La URL viene aquí
+        console.log('✅ Imagen subida:', imageUrl);
+        return imageUrl;
+      } else {
+        console.error('❌ Error del backend:', result.message);
+        return null;
+      }
+
+    } catch (error) {  
+      console.error('❌ Error subiendo imagen:', error);  
+      return null;  
+    }  
   }
 
   if (typeof window !== 'undefined') {  
@@ -493,6 +504,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     authToken,
     setAuthToken,
     sendZip,
-    getHtmlFromDocument
+    getHtmlFromDocument,
+    uploadImage
   }
 });
