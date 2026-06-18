@@ -32,14 +32,22 @@
     </UFormField>
 
     <UFormField label="Subir imagen">
-      <UInput 
+      <UInput
         type="file"
         icon="material-symbols:imagesmode"
-        accept="image/*" 
+        accept="image/*"
         placeholder="Subir imagen"
         @change="onFileChange"
       />
     </UFormField>
+
+    <div
+      v-if="showUploadWarning"
+      class="flex items-start gap-2 rounded-md border border-yellow-400 bg-yellow-50 px-3 py-2 text-xs text-yellow-800"
+    >
+      <span class="mt-0.5">⚠️</span>
+      <span>Falta token de servicios, la imagen puede no verse en el email.</span>
+    </div>
     <MultiStylePropertyPanel
       :names="['textAlign', 'padding']"
       :model-value="data.style"
@@ -61,6 +69,7 @@ import { watch } from 'vue';
 import { useInspectorDrawer } from '../../../../documents/editor/editor.store';
 
 const file = ref<File | null>(null);
+const showUploadWarning = ref(false);
 
 type AvatarSidebarPanelProps = {
   data: AvatarProps;
@@ -130,17 +139,19 @@ async function onFileChange(event: Event) {
         ...props.data,  
         props: { ...props.data.props, imageUrl: imageUrl }  
       });  
-    } else {  
-      const reader = new FileReader();  
-      reader.onload = (e) => {  
-        const base64Url = e.target?.result as string;  
-        handleUpdateData({  
-          ...props.data,  
-          props: { ...props.data.props, imageUrl: base64Url }  
-        });  
-      };   
-      reader.readAsDataURL(file); 
-    }  
+    } else {
+      console.warn('⚠️ uploadImage falló, usando base64 como fallback. La imagen puede no verse en el email enviado.');
+      showUploadWarning.value = true;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64Url = e.target?.result as string;
+        handleUpdateData({
+          ...props.data,
+          props: { ...props.data.props, imageUrl: base64Url }
+        });
+      };
+      reader.readAsDataURL(file);
+    }
   }  
 }
 
