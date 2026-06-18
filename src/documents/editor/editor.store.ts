@@ -53,6 +53,8 @@ function saveVariablesToStorage(variables: Record<string, string>) {
   }
 }
 
+const API_BASE = import.meta.env.VITE_API_BASE ?? 'https://services.celcom.cl';
+
 export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   const document = ref<TValue['document']>(getConfiguration(typeof window !== 'undefined' ? window.location.hash : ''))
   const selectedBlockId = ref<TValue['selectedBlockId']>(null)
@@ -93,9 +95,14 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     saveVariablesToStorage(variables)
   }
 
+  // Origin del padre capturado del primer mensaje válido
+  let parentOrigin: string | null = null;
+
   // Escuchar mensajes de la aplicación padre
   const handleMessage = (event: MessageEvent) => {
     if (!isOriginAllowed(event.origin)) return;
+
+    if (!parentOrigin) parentOrigin = event.origin;
 
     const data = event.data as TReceivedMessage;
 
@@ -127,7 +134,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   // Función para enviar datos a la aplicación padre
   function sendToParent(data: TReceivedMessage) {
     if (window.parent) {
-      window.parent.postMessage(data, '*');
+      window.parent.postMessage(data, parentOrigin ?? '*');
     }
   }
   
@@ -261,23 +268,20 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
 
   async function exportHtmlAndJsonToParent() {
     const { default: renderToStaticMarkup } = await import("../../lib/email-builder/renderers/renderToStaticMarkup");
-    const { createProcessedDocument } = await import("../../utils/documentProcessor");
 
-    /* const proccessedDocument = createProcessedDocument(
-      document.value,
-      globalVariables.value
-    ) */
-
-    /* const html = await renderToStaticMarkup(proccessedDocument, { rootBlockId: 'root' }) */
-    /* const jsonContent = JSON.stringify(proccessedDocument, null, 2); */
-    const html = await renderToStaticMarkup(document.value, { rootBlockId: 'root' }) 
     const jsonContent = JSON.stringify(document.value, null, 2);
+    let html = '';
+    try {
+      html = await renderToStaticMarkup(document.value, { rootBlockId: 'root' });
+    } catch (error) {
+      console.error('❌ Error en renderToStaticMarkup:', error);
+    }
 
     sendToParent({
       type: 'htmlAndJsonResponse',
-      html: html,
+      html,
       json: jsonContent
-    })
+    });
   }
 
   async function loadTemplateFromParent(template: TEditorConfiguration) {
@@ -377,7 +381,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-      const response = await fetch("https://services.celcom.cl/rest/protected/flex_email/addFileZip", {
+      const response = await fetch(`${API_BASE}/rest/protected/flex_email/addFileZip`, {
         method: "POST",
         body: formData,
         signal: controller.signal
@@ -452,7 +456,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-      const response = await fetch("https://services.celcom.cl/rest/protected/flex_email/addFileImage", {
+      const response = await fetch(`${API_BASE}/rest/protected/flex_email/addFileImage`, {
         method: "POST",
         body: formData,
         signal: controller.signal
