@@ -120,7 +120,10 @@ export class HTMLToBlockParser {
                 ));
             }
             const htmlFile = contents.file(htmlFiles[0]);
-            const htmlContent = await (htmlFile as JSZipObject).async("string");
+            if (!htmlFile) {
+                throw new ParseError(`No se pudo leer el archivo HTML: ${htmlFiles[0]}`, 'ZIP_ERROR');
+            }
+            const htmlContent = await htmlFile.async("string");
 
             const parseResult = await this.parseHtmlToBlocksWithErrors(htmlContent);
             console.log("🕵️ JSON FINAL DEL ZIP:", JSON.parse(JSON.stringify(parseResult.configuration)));

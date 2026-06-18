@@ -120,6 +120,10 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     window.removeEventListener('resize', handleResize);
   });
 
+  if (window.parent !== window) {
+    window.parent.postMessage({ type: 'iframeReady' }, '*');
+  }
+
   // Función para enviar datos a la aplicación padre
   function sendToParent(data: TReceivedMessage) {
     if (window.parent) {
@@ -370,20 +374,28 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
       formData.append('TOKEN', token)
       formData.append('file', file);
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
       const response = await fetch("https://services.celcom.cl/rest/protected/flex_email/addFileZip", {
         method: "POST",
-        body: formData
+        body: formData,
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
 
       if (!response.ok){
-        throw new Error(`Error HTTP: ${response.status}`);  
+        throw new Error(`Error HTTP: ${response.status}`);
       }
 
       const result = await response.json();
 
-      if (result.response === "200") {  
-        // Cargar el template procesado en el editor  
+      if (result.response === "200") {
         let htmlContent = result.data;
+        if (!htmlContent || typeof htmlContent !== 'string') {
+          console.error('❌ Respuesta inválida del servidor ZIP: data vacío');
+          return;
+        }
 
         // 1. FIX: Corregir etiquetas <img src="..."> (Tu solución)
         htmlContent = htmlContent.replace(/src="images\/(https?:\/\/)/g, 'src="$1');
@@ -433,24 +445,32 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
         return null;  
       }  
       
-      const formData = new FormData();  
-      formData.append('TOKEN', token);  
-      formData.append('image', file);  
-      
-      const response = await fetch("https://services.celcom.cl/rest/protected/flex_email/addFileImage", {  
-        method: "POST",  
-        body: formData  
-      });  
-    
-      if (!response.ok) {  
-        throw new Error(`Error HTTP: ${response.status}`);  
-      }  
-    
-      const result = await response.json();  
+      const formData = new FormData();
+      formData.append('TOKEN', token);
+      formData.append('image', file);
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+      const response = await fetch("https://services.celcom.cl/rest/protected/flex_email/addFileImage", {
+        method: "POST",
+        body: formData,
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`Error HTTP: ${response.status}`);
+      }
+
+      const result = await response.json();
 
       if (result.response === "200") {
-        const imageUrl = result.data; // La URL viene aquí
+        const imageUrl = result.data;
+        if (!imageUrl || typeof imageUrl !== 'string') {
+          console.error('❌ Respuesta inválida del servidor imagen: data vacío');
+          return null;
+        }
         console.log('✅ Imagen subida:', imageUrl);
         return imageUrl;
       } else {

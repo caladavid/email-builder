@@ -21,12 +21,6 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (id.includes('vue') || id.includes('pinia')) return 'vendor-vue';
-            if (id.includes('@nuxt/ui') || id.includes('@headlessui') || id.includes('reka-ui')) return 'vendor-ui';
-            if (id.includes('dompurify')) return 'vendor-security';
-            return 'vendor';
-          }
           if (id.includes('HTMLToBlockParser') || id.includes('matchers') || id.includes('CSSParser')) return 'parser';
         }
       }
