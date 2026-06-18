@@ -202,7 +202,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   }
 
   async function getHtmlFromDocument(): Promise<string> {
-    const { renderToStaticMarkup } = await import("@flyhub/email-builder");
+    const { default: renderToStaticMarkup } = await import("../../lib/email-builder/renderers/renderToStaticMarkup");
     const { createProcessedDocument } = await import("../../utils/documentProcessor");
 
     const proccessedDocument = createProcessedDocument(
@@ -255,7 +255,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   }
 
   async function exportHtmlAndJsonToParent() {
-    const { renderToStaticMarkup } = await import("@flyhub/email-builder");
+    const { default: renderToStaticMarkup } = await import("../../lib/email-builder/renderers/renderToStaticMarkup");
     const { createProcessedDocument } = await import("../../utils/documentProcessor");
 
     /* const proccessedDocument = createProcessedDocument(

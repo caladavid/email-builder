@@ -35,8 +35,10 @@ const instance = computed(() => {
   if (!block) return undefined;
 
   // @ts-expect-error Element implicitly has an 'any'
-  // FIXME: create function which converts into key: value
-  return READER_DICTIONARY[block.type].Component;
+  const entry = READER_DICTIONARY[block.type];
+  if (!entry) return undefined;
+
+  return entry.Component;
 })
 
 const data = computed(() => {

@@ -11,6 +11,6 @@ import type { ContainerProps } from './ContainerPropsSchema';
 import { computed, type CSSProperties } from 'vue';
 
 const props = defineProps<ContainerProps>();
-const childrenIds = computed(() => props.props?.childrenIds ?? []);
+const childrenIds = computed(() => props.props?.childrenIds ?? (props as any).childrenIds ?? []);
 
 </script>

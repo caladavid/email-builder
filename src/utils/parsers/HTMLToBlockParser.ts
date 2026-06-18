@@ -123,6 +123,7 @@ export class HTMLToBlockParser {
             const htmlContent = await (htmlFile as JSZipObject).async("string");
 
             const parseResult = await this.parseHtmlToBlocksWithErrors(htmlContent);
+            console.log("🕵️ JSON FINAL DEL ZIP:", JSON.parse(JSON.stringify(parseResult.configuration)));
             errors.push(...parseResult.errors);
             warnings.push(...parseResult.warnings);
 
@@ -2409,9 +2410,8 @@ export class HTMLToBlockParser {
                     justifyContent: styles.justifyContent || 'flex-start',
                     alignItems: styles.alignItems || 'stretch',
                     padding: { top: 0, bottom: 0, left: 0, right: 0 },
-
                 },
-                childrenIds
+                props: { childrenIds }
             }
         };
         return id;
@@ -2516,7 +2516,7 @@ export class HTMLToBlockParser {
                     gap: styles.gap || '16px',
                     padding: { top: 0, bottom: 0, left: 0, right: 0 }
                 },
-                childrenIds
+                props: { childrenIds }
             }
         };
         return id;
