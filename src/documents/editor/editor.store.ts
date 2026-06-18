@@ -5,7 +5,7 @@ import { isOriginAllowed } from "../../utils/allowedOrigins";
 import { HTMLToBlockParser } from "../../utils/parsers/HTMLToBlockParser";
 import type { TEditorConfiguration } from "./core";
 import { defineStore } from "pinia";
-import { computed, nextTick, ref, render } from "vue";
+import { computed, nextTick, onScopeDispose, ref, render } from "vue";
 
 // Nuevos tipos para los mensajes recibidos
 type TReceivedMessage = {
@@ -94,30 +94,31 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   }
 
   // Escuchar mensajes de la aplicación padre
-  if (typeof window !== 'undefined') {
-    window.addEventListener('message', (event) => {
-      // Verificar origen por seguridad
-      /* if (event.origin !== 'http://localhost:3000' && event.origin !== 'http://email-builder.multinetlabs.com/' && event.origin !== "http://localhost:5173") return // Tu app principal */
+  const handleMessage = (event: MessageEvent) => {
+    if (!isOriginAllowed(event.origin)) return;
 
-      if (!isOriginAllowed(event.origin)) {
-        return;
+    const data = event.data as TReceivedMessage;
+
+    if (data.type === 'loadDocument') {
+      if (data.document) {
+        resetDocument(data.document);
       }
-
-      const data = event.data as TReceivedMessage; // Casteo de tipo
-
-      // Manejar diferentes tipos de mensajes
-      if (data.type === 'loadDocument') {
-        if (data.document) {
-          resetDocument(data.document);
-        }
-        if (data.variables) {
-          receivedVariables.value = data.variables;
-          // Muestra las variables en la consola para verificar que se recibieron
-          console.log('Variables recibidas desde la app principal:', data.variables);
-        }
+      if (data.variables) {
+        receivedVariables.value = data.variables;
+        console.log('Variables recibidas desde la app principal:', data.variables);
       }
-    })
-  }
+    }
+  };
+
+  const handleResize = () => { viewportWidth.value = window.innerWidth; };
+
+  window.addEventListener('message', handleMessage);
+  window.addEventListener('resize', handleResize);
+
+  onScopeDispose(() => {
+    window.removeEventListener('message', handleMessage);
+    window.removeEventListener('resize', handleResize);
+  });
 
   // Función para enviar datos a la aplicación padre
   function sendToParent(data: TReceivedMessage) {
@@ -486,29 +487,35 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     }
   }
 
-  async function convertAllBase64Images(config: TEditorConfiguration) {  
-  for (const blockId in config) {  
-    const block = config[blockId];  
-    if (block.type === 'Image' && block.data.props?.url?.startsWith('data:image/')) {  
-      const convertedUrl = await convertBase64ToService(block.data.props.url);  
-      if (convertedUrl !== block.data.props.url) {  
-        block.data.props.url = convertedUrl;  
-      }  
-    }  
-    if (block.type === 'Avatar' && block.data.props?.imageUrl?.startsWith('data:image/')) {  
-      const convertedUrl = await convertBase64ToService(block.data.props.imageUrl);  
-      if (convertedUrl !== block.data.props.imageUrl) {  
-        block.data.props.imageUrl = convertedUrl;  
-      }  
-    }  
-  }  
-}
+  async function convertAllBase64Images(config: TEditorConfiguration) {
+    const conversions: Promise<void>[] = [];
 
-  if (typeof window !== 'undefined') {  
-    window.addEventListener('resize', () => {  
-      viewportWidth.value = window.innerWidth  
-    })  
-  }  
+    for (const blockId in config) {
+      const block = config[blockId];
+
+      if (block.type === 'Image' && block.data.props?.url?.startsWith('data:image/')) {
+        conversions.push(
+          convertBase64ToService(block.data.props.url).then(convertedUrl => {
+            if (convertedUrl !== block.data.props.url) {
+              block.data.props.url = convertedUrl;
+            }
+          })
+        );
+      }
+
+      if (block.type === 'Avatar' && block.data.props?.imageUrl?.startsWith('data:image/')) {
+        conversions.push(
+          convertBase64ToService(block.data.props.imageUrl).then(convertedUrl => {
+            if (convertedUrl !== block.data.props.imageUrl) {
+              block.data.props.imageUrl = convertedUrl;
+            }
+          })
+        );
+      }
+    }
+
+    await Promise.all(conversions);
+  }
 
   return {
     document,

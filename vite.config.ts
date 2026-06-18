@@ -9,12 +9,26 @@ export default defineConfig({
   plugins: [vue(), tailwindcss(), ui(), vueJsx()],
   server: {
     proxy: {
-      // Cuando hagas fetch a '/api-zip', Vite lo redirigirá
       '/api-zip': {
         target: 'https://services.celcom.cl/rest/protected/flex_email/addFileZip',
         changeOrigin: true,
-        secure: false, // Útil si el certificado SSL da problemas en local
+        secure: false,
         rewrite: (path) => path.replace(/^\/api-zip/, '')
+      }
+    }
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('vue') || id.includes('pinia')) return 'vendor-vue';
+            if (id.includes('@nuxt/ui') || id.includes('@headlessui') || id.includes('reka-ui')) return 'vendor-ui';
+            if (id.includes('dompurify')) return 'vendor-security';
+            return 'vendor';
+          }
+          if (id.includes('HTMLToBlockParser') || id.includes('matchers') || id.includes('CSSParser')) return 'parser';
+        }
       }
     }
   }
