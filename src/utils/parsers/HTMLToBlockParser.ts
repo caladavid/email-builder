@@ -42,7 +42,7 @@ export class HTMLToBlockParser {
     public useLegacyMode: boolean = false;
 
     private matchers: BlockMatcher[] = [
-        /* ScriptMatcher, */
+        ScriptMatcher,
         ButtonMatcher,
         ImageMatcher,
         InlineIconsMatcher,

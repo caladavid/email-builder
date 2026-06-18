@@ -1,7 +1,7 @@
 <template>  
   <BaseSidebarPanel title="Rich Text Link block">  
     <UFormField label="Content">  
-      <div class="content-preview" v-html="data.props?.content ?? 'No content'" />  
+      <div class="content-preview" v-html="safeContent" />  
     </UFormField>  
   
     <MultiStylePropertyPanel  
@@ -13,23 +13,26 @@
 </template>  
   
 <script setup lang="ts">  
-import BaseSidebarPanel from './helpers/BaseSidebarPanel.vue';  
-import MultiStylePropertyPanel from './helpers/style-inputs/MultiStylePropertyPanel.vue';  
-import type { RichTextLinkProps } from '../../../../documents/blocks/RichTextLink/RichTextLinkPropsSchema';  
-import RichTextLinkPropsSchema from '../../../../documents/blocks/RichTextLink/RichTextLinkPropsSchema';  
-import { ref } from 'vue';  
+import BaseSidebarPanel from './helpers/BaseSidebarPanel.vue';
+import MultiStylePropertyPanel from './helpers/style-inputs/MultiStylePropertyPanel.vue';
+import type { RichTextLinkProps } from '../../../../documents/blocks/RichTextLink/RichTextLinkPropsSchema';
+import RichTextLinkPropsSchema from '../../../../documents/blocks/RichTextLink/RichTextLinkPropsSchema';
+import { ref, computed } from 'vue';
+import DOMPurify from 'dompurify';  
   
 type RichTextLinkSidebarPanelProps = {  
   data: RichTextLinkProps;  
 }  
   
-const props = defineProps<RichTextLinkSidebarPanelProps>();  
-  
-const emit = defineEmits<{  
-  (e: 'update:data', args: RichTextLinkProps): void  
-}>();  
-  
-const errors = ref<Zod.ZodError | null>(null);  
+const props = defineProps<RichTextLinkSidebarPanelProps>();
+
+const emit = defineEmits<{
+  (e: 'update:data', args: RichTextLinkProps): void
+}>();
+
+const errors = ref<Zod.ZodError | null>(null);
+
+const safeContent = computed(() => DOMPurify.sanitize(props.data.props?.content ?? 'No content'));  
   
 function handleUpdateData(data: unknown) {  
   const res = RichTextLinkPropsSchema.safeParse(data);  

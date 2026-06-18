@@ -9,6 +9,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { getFontFamily, getPadding } from '@flyhub/email-core';
+import DOMPurify from 'dompurify';
 
 // 1. Definición de Tipos basada en tu Schema Zod
 type TextProps = {
@@ -62,7 +63,7 @@ const renderedContent = computed(() => {
 
   // Si no es markdown, devolvemos el texto (o HTML si tu editor guarda HTML)
   if (!props.props?.markdown) {
-    return rawText;
+    return DOMPurify.sanitize(rawText);
   }
 
   // Si es Markdown, aplicamos un parser simple

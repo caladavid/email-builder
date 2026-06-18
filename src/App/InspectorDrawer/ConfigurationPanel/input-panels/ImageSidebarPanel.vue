@@ -40,6 +40,7 @@
         placeholder="Subir imagen"
         @change="onFileChange"
       />
+      <p v-if="uploadError" class="text-red-500 text-xs mt-1">{{ uploadError }}</p>
     </UFormField>
 
     <div
@@ -103,8 +104,12 @@ import { ImagePropsSchema } from '../../../../documents/blocks/Image/ImageReader
 import { ref, watch } from 'vue';
 import { z } from 'zod';
 import { useInspectorDrawer } from '../../../../documents/editor/editor.store';
-const file = ref<File | null>(null)
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
+
+const file = ref<File | null>(null);
 const showUploadWarning = ref(false);
+const uploadError = ref<string | null>(null);
 
 type ImageSidebarPanelProps = {
   data: ImageProps
@@ -134,53 +139,44 @@ function handleUpdateData(data: unknown) {
   }
 }
 
-/* function onFileChange(event: Event){
+async function onFileChange(event: Event) {
   const target = event.target as HTMLInputElement;
-  const files = target.files
-  if (files && files.length > 0) {
-    file.value = files[0];
+  const files = target.files;
+  if (!files || files.length === 0) return;
 
+  const selectedFile = files[0];
+  uploadError.value = null;
+
+  if (!ALLOWED_IMAGE_TYPES.includes(selectedFile.type)) {
+    uploadError.value = 'Tipo de archivo no permitido. Use JPG, PNG, GIF, WebP o SVG.';
+    target.value = '';
+    return;
+  }
+  if (selectedFile.size > MAX_IMAGE_SIZE) {
+    uploadError.value = 'El archivo supera el límite de 10MB.';
+    target.value = '';
+    return;
+  }
+
+  const imageUrl = await inspectorDrawer.uploadImage(selectedFile);
+  if (imageUrl) {
+    handleUpdateData({
+      ...props.data,
+      props: { ...props.data.props, url: imageUrl }
+    });
+  } else {
+    console.warn('⚠️ uploadImage falló, usando base64 como fallback. La imagen puede no verse en el email enviado.');
+    showUploadWarning.value = true;
     const reader = new FileReader();
     reader.onload = (e) => {
       const base64Url = e.target?.result as string;
-
-
       handleUpdateData({
         ...props.data,
-        props: { ...props.data.props, url: base64Url}
+        props: { ...props.data.props, url: base64Url }
       });
     };
-
-    reader.readAsDataURL(files[0]);
-  };
-} */
-
-async function onFileChange(event: Event) {  
-  const target = event.target as HTMLInputElement;  
-  const files = target.files;  
-  if (files && files.length > 0) {  
-    const file = files[0];  
-    // Llama a tu función uploadImage (debe estar expuesta en el store)  
-    const imageUrl = await inspectorDrawer.uploadImage(file);  
-    if (imageUrl) {  
-      handleUpdateData({  
-        ...props.data,  
-        props: { ...props.data.props, url: imageUrl }  
-      });  
-    } else {
-      console.warn('⚠️ uploadImage falló, usando base64 como fallback. La imagen puede no verse en el email enviado.');
-      showUploadWarning.value = true;
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const base64Url = e.target?.result as string;
-        handleUpdateData({
-          ...props.data,
-          props: { ...props.data.props, url: base64Url }
-        });
-      };
-      reader.readAsDataURL(file);
-    }
-  }  
+    reader.readAsDataURL(selectedFile);
+  }
 }
 
 watch(  

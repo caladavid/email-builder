@@ -37,8 +37,10 @@
   "dependencies": {
     "@flyhub/email-builder": "^0.0.5",
     "@nuxt/ui": "^3.1.0",
+    "@types/dompurify": "^3.0.5",
     "@vitejs/plugin-vue": "^5.2.3",
     "@vitejs/plugin-vue-jsx": "^4.1.2",
+    "dompurify": "^3.4.11",
     "highlight.js": "^11.11.1",
     "jszip": "^3.10.1",
     "juice": "^11.1.0",
