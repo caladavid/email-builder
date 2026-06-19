@@ -24,6 +24,7 @@ import { LayoutTableMatcher } from "./matchers/LayoutTableMatcher";
 import { ComparisonSystem } from "./ComparisonSystem";
 import { CriticalLogger } from "./CriticalLogger";
 import { HeadingMatcher } from "./matchers/HeadingMatcher";
+import { sanitizeBlocks, type SourceHtmlMap } from "./blockSanitizer";
 
 export class HTMLToBlockParser {
 
@@ -31,6 +32,7 @@ export class HTMLToBlockParser {
     private fontMap: Map<string, { url: string; format: string }> = new Map();
     private mediaMap: Map<string, string> = new Map();
     public blocks: Record<string, any> = {};
+    public sourceHtmlMap: SourceHtmlMap = new Map();
     private mobileStylesMap: Map<string, any> = new Map();
     private childrenIds: string[] = [];
     public processedElements: WeakSet<Element> = new WeakSet();
@@ -577,6 +579,7 @@ export class HTMLToBlockParser {
 
             // 6. Generación de Bloques
             this.blocks = {};
+            this.sourceHtmlMap = new Map();
             this.childrenIds = [];
             this.processedElements = new WeakSet();
 
@@ -1008,6 +1011,7 @@ export class HTMLToBlockParser {
         if (this.isSeparator(element, currentStyles)) {
             const id = uuidv4();
             this.blocks[id] = { type: "Separator", data: { style: currentStyles } };
+            this.sourceHtmlMap.set(id, element.outerHTML);
             return id;
         }
 
@@ -3257,6 +3261,11 @@ export class HTMLToBlockParser {
             }
         });
 
+        const { blocks: sanitizedBlocks, remapped } = sanitizeBlocks(this.blocks, this.sourceHtmlMap);
+        if (remapped.length > 0) {
+            console.warn('⚠️ blockSanitizer remapped:', remapped);
+        }
+
         const config = {
             [rootId]: {
                 type: "EmailLayout" as const,
@@ -3268,8 +3277,8 @@ export class HTMLToBlockParser {
                     childrenIds: this.childrenIds
                 }
             },
-            ...this.blocks
-        } as unknown as TEditorConfiguration;;
+            ...sanitizedBlocks
+        } as unknown as TEditorConfiguration;
 
         const validation = EditorConfigurationSchema.safeParse(config);
         if (!validation.success) {
