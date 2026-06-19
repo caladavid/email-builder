@@ -154,10 +154,27 @@ export class HTMLToBlockParser {
     private cleanHtml(htmlContent: string): string {
         let cleaned = htmlContent;
 
-        // Eliminar Comentarios de IE/Outlook viejos
-        cleaned = cleaned.replace(/<!-- \[if[\s\S]*?endif\] -->/gi, "");
-        const msoRegex = new RegExp("", "gi");
-        cleaned = cleaned.replace(msoRegex, "");
+        // Eliminar comentarios condicionales de IE/Outlook (MSO).
+        // El orden importa: primero DESENVOLVEMOS los bloques "downlevel-revealed"
+        // (contenido visible para clientes modernos, p.ej. el <a> de un bulletproof
+        // button) conservando su interior; recién después borramos los bloques
+        // "downlevel-hidden" (fallbacks VML solo-Outlook) completos.
+        // Variantes cubiertas (cualquier condición [if ...], con o sin espacios):
+        //   revealed:        <!--[if !mso]><!-->  ...  <!--<![endif]-->
+        //   revealed legacy: <![if !mso]>         ...  <![endif]>
+        //   hidden:          <!--[if mso]>        ...  <![endif]-->
+        //   hidden:          <!--[if gte mso 9]>  ...  <![endif]-->
+        cleaned = cleaned
+            // apertura revealed: <!--[if ...]><!--> (tolera espacios en el truco <!-->)
+            .replace(/<!--\[if[^\]]*?\]>\s*<!--\s*>/gi, "")
+            // cierre revealed:   <!--<![endif]-->
+            .replace(/<!--\s*<!\[endif\]\s*-->/gi, "")
+            // apertura revealed legacy (sin comentario): <![if ...]>
+            .replace(/<!\[if[^\]]*?\]>/gi, "")
+            // cierre revealed legacy: <![endif]>
+            .replace(/<!\[endif\]>/gi, "");
+        // hidden (solo-Outlook): borrar el bloque condicional completo.
+        cleaned = cleaned.replace(/<!--\[if[\s\S]*?<!\[endif\]\s*-->/gi, "");
 
         // a. Si hay <tbody ...><tbody ...>, quitamos el segundo apertura
         cleaned = cleaned.replace(/(<tbody[^>]*>)\s*<tbody[^>]*>/gi, "$1");
@@ -926,14 +943,22 @@ export class HTMLToBlockParser {
             return matcherResult.id;
         }
         
-        // 4. Fallback: Si los Matchers fallaron, usamos Legacy para no dejar huecos
-        // (A menos que queramos ser estrictos, pero por ahora es seguro dejarlo)
-        const fallbackId = this.processElementLegacy(element, inheritedStyles);
-        if (fallbackId) {
+        // 4. Fallback: Matchers fallaron → preservar HTML original intacto
+        const rawIgnored = ['br', 'script', 'style', 'meta', 'title', 'link', 'thead', 'tbody', 'tfoot', 'tr'];
+        if (!rawIgnored.includes(tagName)) {
+            const id = uuidv4();
+            this.blocks[id] = {
+                type: 'Html',
+                data: {
+                    props: { contents: element.outerHTML },
+                    style: { padding: { top: 0, bottom: 0, left: 0, right: 0 }, backgroundColor: null }
+                }
+            };
+            this.sourceHtmlMap.set(id, element.outerHTML);
             this.processedElements.add(element);
-            return fallbackId;
+            return id;
         }
-        
+
         // 5. Nada funcionó
         CriticalLogger.warning(`Elemento no procesado: <${tagName}>`, element);
         return null;
@@ -1063,7 +1088,7 @@ export class HTMLToBlockParser {
             this.blocks[id] = {
                 type: "Html",
                 data: {
-                    props: { content: element.outerHTML },
+                    props: { contents: element.outerHTML },
                     style: { padding: { top: 0, bottom: 0, left: 0, right: 0 }, backgroundColor: null }
                 }
             };
