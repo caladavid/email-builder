@@ -16,6 +16,26 @@ export const CANVAS_BRIDGE_CODE = `
   var prevSelOutlineOffset = '';
   var _internalDragEl = null;
 
+  // Walk up to data-block-type; if not found, use the clicked element directly
+  // (imported templates have no data-block-type so we allow individual element selection)
+  function findBlockEl(el) {
+    var cur = el;
+    while (cur && cur !== document.body && !cur.getAttribute('data-block-type')) {
+      cur = cur.parentElement;
+    }
+    if (cur && cur !== document.body && cur !== document.documentElement) {
+      console.debug('[bridge] findBlockEl: data-block-type', cur.tagName, cur.getAttribute('data-block-type'));
+      return cur;
+    }
+    // No data-block-type — select the clicked element itself (skip ignored tags)
+    var target = el;
+    while (target && (IGNORE_TAGS.has(target.tagName) || target === document.body || target === document.documentElement)) {
+      target = target.parentElement;
+    }
+    console.debug('[bridge] findBlockEl: fallback direct', target ? target.tagName : 'null', target ? (target.className || target.id || '') : '');
+    return target || null;
+  }
+
   function getElementPath(el) {
     if (!el || el === document.body) return 'body';
     var parts = [];
@@ -98,14 +118,18 @@ export const CANVAS_BRIDGE_CODE = `
 
   function selectElement(el) {
     if (!el) return;
-    // clear previous selection
+    console.debug('[bridge] selectElement:', el.tagName, '| data-block-type:', el.getAttribute('data-block-type'), '| depth from body:', (function(e){var d=0;while(e&&e!==document.body){d++;e=e.parentElement;}return d;})(el));
+    // clear previous selection — always restore to empty, never back to a saved blue outline
     if (selectedEl && selectedEl !== el) {
-      clearOutline(selectedEl, prevSelOutline, prevSelOutlineOffset);
+      clearOutline(selectedEl, '', '');
       try { selectedEl.removeAttribute('draggable'); } catch(err) {}
     }
-    prevSelOutline = el.style.outline.includes('dashed') ? '' : (el.style.outline || '');
-    prevSelOutlineOffset = el.style.outlineOffset || '';
+    prevSelOutline = '';
+    prevSelOutlineOffset = '';
     selectedEl = el;
+    // Clear any hover outlines left on child elements
+    var staleHovers = el.querySelectorAll('[style*="outline"]');
+    for (var si = 0; si < staleHovers.length; si++) { staleHovers[si].style.outline = ''; }
     try { el.setAttribute('draggable', 'true'); } catch(err) {}
     el.style.outline = '2px solid rgba(0,121,204,1)';
     el.style.outlineOffset = '-1px';
@@ -146,6 +170,7 @@ export const CANVAS_BRIDGE_CODE = `
     var el = e.target;
     if (!el || IGNORE_TAGS.has(el.tagName)) return;
     if (el === selectedEl || el === editingEl) return;
+    if (selectedEl && selectedEl.contains(el)) return;
     if (hoveredEl && hoveredEl !== selectedEl && hoveredEl !== editingEl) {
       if (hoveredEl.style.outline.includes('dashed')) {
         hoveredEl.style.outline = prevHoverOutline || '';
@@ -166,33 +191,32 @@ export const CANVAS_BRIDGE_CODE = `
     }
   }, true);
 
-  // CLICK → SELECT
+  // CLICK → SELECT (walk up to block root, fallback to direct body child for imported templates)
   document.addEventListener('click', function (e) {
     var el = e.target;
     if (!el || IGNORE_TAGS.has(el.tagName)) return;
-    if (editingEl && !editingEl.contains(el)) {
-      exitEditing();
+    if (editingEl) {
+      if (!editingEl.contains(el)) {
+        exitEditing();
+      } else {
+        return; // click inside editing element → just move cursor, no re-select
+      }
     }
     e.stopPropagation();
-    selectElement(el);
+    var block = findBlockEl(el);
+    if (!block) return;
+    selectElement(block);
+    // For imported templates (no data-block-type), auto-enter edit mode on click for text elements
+    if (!block.getAttribute('data-block-type') && !NON_EDITABLE_TAGS.has(block.tagName) && !editingEl) {
+      editingEl = block;
+      try { block.removeAttribute('draggable'); } catch(err) {}
+      block.contentEditable = 'true';
+      block.focus();
+      var er2 = block.getBoundingClientRect();
+      parent.postMessage({ type: 'editing-start', path: getElementPath(block), rect: { top: er2.top + window.scrollY, left: er2.left + window.scrollX, width: er2.width, height: er2.height } }, '*');
+    }
   }, true);
 
-  // DBLCLICK → INLINE EDIT (allow any non-structural, non-media element)
-  document.addEventListener('dblclick', function (e) {
-    var el = e.target;
-    if (!el || IGNORE_TAGS.has(el.tagName)) return;
-    if (NON_EDITABLE_TAGS.has(el.tagName)) return;
-    e.stopPropagation();
-    if (editingEl && editingEl !== el) exitEditing();
-    editingEl = el;
-    try { el.removeAttribute('draggable'); } catch(err) {}
-    el.contentEditable = 'true';
-    el.style.outline = '2px solid rgba(0,200,100,1)';
-    el.style.outlineOffset = '-1px';
-    el.focus();
-    var editRect = el.getBoundingClientRect();
-    parent.postMessage({ type: 'editing-start', path: getElementPath(el), rect: { top: editRect.top + window.scrollY, left: editRect.left + window.scrollX, width: editRect.width, height: editRect.height } }, '*');
-  }, true);
 
   function exitEditing() {
     if (!editingEl) return;
@@ -200,11 +224,13 @@ export const CANVAS_BRIDGE_CODE = `
     editingEl = null;
     exiting.contentEditable = 'false';
     exiting.blur();
-    exiting.style.outline = '';
-    exiting.style.outlineOffset = '';
     notifyDomChanged();
     parent.postMessage({ type: 'editing-end' }, '*');
-    selectElement(exiting);
+    // Re-select to restore blue outline (exitEditing may have cleared it)
+    if (exiting === selectedEl) {
+      exiting.style.outline = '2px solid rgba(0,121,204,1)';
+      exiting.style.outlineOffset = '-1px';
+    }
   }
 
   document.addEventListener('keydown', function (e) {
@@ -218,6 +244,19 @@ export const CANVAS_BRIDGE_CODE = `
       selectedEl = null;
       parent.postMessage({ type: 'deselect' }, '*');
     }
+  }, true);
+
+  // Forward keyboard shortcuts to parent (iframe captures focus, parent never sees keydown)
+  document.addEventListener('keydown', function(e) {
+    if (editingEl) return;
+    var fwd = false;
+    if (e.ctrlKey) fwd = true;
+    if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) fwd = true;
+    if (!e.ctrlKey && !e.altKey && (e.key === 'Delete' || e.key === 'Backspace') && selectedEl) fwd = true;
+    if (!fwd) return;
+    e.preventDefault();
+    e.stopPropagation();
+    parent.postMessage({ type: 'keydown', key: e.key, ctrlKey: !!e.ctrlKey, shiftKey: !!e.shiftKey, altKey: !!e.altKey }, '*');
   }, true);
 
   // COMMANDS FROM PARENT
@@ -385,6 +424,22 @@ export const CANVAS_BRIDGE_CODE = `
         parent.postMessage({ type: 'html-response', html: document.documentElement.outerHTML }, '*');
         break;
 
+      case 'get-outerhtml':
+        if (target) parent.postMessage({ type: 'outerhtml-response', html: target.outerHTML }, '*');
+        break;
+
+      case 'replace-html': {
+        var rWrapper = document.createElement('div');
+        rWrapper.innerHTML = cmd.html || '';
+        var rNewEl = rWrapper.firstElementChild;
+        if (rNewEl && target && target.parentElement) {
+          target.parentElement.replaceChild(rNewEl, target);
+          notifyDomChanged();
+          selectElement(rNewEl);
+        }
+        break;
+      }
+
       case 'get-tree': {
         function buildNode(el) {
           if (!el || el.nodeType !== 1) return null;
@@ -414,6 +469,15 @@ export const CANVAS_BRIDGE_CODE = `
         break;
 
       case 'exec-command':
+        // Auto-enter edit mode so format commands work without double-click
+        if (!editingEl && target && !NON_EDITABLE_TAGS.has(target.tagName)) {
+          editingEl = target;
+          try { target.removeAttribute('draggable'); } catch(err) {}
+          target.contentEditable = 'true';
+          target.focus();
+          var er = target.getBoundingClientRect();
+          parent.postMessage({ type: 'editing-start', path: getElementPath(target), rect: { top: er.top + window.scrollY, left: er.left + window.scrollX, width: er.width, height: er.height } }, '*');
+        }
         try { document.execCommand(cmd.command, false, cmd.value || null); } catch(err) {}
         notifyDomChanged();
         break;
@@ -427,23 +491,52 @@ export const CANVAS_BRIDGE_CODE = `
   // ── Drag-drop (palette external + internal canvas reorder) ───────────────
   var dropIndicator = null;
   var dropTarget = null;
+  var _dropPosition = 'after';
   var _rafId = null;
   var _dragleaveTimer = null;
+  var _placeholderHighlighted = null;
 
   function removeDropIndicator() {
-    if (dropIndicator && dropIndicator.parentElement) dropIndicator.parentElement.removeChild(dropIndicator);
+    if (dropIndicator) {
+      if (dropIndicator.parentElement) dropIndicator.parentElement.removeChild(dropIndicator);
+      dropIndicator = null;
+    }
+  }
+
+  function highlightPlaceholderForDrop(el) {
+    if (_placeholderHighlighted === el) return;
+    clearPlaceholderHighlight();
+    _placeholderHighlighted = el;
+    el.__dragOrigBorder = el.style.border;
+    el.__dragOrigBg = el.style.background;
+    el.style.border = '2px solid #0045B0';
+    el.style.background = 'rgba(0,69,176,0.10)';
+  }
+
+  function clearPlaceholderHighlight() {
+    if (!_placeholderHighlighted) return;
+    _placeholderHighlighted.style.border = _placeholderHighlighted.__dragOrigBorder || '';
+    _placeholderHighlighted.style.background = _placeholderHighlighted.__dragOrigBg || '';
+    _placeholderHighlighted = null;
   }
 
   function createDropIndicator() {
     var el = document.createElement('div');
     el.id = '__drop-indicator__';
-    // Thin line so layout shift is minimal (3px vs 38px), label floats above via absolute
-    el.style.cssText = 'position:relative;height:3px;background:#0045B0;box-shadow:0 0 8px rgba(0,69,176,0.5);border-radius:2px;pointer-events:none;box-sizing:border-box;overflow:visible;z-index:9999;';
-    var lbl = document.createElement('div');
-    lbl.style.cssText = 'position:absolute;left:50%;transform:translateX(-50%);top:-24px;background:#0045B0;color:white;font-size:10px;font-weight:700;font-family:sans-serif;padding:2px 12px;border-radius:4px 4px 0 0;white-space:nowrap;pointer-events:none;';
-    lbl.textContent = '⬇ Soltar aquí';
-    el.appendChild(lbl);
+    el.style.cssText = 'position:fixed;pointer-events:none;z-index:9999;box-sizing:border-box;border:2px dashed rgba(0,69,176,0.55);border-radius:8px;background:rgba(0,69,176,0.05);';
+    document.body.appendChild(el);
     return el;
+  }
+
+  function positionDropIndicator(refEl, pos) {
+    if (!dropIndicator) return;
+    var rect = refEl.getBoundingClientRect();
+    var h = Math.min(Math.max(rect.height, 40), 60);
+    var y = pos === 'before' ? rect.top - h - 4 : rect.bottom + 4;
+    dropIndicator.style.left = rect.left + 'px';
+    dropIndicator.style.width = rect.width + 'px';
+    dropIndicator.style.top = y + 'px';
+    dropIndicator.style.height = h + 'px';
   }
 
   document.addEventListener('dragstart', function(e) {
@@ -459,6 +552,7 @@ export const CANVAS_BRIDGE_CODE = `
   document.addEventListener('dragend', function(e) {
     _internalDragEl = null;
     removeDropIndicator();
+    clearPlaceholderHighlight();
     if (_rafId) { cancelAnimationFrame(_rafId); _rafId = null; }
     if (_dragleaveTimer) { clearTimeout(_dragleaveTimer); _dragleaveTimer = null; }
     dropTarget = null;
@@ -475,6 +569,7 @@ export const CANVAS_BRIDGE_CODE = `
       if (_dragleaveTimer) clearTimeout(_dragleaveTimer);
       _dragleaveTimer = setTimeout(function() {
         removeDropIndicator();
+        clearPlaceholderHighlight();
         dropTarget = null;
         _dragleaveTimer = null;
       }, 100);
@@ -489,22 +584,44 @@ export const CANVAS_BRIDGE_CODE = `
     if (!el || el === document.documentElement || el === dropIndicator) return;
     if (el === document.body) el = document.body.lastElementChild || document.body;
     if (_internalDragEl && (_internalDragEl === el || _internalDragEl.contains(el))) return;
-    var candidate = el;
-    // RAF throttle: reposition indicator at most once per animation frame
-    if (_rafId) return;
+    var candidate = findBlockEl(el);
+    if (!candidate) return;
+
+    // Walk up to find placeholder ancestor
+    var phEl = candidate;
+    while (phEl && phEl !== document.body) {
+      if (phEl.getAttribute && phEl.getAttribute('data-block-type') === 'placeholder') break;
+      phEl = phEl.parentElement;
+    }
+    var isOverPlaceholder = phEl && phEl !== document.body;
+
+    if (isOverPlaceholder) {
+      removeDropIndicator();
+      if (_rafId) { cancelAnimationFrame(_rafId); _rafId = null; }
+      highlightPlaceholderForDrop(phEl);
+      dropTarget = phEl;
+      return;
+    }
+
+    clearPlaceholderHighlight();
+    // Determine before/after based on cursor Y vs element midpoint
+    var candidateRect = candidate.getBoundingClientRect();
+    var newPosition = e.clientY < (candidateRect.top + candidateRect.height / 2) ? 'before' : 'after';
+    if (_rafId && candidate === dropTarget && newPosition === _dropPosition) return;
+    if (_rafId) { cancelAnimationFrame(_rafId); }
     _rafId = requestAnimationFrame(function() {
       _rafId = null;
-      // Skip DOM mutation if target hasn't changed and indicator already placed
-      if (candidate === dropTarget && dropIndicator && dropIndicator.parentElement) return;
       dropTarget = candidate;
+      _dropPosition = newPosition;
       if (!dropIndicator) dropIndicator = createDropIndicator();
-      if (dropTarget.parentElement) dropTarget.parentElement.insertBefore(dropIndicator, dropTarget.nextSibling);
+      positionDropIndicator(dropTarget, _dropPosition);
     });
   });
 
   document.addEventListener('drop', function(e) {
     e.preventDefault();
     removeDropIndicator();
+    clearPlaceholderHighlight();
     if (_rafId) { cancelAnimationFrame(_rafId); _rafId = null; }
     if (_dragleaveTimer) { clearTimeout(_dragleaveTimer); _dragleaveTimer = null; }
     if (_internalDragEl) {
@@ -518,7 +635,7 @@ export const CANVAS_BRIDGE_CODE = `
     } else {
       if (!dropTarget) return;
       var path = getElementPath(dropTarget);
-      parent.postMessage({ type: 'drop-request', path: path }, '*');
+      parent.postMessage({ type: 'drop-request', path: path, position: _dropPosition }, '*');
       dropTarget = null;
     }
   });
