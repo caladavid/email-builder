@@ -11,8 +11,15 @@
 
     <!-- ── Contenido (block-type-specific) ─────────────────────────────── -->
 
+    <!-- PLACEHOLDER -->
+    <StyleSection v-if="blockType === 'placeholder'" title="Bloque vacío">
+      <div style="text-align:center;padding:8px 0;color:#64748b;font-size:11px;line-height:1.6;">
+        Haz clic en un bloque de la barra izquierda para reemplazar este espacio.
+      </div>
+    </StyleSection>
+
     <!-- HEADING -->
-    <StyleSection v-if="blockType === 'heading'" title="Contenido">
+    <StyleSection v-else-if="blockType === 'heading'" title="Contenido">
       <StyleRow label="Texto" type="text" :value="store.selectedElementInnerText" placeholder="Texto del encabezado" @change="setInnerText" />
       <div style="display:flex;flex-direction:column;gap:5px;">
         <label style="font-size:11px;font-weight:600;color:#0045B0;">Nivel</label>
@@ -177,6 +184,7 @@ const uploadWarning = ref(false);
 
 const blockType = computed(() => {
   const t = store.selectedElementTagName;
+  if (t === 'placeholder') return 'placeholder';
   if (t === 'Encabezado' || /^H[1-6]$/.test(t)) return 'heading';
   if (t === 'Texto' || t === 'P') return 'text';
   if (t === 'Botón') return 'button';

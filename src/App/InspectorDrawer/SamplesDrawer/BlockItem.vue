@@ -6,9 +6,13 @@
         class="block-item cursor-grab bg-[var(--color-blue)] hover:bg-[var(--ui-bg-elevated)] rounded-lg p-3 border border-gray-200 transition-colors"
         :style="{
             borderColor: 'var(--ui-border)',
-            color: 'var(--color-white)'
+            color: 'var(--color-white)',
+            position: 'relative',
         }"
     >
+        <!-- "+" badge: top-right corner, shows on hover -->
+        <div class="block-add-badge">+</div>
+
         <div class="block-preview mb-2 flex justify-center">
             <div class="text-2xl" :style="{ color: 'var(--color-white, #0079cc)' }">
                 <UIcon v-if="isMaterialIcon" :name="props.icon" />
@@ -59,12 +63,14 @@ function handleClick() {
   if (!store.rawHtml) return;
   if (!htmlTemplate.value) return;
   const selectedPath = store.selectedElementPath;
-  sendToCanvas({
-    type: 'insert-html',
-    path: selectedPath ?? null,
-    position: 'after',
-    html: htmlTemplate.value,
-  });
+  if (selectedPath) {
+    sendToCanvas({ type: 'replace-html', path: selectedPath, html: htmlTemplate.value });
+  } else if (store.rawHtml.includes('data-block-type="placeholder"')) {
+    // Auto-replace placeholder even if user never clicked it first
+    sendToCanvas({ type: 'replace-html', path: '[data-block-type="placeholder"]', html: htmlTemplate.value });
+  } else {
+    sendToCanvas({ type: 'insert-html', path: null, position: 'after', html: htmlTemplate.value });
+  }
 }
 
 /* const handleDragEnd = () => {
@@ -111,5 +117,26 @@ function getIcon(): string {
 
 .block-item:active {
   transform: translateY(0);
+}
+
+.block-add-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.block-item:hover .block-add-badge {
+  opacity: 1;
 }
 </style>

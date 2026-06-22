@@ -32,7 +32,7 @@
             letterSpacing: '0.01em',
             transition: 'all 0.15s',
             background: activeTab === String(i) ? 'white' : 'transparent',
-            color: activeTab === String(i) ? '#0045B0' : '#64748b',
+            color: activeTab === String(i) ? '#0045B0' : 'var(--color-primary)',
             boxShadow: activeTab === String(i) ? '0 1px 4px rgba(0,0,0,0.10)' : 'none',
           }"
           @click="activeTab = String(i)"

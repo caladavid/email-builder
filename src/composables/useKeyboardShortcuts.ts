@@ -57,7 +57,7 @@ export function useKeyboardShortcuts() {
       }
 
       if (e.ctrlKey && e.key.toLowerCase() === 'c') {
-        store.htmlClipboard = selectedPath;
+        sendToCanvas({ type: 'get-outerhtml', path: selectedPath });
         return;
       }
 
@@ -69,7 +69,7 @@ export function useKeyboardShortcuts() {
 
       if (e.ctrlKey && e.key.toLowerCase() === 'v' && store.htmlClipboard) {
         e.preventDefault();
-        sendToCanvas({ type: 'duplicate', path: store.htmlClipboard });
+        sendToCanvas({ type: 'insert-html', path: selectedPath, position: 'after', html: store.htmlClipboard });
         return;
       }
 
