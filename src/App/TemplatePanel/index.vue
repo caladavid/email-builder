@@ -96,7 +96,7 @@
 
 <script setup lang="ts">
 import EditorBlock from '../../documents/editor/EditorBlock.vue'
-import { computed, nextTick, watch } from 'vue'
+import { computed, watch } from 'vue'
 import { useKeyboardShortcuts } from '../../composables/useKeyboardShortcuts'
 import HtmlPanel from './HtmlPanel.vue'
 import JsonPanel from './JsonPanel.vue'
@@ -112,12 +112,21 @@ const inspectorDrawer = useInspectorDrawer()
 
 const isIframeMode = computed(() => !!inspectorDrawer.rawHtml)
 
+// Blank canvas for new empty templates — placeholder block only, not real email content
+const BLANK_EMAIL_HTML = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"/><style>*{box-sizing:border-box;}body{margin:0;padding:0;background:#f5f5f5;font-family:Arial,sans-serif;}.material-symbols-outlined{font-family:'Material Symbols Outlined';font-weight:normal;font-style:normal;font-size:1.2rem;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;word-wrap:normal;direction:ltr;-webkit-font-smoothing:antialiased;}</style></head><body><div data-block-type="placeholder" style="margin:0 auto;max-width:600px;min-height:48px;border:2px dashed #c7d8f5;border-radius:10px;background:#ffffff;display:flex;align-items:center;justify-content:center;cursor:pointer;"><div style="width:24px;height:24px;border-radius:50%;background:#0045B0;display:flex;align-items:center;justify-content:center;pointer-events:none;"><span class="material-symbols-outlined" style="font-size:1.2rem;color:white;pointer-events:none;user-select:none;">add</span></div></div></body></html>`;
+
 // Auto-convert block mode to iframe mode whenever rawHtml is cleared
 watch(() => inspectorDrawer.rawHtml, async (html) => {
   if (html) return; // already in iframe mode
-  await nextTick(); // wait for document to settle after resetDocument()
   try {
     const doc = createProcessedDocument(inspectorDrawer.document, inspectorDrawer.globalVariables || {});
+    const rootBlock = (doc as any)['root'];
+    const childrenIds: string[] = rootBlock?.data?.props?.childrenIds ?? rootBlock?.data?.childrenIds ?? [];
+    // Empty template → start with a clean blank canvas instead of rendering the EmailLayout wrapper
+    if (!childrenIds.length) {
+      inspectorDrawer.importRawHtml(BLANK_EMAIL_HTML);
+      return;
+    }
     const rendered = await renderToStaticMarkup(doc, { rootBlockId: 'root' });
     inspectorDrawer.importRawHtml(rendered);
   } catch (e) {
@@ -125,11 +134,19 @@ watch(() => inspectorDrawer.rawHtml, async (html) => {
   }
 }, { immediate: true })
 
-// Strip injected bridge script so it doesn't interfere with the read-only preview
+// Strip bridge script + editor-only inline styles and attributes so preview is clean
 const previewHtml = computed(() => {
-  const html = inspectorDrawer.rawHtml;
+  let html = inspectorDrawer.rawHtml;
   if (!html) return '';
-  return html.replace(/<script[^>]+id="__canvas-bridge__"[^>]*>[\s\S]*?<\/script>/gi, '');
+  // Remove bridge script
+  html = html.replace(/<script[^>]+id="__canvas-bridge__"[^>]*>[\s\S]*?<\/script>/gi, '');
+  // Remove selection/hover outlines (outline and outline-offset, with optional leading ;)
+  html = html.replace(/;?\s*outline(?:-offset)?\s*:[^;}"]*;?/gi, '');
+  // Remove contenteditable attribute set by bridge editing mode
+  html = html.replace(/\s*contenteditable="[^"]*"/gi, '');
+  // Remove draggable attribute set by bridge
+  html = html.replace(/\s*draggable="[^"]*"/gi, '');
+  return html;
 });
 
 useKeyboardShortcuts()
