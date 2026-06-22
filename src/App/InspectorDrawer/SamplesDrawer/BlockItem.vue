@@ -1,21 +1,22 @@
 <template>
     <div
         draggable="true"
-        @dragstart="handleDragStart" 
-        class="block-item cursor-grab bg-[var(--color-blue)] hover:bg-[var(--ui-bg-elevated)] rounded-lg p-3 border border-gray-200 transition-colors"  
-        :style="{   
-            borderColor: 'var(--ui-border) hover:bg-[var(--color-secondary)]',  
-            color: 'var(--color-white)'  
-        }" 
+        @dragstart="handleDragStart"
+        @click="handleClick"
+        class="block-item cursor-grab bg-[var(--color-blue)] hover:bg-[var(--ui-bg-elevated)] rounded-lg p-3 border border-gray-200 transition-colors"
+        :style="{
+            borderColor: 'var(--ui-border)',
+            color: 'var(--color-white)'
+        }"
     >
-        <div class="block-preview  mb-2 flex justify-center">    
-            <div class="text-2xl" :style="{ color: 'var(--color-white, #0079cc)' }">    
-                <UIcon v-if="isMaterialIcon" :name="props.icon" />  
-                <span v-else>{{ getIcon() }}</span>  
-            </div>    
-        </div> 
+        <div class="block-preview mb-2 flex justify-center">
+            <div class="text-2xl" :style="{ color: 'var(--color-white, #0079cc)' }">
+                <UIcon v-if="isMaterialIcon" :name="props.icon" />
+                <span v-else>{{ getIcon() }}</span>
+            </div>
+        </div>
 
-        <span class="block-name text-xs text-center font-medium ">
+        <span class="block-name text-xs text-center font-medium">
             {{ displayName }}
         </span>
     </div>
@@ -23,7 +24,9 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-
+import { useInspectorDrawer } from '../../../documents/editor/editor.store';
+import { BUTTONS } from '../../../documents/blocks/helpers/buttons';
+import { sendToCanvas } from '../../../composables/useCanvasBridge';
 
 interface Props {
     type: string;
@@ -32,24 +35,37 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const store = useInspectorDrawer();
+
+const htmlTemplate = computed(() => {
+  const btn = BUTTONS.find(b => b.label === props.type);
+  return btn?.htmlTemplate ?? '';
+});
 
 const handleDragStart = (event: DragEvent) => {
-    /* console.log('🚀 Iniciando drag desde BlockItem:', props.type);  */ 
+  store.draggedHtml = htmlTemplate.value;
   if (event.dataTransfer) {
-    // Importante: usar "block-type:" como prefijo para identificar que es un nuevo bloque
     event.dataTransfer.setData('text/plain', `block-type:${props.type}`);
-    
     event.dataTransfer.effectAllowed = 'copyMove';
-    
-    // Opcional: agregar datos adicionales
     event.dataTransfer.setData('application/json', JSON.stringify({
       type: props.type,
-      displayName: props.displayName
+      displayName: props.displayName,
+      htmlTemplate: htmlTemplate.value,
     }));
-    
-    /* console.log('🚀 Iniciando arrastre de nuevo bloque:', props.type); */
   }
 };
+
+function handleClick() {
+  if (!store.rawHtml) return;
+  if (!htmlTemplate.value) return;
+  const selectedPath = store.selectedElementPath;
+  sendToCanvas({
+    type: 'insert-html',
+    path: selectedPath ?? null,
+    position: 'after',
+    html: htmlTemplate.value,
+  });
+}
 
 /* const handleDragEnd = () => {
   console.log('🏁 Finalizando arrastre');
@@ -79,21 +95,21 @@ function getIcon(): string {
 }
 </script>
 
-<style scoped>  
-.block-item {  
-  min-height: 80px;  
-  display: flex;  
-  flex-direction: column;  
-  justify-content: center;  
-  user-select: none;  
-}  
-  
-.block-item:hover {  
-  transform: translateY(-1px);  
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);  
-}  
-  
-.block-item:active {  
-  transform: translateY(0);  
-}  
+<style scoped>
+.block-item {
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  user-select: none;
+}
+
+.block-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.block-item:active {
+  transform: translateY(0);
+}
 </style>

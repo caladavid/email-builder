@@ -154,9 +154,16 @@ const htmlImported = `
 
   code.value = html
 }, { immediate: true }) */
-watch(() => [inspectorDrawer.document, inspectorDrawer.globalVariables], async () => {  
+// Iframe mode: rawHtml is source of truth
+watch(() => inspectorDrawer.rawHtml, (html) => {
+  if (html) code.value = html;
+}, { immediate: true });
+
+// Block mode: render from JSON document
+watch(() => [inspectorDrawer.document, inspectorDrawer.globalVariables], async () => {
+  if (inspectorDrawer.rawHtml) return; // skip if iframe mode
   const html = await renderToStaticMarkup(processedDocument.value, { rootBlockId: 'root' })
-  code.value = html  
-}, { immediate: true, deep: true }) 
+  code.value = html
+}, { immediate: true, deep: true })
 </script>
 

@@ -1,86 +1,91 @@
 <template>
-  <div class="space-y-2">
-    <UFormField :label="label">
-      <div
-        class="gap-x-1 flex items-center"
-        :style="{
-          '--bg-color': value ?? '#FFFFFF',
-        }"
-      >
-        <UPopover>
-          <UButton label="Elegir color" color="neutral" variant="outline">
-            <template #leading>
-              <UIcon v-if="value === null" name="material-symbols:palette" class="text-lg" />
-              <span v-else :style="{ backgroundColor: value ?? undefined }" class="size-3 rounded-full" />
-            </template>
-          </UButton>
-
-          <template #content>
-            <UColorPicker :model-value="value ?? undefined" class="p-2" @update:model-value="handleChange($event ?? null)" />
-          </template>
-        </UPopover>
-
-        <!-- Campo de texto para código hexadecimal -->  
-        <UInput  
-          :model-value="value ?? ''"  
-          placeholder="#RRGGBB"  
-          class="w-32"  
-          @update:model-value="handleTextInput"  
-        />  
-
-        <!-- reset button -->
-        <UButton
-          v-if="nullable && typeof value === 'string' && value.length > 0"
-          class="bg-transparent text-white p-1 cursor-pointer hover:bg-white/10"
-          size="sm"
-          @click="handleChange(null)"
+  <div style="display:flex;flex-direction:column;gap:5px;">
+    <label style="font-size:11px;font-weight:600;color:#0045B0;line-height:1.2;">{{ label }}</label>
+    <div style="display:flex;gap:6px;align-items:center;">
+      <!-- "Elegir color" trigger button with native color picker overlaid -->
+      <div style="position:relative;flex-shrink:0;">
+        <button
+          type="button"
+          style="display:flex;align-items:center;gap:6px;background:#0045B0;color:white;border:none;border-radius:7px;padding:6px 10px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;"
         >
-          <UIcon name="material-symbols:close" class="text-xl" />
-        </UButton>
+          <span :style="{
+            width: '14px', height: '14px', borderRadius: '50%',
+            background: value ?? '#FFFFFF',
+            border: '2px solid rgba(255,255,255,0.6)',
+            flexShrink: 0, display: 'inline-block',
+          }" />
+          Elegir color
+        </button>
+        <input
+          type="color"
+          :value="hexValue"
+          style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;border:none;padding:0;"
+          @input="onColorPick"
+        />
       </div>
-    </UFormField>
+
+      <!-- Hex text input -->
+      <input
+        type="text"
+        :value="value ?? ''"
+        placeholder="#RRGGBB"
+        maxlength="7"
+        style="flex:1;font-size:11px;padding:6px 8px;border:1px solid #c7d8f5;border-radius:7px;color:#111;background:white;outline:none;"
+        @change="onHexChange"
+        @keydown.enter.prevent="($event.target as HTMLInputElement).blur()"
+      />
+
+      <!-- Nullable reset -->
+      <button
+        v-if="nullable && value !== null"
+        type="button"
+        style="padding:4px 6px;border:1px solid #c7d8f5;border-radius:6px;background:white;cursor:pointer;font-size:11px;color:#64748b;"
+        @click="handleChange(null)"
+      >✕</button>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
-type Props = {
-  nullable: true,
-  label: string,
-  defaultValue: string | null,
-} | {
-  nullable: false,
-  label: string,
-  defaultValue: string,
-}
+type Props =
+  | { nullable: true;  label: string; defaultValue: string | null }
+  | { nullable: false; label: string; defaultValue: string };
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
 
 const emit = defineEmits<{
-  (e: 'change', args: typeof props.nullable extends true ? string | null : string): void
-}>()
+  (e: 'change', value: string | null): void;
+}>();
 
-/** Refs */
+const value = ref<string | null>(props.defaultValue);
 
-const value = ref(props.defaultValue)
+watch(() => props.defaultValue, (v) => { value.value = v; });
 
-/** Functions */
+const hexValue = computed(() => {
+  const v = value.value ?? '#000000';
+  if (v.startsWith('#')) return v.slice(0, 7);
+  const m = v.match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/);
+  if (m) return '#' + [m[1],m[2],m[3]].map(n => parseInt(n).toString(16).padStart(2,'0')).join('');
+  return '#000000';
+});
 
-function isValidHexColor(color: string): boolean {  
-  return /^#[0-9A-Fa-f]{6}$/.test(color) || /^#[0-9A-Fa-f]{3}$/.test(color);  
-} 
-
-function handleChange(newValue: string | null) {
-  value.value = newValue;
-  emit('change', newValue as typeof props.nullable extends true ? string | null : string);
+let colorTimer: ReturnType<typeof setTimeout> | null = null;
+function onColorPick(e: Event) {
+  const hex = (e.target as HTMLInputElement).value;
+  value.value = hex;
+  if (colorTimer) clearTimeout(colorTimer);
+  colorTimer = setTimeout(() => { handleChange(hex); colorTimer = null; }, 30);
 }
 
-function handleTextInput(newValue: string) {  
-  const trimmed = newValue.trim();  
-  if (isValidHexColor(trimmed)) {  
-    handleChange(trimmed);  
-  }  
-}  
+function onHexChange(e: Event) {
+  let h = (e.target as HTMLInputElement).value.trim();
+  if (!h.startsWith('#')) h = '#' + h;
+  if (/^#[0-9a-fA-F]{6}$/.test(h)) { value.value = h; handleChange(h); }
+}
 
+function handleChange(v: string | null) {
+  emit('change', v as any);
+}
 </script>

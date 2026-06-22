@@ -14,23 +14,23 @@
     <template #list-trailing>
       <div :class="['flex w-full justify-end md:gap-x-2', inspectorDrawer.inspectorDrawerOpen ? 'mr-8' : '']">
         <UTooltip text="Deshacer">
-          <UButton   
-            icon="material-symbols:undo"  
-            :disabled="!inspectorDrawer.canUndo()"  
-            @click="inspectorDrawer.undo()"  
-            variant="ghost"  
-            color="neutral"  
-          />  
+          <UButton
+            icon="material-symbols:undo"
+            :disabled="isIframeMode ? !inspectorDrawer.canUndoHtml() : !inspectorDrawer.canUndo()"
+            @click="isIframeMode ? inspectorDrawer.undoHtml() : inspectorDrawer.undo()"
+            variant="ghost"
+            color="neutral"
+          />
         </UTooltip>
-        
+
         <UTooltip text="Rehacer">
-          <UButton   
-            icon="material-symbols:redo"  
-            :disabled="!inspectorDrawer.canRedo()"  
-            @click="inspectorDrawer.redo()"  
-            variant="ghost"  
-            color="neutral"  
-          />  
+          <UButton
+            icon="material-symbols:redo"
+            :disabled="isIframeMode ? !inspectorDrawer.canRedoHtml() : !inspectorDrawer.canRedo()"
+            @click="isIframeMode ? inspectorDrawer.redoHtml() : inspectorDrawer.redo()"
+            variant="ghost"
+            color="neutral"
+          />
         </UTooltip>
         
         <!-- <DownloadJson /> -->
@@ -69,13 +69,20 @@
       </div>
     </template>
     <template #editor>
-      <div :style="mainBoxStyle">
+      <IframeCanvas v-if="isIframeMode" />
+      <div v-else :style="mainBoxStyle">
         <EditorBlock id="root" />
       </div>
     </template>
     <template #preview>
       <div :style="mainBoxStyle">
-        <Reader :document="processedDocument" root-block-id="root" />
+        <iframe
+          v-if="isIframeMode"
+          :srcdoc="previewHtml"
+          sandbox="allow-same-origin allow-scripts allow-popups allow-popups-to-escape-sandbox"
+          style="width:100%;height:100%;border:none;display:block;min-height:600px;"
+        />
+        <Reader v-else :document="processedDocument" root-block-id="root" />
       </div>
     </template>
     <template #html>
@@ -89,25 +96,43 @@
 
 <script setup lang="ts">
 import EditorBlock from '../../documents/editor/EditorBlock.vue'
-import { computed } from 'vue'
+import { computed, nextTick, watch } from 'vue'
+import { useKeyboardShortcuts } from '../../composables/useKeyboardShortcuts'
 import HtmlPanel from './HtmlPanel.vue'
 import JsonPanel from './JsonPanel.vue'
 import ImportJson from './ImportJson/index.vue'
 import DownloadJson from './DownloadJson/index.vue'
-/* import { Reader } from '@flyhub/email-builder' */
 import { useInspectorDrawer } from '../../documents/editor/editor.store'
 import VariablesModal from '../VariablesModal/index.vue'
 import { createProcessedDocument } from '../../utils/documentProcessor'
-/* import { Reader } from '../../lib/@flyhub/email-builder' */
-import { Reader } from '../../lib/email-builder/index'
-
-
-// FIXME: implement
-// import ShareButton from './ShareButton.vue'
-
-// FIXME: implement handleChangeSelectedScreenSize
+import { Reader, renderToStaticMarkup } from '../../lib/email-builder/index'
+import IframeCanvas from './IframeCanvas.vue'
 
 const inspectorDrawer = useInspectorDrawer()
+
+const isIframeMode = computed(() => !!inspectorDrawer.rawHtml)
+
+// Auto-convert block mode to iframe mode whenever rawHtml is cleared
+watch(() => inspectorDrawer.rawHtml, async (html) => {
+  if (html) return; // already in iframe mode
+  await nextTick(); // wait for document to settle after resetDocument()
+  try {
+    const doc = createProcessedDocument(inspectorDrawer.document, inspectorDrawer.globalVariables || {});
+    const rendered = await renderToStaticMarkup(doc, { rootBlockId: 'root' });
+    inspectorDrawer.importRawHtml(rendered);
+  } catch (e) {
+    console.warn('Block→iframe auto-convert failed', e);
+  }
+}, { immediate: true })
+
+// Strip injected bridge script so it doesn't interfere with the read-only preview
+const previewHtml = computed(() => {
+  const html = inspectorDrawer.rawHtml;
+  if (!html) return '';
+  return html.replace(/<script[^>]+id="__canvas-bridge__"[^>]*>[\s\S]*?<\/script>/gi, '');
+});
+
+useKeyboardShortcuts()
 
 const tabs = [
   {

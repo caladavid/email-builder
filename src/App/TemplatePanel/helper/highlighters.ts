@@ -11,11 +11,21 @@ hljs.registerLanguage('json', jsonHighlighter);
 hljs.registerLanguage('html', xmlHighlighter);
 
 export async function html(value: string): Promise<string> {
-  const prettyValue = await format(value, {
-    parser: 'html',
-    plugins: [prettierPluginHtml],
-  });
-  return hljs.highlight(prettyValue, { language: 'html' }).value;
+  let source = value;
+  try {
+    source = await format(value, {
+      parser: 'html',
+      plugins: [prettierPluginHtml],
+    });
+  } catch {
+    // Malformed HTML (mismatched tags, etc.) — skip formatting, highlight as-is
+  }
+  try {
+    return hljs.highlight(source, { language: 'html' }).value;
+  } catch {
+    // Highlight also failed — return escaped plain text
+    return source.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
 }
 
 export async function json(value: string): Promise<string> {

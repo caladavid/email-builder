@@ -63,9 +63,9 @@ onMounted(() => {
 
     const data = event.data;
 
-    if (!data.type || !['updateVariables', 'addVariable', 'requestHtml', 'loadTemplate', "requestJson", "requestHtmlAndJson", "clearTemplate", "setToken"].includes(data.type)) {    
-      return;  
-    } 
+    if (!data.type || !['updateVariables', 'addVariable', 'requestHtml', 'loadTemplate', "requestJson", "requestHtmlAndJson", "clearTemplate", "setToken"].includes(data.type)) {
+      return;
+    }
 
      switch (data.type) {  
       case 'updateVariables':  

@@ -103,8 +103,6 @@
 import { computed, ref } from 'vue';
 import { useInspectorDrawer } from '../../../documents/editor/editor.store';
 import validateJsonStringValue from './validateJsonStringValue';
-import JSZip from 'jszip';  
-import { HTMLToBlockParser } from '../../../utils/parsers/HTMLToBlockParser';
 /* import { HTMLToBlockParser } from './htmlParser';  */
 
 const inspectorDrawer = useInspectorDrawer()
@@ -163,68 +161,84 @@ function handleCancel() {
   activeTab.value = 'json';  
 }
 
-async function handleZipUpload(event: Event) {    
-  const file = (event.target as HTMLInputElement).files?.[0];    
-  if (!file) return;  
- 
-    
-  zipProcessing.value = true;    
-  zipError.value = null;    
-  zipSuccess.value = null;    
-    
-  try {    
+async function handleZipUpload(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+
+  zipProcessing.value = true;
+  zipError.value = null;
+  zipSuccess.value = null;
+
+  try {
     const currentOrigin = window.location.origin;
 
     if (currentOrigin.includes('localhost:3000') || currentOrigin.includes('localhost:5173')) {
+      // Local: extract HTML + embed images as base64 (no backend call)
+      const JSZip = (await import('jszip')).default;
+      const zip = await JSZip.loadAsync(file);
 
-      const parser = new HTMLToBlockParser();   
-      const result = await parser.parseZipToBlocks(file);  
-        
-      // Separar errores críticos de advertencias  
-      const criticalErrors = result.errors.filter(e => !e.recoverable);  
-      const warnings = result.errors.filter(e => e.recoverable);  
-        
-      if (criticalErrors.length > 0) {  
-        // Mostrar solo errores críticos  
-        const errorMessage = criticalErrors  
-          .map(e => `${e.type}: ${e.message}`)  
-          .join('\n');  
-        zipError.value = errorMessage;  
-        return;  
-      }  
-        
-      // Mostrar advertencias informativas si existen  
-      if (warnings.length > 0) {  
-        console.error('Advertencias durante la importación:', warnings);  
-        // Opcional: mostrar advertencias al usuario  
-        // zipWarning.value = warnings.map(w => w.message).join('\n');  
-      }  
-        
-      // Continuar con la importación si no hay errores críticos  
-      if (result.configuration) { 
-        inspectorDrawer.resetDocument(result.configuration);  
-        zipSuccess.value = 'ZIP importado exitosamente';  
-          
-        setTimeout(() => {    
-          handleCancel();    
-        }, 1500);  
-      }  
+      const htmlFile = zip.file('index.html') ?? zip.file(/\.html$/i)[0] ?? null;
+      if (!htmlFile) {
+        zipError.value = 'No se encontró un archivo HTML en el ZIP';
+        return;
+      }
+      let htmlContent = await htmlFile.async('string');
+
+      // Build image map: full path + basename for flexible lookup
+      const imageMap = new Map<string, string>();
+      const imageEntries = Object.entries(zip.files).filter(
+        ([name]) => isImageFile(name) && !zip.files[name].dir
+      );
+      await Promise.all(imageEntries.map(async ([name, entry]) => {
+        try {
+          const b64 = await entry.async('base64');
+          const ext = name.split('.').pop()?.toLowerCase() ?? 'png';
+          const dataUri = `data:${getMimeType(ext)};base64,${b64}`;
+          imageMap.set(name, dataUri);
+          imageMap.set(name.replace(/^.*[\\/]/, ''), dataUri); // basename fallback
+        } catch { /* skip unreadable entries */ }
+      }));
+
+      if (imageMap.size > 0) {
+        const resolveUri = (src: string) => {
+          if (/^(https?:\/\/|data:|cid:)/i.test(src)) return null;
+          return imageMap.get(src) ?? imageMap.get(src.replace(/^.*[\\/]/, '')) ?? null;
+        };
+
+        // <img src="..." and <img src='...'> — \b avoids the \s bug where first-attr src fails
+        htmlContent = htmlContent.replace(
+          /(<img[^>]+\bsrc=)(["'])([^"']+)\2/gi,
+          (match, pre, q, src) => { const uri = resolveUri(src); return uri ? `${pre}${q}${uri}${q}` : match; }
+        );
+        // background="..." on <td> etc.
+        htmlContent = htmlContent.replace(
+          /(\bbackground=)(["'])([^"']+)\2/gi,
+          (match, pre, q, src) => { const uri = resolveUri(src); return uri ? `${pre}${q}${uri}${q}` : match; }
+        );
+        // CSS url() in inline styles and <style> blocks
+        htmlContent = htmlContent.replace(
+          /url\((['"]?)([^'")]+)\1\)/gi,
+          (match, q, src) => { const uri = resolveUri(src); return uri ? `url('${uri}')` : match; }
+        );
+      }
+
+      inspectorDrawer.importRawHtml(htmlContent);
+      zipSuccess.value = `ZIP importado (${imageMap.size} imágenes embebidas)`;
+      setTimeout(handleCancel, 1500);
 
     } else {
-      await inspectorDrawer.sendZip(file);        
-      zipSuccess.value = 'Plantilla importada exitosamente';     
-        
-      setTimeout(() => {      
-        handleCancel();      
-      }, 1500);
+      // Production: backend processes + uploads images to CDN
+      await inspectorDrawer.sendZip(file);
+      zipSuccess.value = 'Plantilla importada exitosamente';
+      setTimeout(handleCancel, 1500);
     }
-      
-  } catch (error) {    
-    console.error('❌ Error processing ZIP:', error);    
-    zipError.value = 'Error al procesar el archivo ZIP';    
-  } finally {    
-    zipProcessing.value = false;    
-  }    
+
+  } catch (err) {
+    console.error('❌ Error processing ZIP:', err);
+    zipError.value = 'Error al procesar el archivo ZIP';
+  } finally {
+    zipProcessing.value = false;
+  }
 }
 
 /* async function handleZipUpload(event: Event) {    
