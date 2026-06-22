@@ -1,51 +1,18 @@
 <template>
   <div :style="containerStyle" @click.stop>
-    <div style="display:flex;flex-direction:column;gap:4px;">
-      <UButton
-        class="tune-overlay-btn"
-        icon="material-symbols:arrow-upward"
-        size="xs"
-        variant="ghost"
-        color="neutral"
-        title="Subir"
-        @click="emit('action', 'up')"
-      />
-      <UButton
-        class="tune-overlay-btn"
-        icon="material-symbols:arrow-downward"
-        size="xs"
-        variant="ghost"
-        color="neutral"
-        title="Bajar"
-        @click="emit('action', 'down')"
-      />
-      <UButton
-        class="tune-overlay-btn"
-        icon="material-symbols:content-copy"
-        size="xs"
-        variant="ghost"
-        color="neutral"
-        title="Duplicar"
-        @click="emit('action', 'duplicate')"
-      />
-      <UButton
-        class="tune-overlay-btn"
-        icon="material-symbols:vertical-align-top"
-        size="xs"
-        variant="ghost"
-        color="neutral"
-        title="Seleccionar padre"
-        @click="emit('action', 'parent')"
-      />
-      <UButton
-        class="tune-overlay-btn"
-        icon="material-symbols:delete-outline"
-        size="xs"
-        variant="ghost"
-        color="error"
-        title="Eliminar"
-        @click="emit('action', 'delete')"
-      />
+    <div style="display:flex;flex-direction:column;gap:2px;">
+      <button class="tune-btn" title="Subir"           @click="emit('action', 'up')">
+        <UIcon name="material-symbols:arrow-upward"   style="font-size:20px;" />
+      </button>
+      <button class="tune-btn" title="Bajar"           @click="emit('action', 'down')">
+        <UIcon name="material-symbols:arrow-downward" style="font-size:20px;" />
+      </button>
+      <button class="tune-btn" title="Duplicar"        @click="emit('action', 'duplicate')">
+        <UIcon name="material-symbols:content-copy"   style="font-size:20px;" />
+      </button>
+      <button class="tune-btn tune-btn--delete" title="Eliminar" @click="emit('action', 'delete')">
+        <UIcon name="material-symbols:delete-outline" style="font-size:20px;" />
+      </button>
     </div>
   </div>
 </template>
@@ -64,12 +31,12 @@ const emit = defineEmits<{
 const containerStyle = computed(() => ({
   position: 'absolute' as const,
   top: props.rect.top + 'px',
-  left: (props.rect.left - 44) + 'px',
+  left: Math.max(4, props.rect.left - 52) + 'px',
   zIndex: 200,
-  background: 'white',
-  borderRadius: '8px',
+  background: '#1e293b',
+  borderRadius: '10px',
   padding: '4px',
-  boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+  boxShadow: '0 4px 20px rgba(0,0,0,0.35)',
   display: 'flex',
   flexDirection: 'column' as const,
   gap: '2px',
@@ -77,13 +44,26 @@ const containerStyle = computed(() => ({
 </script>
 
 <style scoped>
-.tune-overlay-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
+.tune-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: transparent;
+  color: white;
+  border-radius: 7px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  transition: background 0.12s;
+}
+.tune-btn:hover {
+  background: rgba(255,255,255,0.12);
+}
+.tune-btn--delete {
+  color: #f87171;
+}
+.tune-btn--delete:hover {
+  background: rgba(248,113,113,0.15);
 }
 </style>
