@@ -102,7 +102,9 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   const handleMessage = (event: MessageEvent) => {
     if (!isOriginAllowed(event.origin)) return;
 
-    if (!parentOrigin) parentOrigin = event.origin;
+    if (!parentOrigin && event.origin !== window.location.origin) {
+      parentOrigin = event.origin;
+    }
 
     const data = event.data as TReceivedMessage;
 
@@ -224,9 +226,9 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
 
     let html = await renderToStaticMarkup(proccessedDocument, { rootBlockId: 'root' })
 
-  const tempDiv = document.createElement('div');  
-  tempDiv.innerHTML = html;  
-  html = tempDiv.textContent || tempDiv.innerHTML || html;  
+  const tempDiv = window.document.createElement('div');
+  tempDiv.innerHTML = html;
+  html = tempDiv.textContent || tempDiv.innerHTML || html;
     
   // Si lo anterior no funciona, intentar con decodeURIComponent  
   if (html.includes('&lt;')) {  
@@ -267,16 +269,21 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   }
 
   async function exportHtmlAndJsonToParent() {
-    const { default: renderToStaticMarkup } = await import("../../lib/email-builder/renderers/renderToStaticMarkup");
-
-    const jsonContent = JSON.stringify(document.value, null, 2);
+    console.log('[Builder] exportHtmlAndJsonToParent called');
     let html = '';
+    let jsonContent = '{}';
     try {
-      html = await renderToStaticMarkup(document.value, { rootBlockId: 'root' });
+      const { default: renderToStaticMarkup } = await import("../../lib/email-builder/renderers/renderToStaticMarkup");
+      jsonContent = JSON.stringify(document.value, null, 2);
+      try {
+        html = await renderToStaticMarkup(document.value, { rootBlockId: 'root' });
+      } catch (error) {
+        console.error('❌ Error en renderToStaticMarkup:', error);
+      }
     } catch (error) {
-      console.error('❌ Error en renderToStaticMarkup:', error);
+      console.error('❌ exportHtmlAndJsonToParent error before sendToParent:', error);
     }
-
+    console.log('[Builder] Sending htmlAndJsonResponse, html.length:', html.length);
     sendToParent({
       type: 'htmlAndJsonResponse',
       html,

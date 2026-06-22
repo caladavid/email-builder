@@ -85,9 +85,10 @@ onMounted(() => {
       case 'requestJson':  
         await editorStore.exportJsonToParent();  
         break; 
-      case 'requestHtmlAndJson':  
-        await editorStore.exportHtmlAndJsonToParent();  
-        break; 
+      case 'requestHtmlAndJson':
+        console.log('[Builder] requestHtmlAndJson received');
+        await editorStore.exportHtmlAndJsonToParent();
+        break;
       case 'clearTemplate':  
         editorStore.resetDocument(getConfiguration(''));  
         break; 
