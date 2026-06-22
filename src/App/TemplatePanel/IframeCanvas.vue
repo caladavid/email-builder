@@ -1,11 +1,11 @@
 <template>
   <div
     ref="containerRef"
-    class="relative w-full h-full overflow-auto"
-    style="background: #e5e7eb;"
+    class="relative w-full h-full overflow-y-auto"
+    style="background: #f5f5f5;"
     @click.self="handleContainerClick"
   >
-    <div :style="wrapperStyle" class="relative mx-auto">
+    <div :style="wrapperStyle" class="relative mx-auto mt-10 mb-6">
       <!-- Iframe real del canvas -->
       <iframe
         ref="iframeRef"
@@ -22,16 +22,33 @@
         class="pointer-events-none"
       >
         <div style="position:absolute;inset:0;border:2px solid rgba(0,121,204,1);pointer-events:none;" />
-        <!-- Badge con tag name -->
-        <div
-          style="
-            position:absolute;top:-20px;left:0;
-            background:rgba(0,121,204,1);color:white;
-            font-size:10px;padding:2px 6px;font-family:monospace;
-            border-radius:3px 3px 0 0;white-space:nowrap;
-          "
-        >
-          {{ store.selectedElementTagName.toLowerCase() }}
+        <!-- Formatting mini-bar (top-right, solo en bloques de texto) -->
+        <div v-if="isTextBlock" style="position:absolute;top:-30px;right:0;display:flex;align-items:center;gap:1px;background:#0033A0;padding:3px 5px;border-radius:6px 6px 0 0;pointer-events:all;" @click.stop>
+          <button @click.stop="handleFormat('bold')"          title="Negrita (Ctrl+B)"   style="width:24px;height:24px;border:none;background:transparent;color:white;font-family:serif;font-size:14px;font-weight:800;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;"><b>B</b></button>
+          <button @click.stop="handleFormat('italic')"        title="Cursiva (Ctrl+I)"   style="width:24px;height:24px;border:none;background:transparent;color:white;font-family:serif;font-size:14px;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;"><i>I</i></button>
+          <button @click.stop="handleFormat('underline')"     title="Subrayado"          style="width:24px;height:24px;border:none;background:transparent;color:white;font-family:serif;font-size:14px;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;"><u>U</u></button>
+          <button @click.stop="handleFormat('strikeThrough')" title="Tachado"            style="width:24px;height:24px;border:none;background:transparent;color:white;font-family:serif;font-size:13px;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;"><s>S</s></button>
+          <div style="width:1px;height:16px;background:rgba(255,255,255,0.3);margin:0 2px;flex-shrink:0;" />
+          <button @click.stop="handleFormat('justifyLeft')"   title="Alinear izquierda"  style="width:24px;height:24px;border:none;background:transparent;color:white;font-size:13px;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;">&#8676;</button>
+          <button @click.stop="handleFormat('justifyCenter')" title="Centrar"            style="width:24px;height:24px;border:none;background:transparent;color:white;font-size:13px;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;">&#9776;</button>
+          <button @click.stop="handleFormat('justifyRight')"  title="Alinear derecha"    style="width:24px;height:24px;border:none;background:transparent;color:white;font-size:13px;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;">&#8677;</button>
+          <div style="width:1px;height:16px;background:rgba(255,255,255,0.3);margin:0 2px;flex-shrink:0;" />
+          <button @click.stop="showLinkInput = !showLinkInput" title="Enlace" style="width:24px;height:24px;border:none;background:transparent;color:white;font-size:13px;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;">🔗</button>
+          <button @click.stop="handleFormat('removeFormat')"  title="Limpiar formato"    style="width:24px;height:24px;border:none;background:transparent;color:white;font-size:11px;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;">T✕</button>
+          <!-- Link URL input -->
+          <div v-if="showLinkInput" style="display:flex;gap:3px;align-items:center;margin-left:4px;">
+            <input
+              v-model="linkUrl"
+              type="url"
+              placeholder="https://..."
+              style="font-size:11px;padding:2px 6px;border:1px solid rgba(255,255,255,0.4);border-radius:4px;width:140px;background:rgba(255,255,255,0.15);color:white;outline:none;"
+              @click.stop
+              @mousedown.stop
+              @keydown.enter.stop="applyLink"
+              @keydown.escape.stop="showLinkInput = false"
+            />
+            <button @click.stop="applyLink" style="width:22px;height:22px;border:none;background:#22c55e;color:white;font-size:12px;font-weight:700;cursor:pointer;border-radius:3px;">✓</button>
+          </div>
         </div>
       </div>
 
@@ -42,12 +59,6 @@
         @action="handleTuneAction"
       />
 
-      <!-- Toolbar de formato (aparece al doble-click en modo edición) -->
-      <FormattingToolbar
-        v-if="isEditing"
-        :rect="editingRect ?? { top: 48, left: 8, width: 200, height: 20 }"
-        @format="handleFormat"
-      />
 
       <!-- "+" add-block button — shows below selection overlay in iframe mode -->
       <div
@@ -62,6 +73,7 @@
         @click.stop
       >
         <button
+          v-show="store.selectedElementTagName !== 'placeholder'"
           style="width:24px;height:24px;border-radius:50%;background:#0079CC;border:2px solid white;color:white;font-size:16px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,0.25);"
           @click="showBlockPicker = !showBlockPicker"
         >+</button>
@@ -69,20 +81,19 @@
         <!-- Block picker popup -->
         <div
           v-if="showBlockPicker"
-          style="position:absolute;top:30px;left:50%;transform:translateX(-50%);background:white;border:1px solid #c7d8f5;border-radius:12px;padding:12px;box-shadow:0 8px 24px rgba(0,121,204,0.18);z-index:300;width:230px;max-height:300px;overflow-y:auto;"
+          style="position:absolute;top:30px;left:50%;transform:translateX(-50%);background:#0033A0;border-radius:14px;padding:12px;box-shadow:0 8px 32px rgba(0,0,0,0.32);z-index:300;width:296px;max-height:380px;overflow-y:auto;"
         >
-          <div style="font-size:10px;font-weight:700;color:#0045B0;margin-bottom:8px;">Insertar bloque después</div>
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
             <div
               v-for="btn in BUTTONS"
               :key="btn.label"
-              style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 4px;background:#f0f6ff;border-radius:8px;cursor:pointer;border:1px solid #c7d8f5;"
-              @mouseenter="($event.currentTarget as HTMLElement).style.background='#dbeafe'"
-              @mouseleave="($event.currentTarget as HTMLElement).style.background='#f0f6ff'"
+              style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:10px 4px 8px;background:white;border-radius:8px;cursor:pointer;min-height:72px;"
+              @mouseenter="($event.currentTarget as HTMLElement).style.boxShadow='0 2px 8px rgba(0,0,0,0.18)'"
+              @mouseleave="($event.currentTarget as HTMLElement).style.boxShadow='none'"
               @click.stop="insertBlockAt(btn)"
             >
-              <UIcon :name="btn.icon" style="font-size:18px;color:#0079CC;" />
-              <span style="font-size:9px;font-weight:600;color:#0045B0;text-align:center;line-height:1.2;">{{ btn.label }}</span>
+              <UIcon :name="btn.icon" style="font-size:22px;color:#0033A0;" />
+              <span style="font-size:9px;font-weight:700;color:#0033A0;text-align:center;line-height:1.2;">{{ btn.label }}</span>
             </div>
           </div>
         </div>
@@ -98,7 +109,6 @@ import { CANVAS_BRIDGE_CODE } from '../../utils/canvas-bridge';
 import { registerCanvasIframe, sendToCanvas } from '../../composables/useCanvasBridge';
 import { BUTTONS } from '../../documents/blocks/helpers/buttons';
 import TuneMenuOverlay from './TuneMenuOverlay.vue';
-import FormattingToolbar from './FormattingToolbar.vue';
 
 const store = useInspectorDrawer();
 
@@ -110,6 +120,15 @@ const editingRect = ref<{ top: number; left: number; width: number; height: numb
 const isEditing = ref(false);
 const bridgeReady = ref(false);
 const showBlockPicker = ref(false);
+const showLinkInput = ref(false);
+const linkUrl = ref('');
+
+const TEXT_BLOCK_TYPES = new Set(['Encabezado', 'Texto', 'Botón', 'Html', 'Enlace', 'Contenedor']);
+const TEXT_HTML_TAGS = new Set(['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'TD', 'TH', 'LI', 'A', 'SPAN', 'DIV']);
+const isTextBlock = computed(() =>
+  TEXT_BLOCK_TYPES.has(store.selectedElementTagName) ||
+  TEXT_HTML_TAGS.has(store.selectedElementTagName.toUpperCase())
+);
 
 // Prevent double injection on the same document write (both @load and nextTick can fire)
 let _bridgeInjected = false;
@@ -206,6 +225,7 @@ function injectBridge(doc: Document) {
   script.id = '__canvas-bridge__';
   script.textContent = CANVAS_BRIDGE_CODE;
   (doc.head || doc.body || doc.documentElement).appendChild(script);
+
 }
 
 function updateIframeHeight() {
@@ -268,7 +288,8 @@ function handleMessage(event: MessageEvent) {
       break;
 
     case 'select':
-      showBlockPicker.value = false;
+      showBlockPicker.value = data.blockType === 'placeholder';
+      
       store.selectedElementPath = data.path;
       store.selectedElementStyles = data.styles ?? {};
       store.selectedElementAttrs = data.attrs ?? {};
@@ -278,7 +299,6 @@ function handleMessage(event: MessageEvent) {
       overlayRect.value = data.rect ?? null;
       store.selectedSidebarTab = 'styles';
       if (!store.inspectorDrawerOpen) {
-        // Drawer opening causes layout shift → refresh overlay after Vue redraws
         store.inspectorDrawerOpen = true;
         if (!_overlayRefreshPending) {
           _overlayRefreshPending = true;
@@ -302,10 +322,8 @@ function handleMessage(event: MessageEvent) {
       break;
 
     case 'editing-start': {
-      // Fallback to last known overlay rect if bridge didn't send one
-      const fallbackRect = overlayRect.value;
-      overlayRect.value = null;
-      editingRect.value = data.rect ?? fallbackRect;
+      // Keep overlayRect so mini-bar stays visible during editing
+      editingRect.value = data.rect ?? overlayRect.value;
       isEditing.value = true;
       break;
     }
@@ -333,13 +351,44 @@ function handleMessage(event: MessageEvent) {
     case 'html-response':
       break;
 
+    case 'outerhtml-response':
+      if (data.html) store.htmlClipboard = data.html;
+      break;
+
+    case 'keydown': {
+      const { key, ctrlKey, shiftKey, altKey } = data;
+      const k = (key as string).toLowerCase();
+      if (ctrlKey && !shiftKey && k === 'z') { store.undoHtml(); }
+      else if (ctrlKey && (k === 'y' || (shiftKey && k === 'z'))) { store.redoHtml(); }
+      else if (ctrlKey && k === 'c' && store.selectedElementPath) {
+        sendToCanvas({ type: 'get-outerhtml', path: store.selectedElementPath });
+      } else if (ctrlKey && k === 'v' && store.htmlClipboard) {
+        sendToCanvas({ type: 'insert-html', path: store.selectedElementPath ?? 'body', position: 'after', html: store.htmlClipboard });
+      } else if (ctrlKey && k === 'd' && store.selectedElementPath) {
+        sendToCanvas({ type: 'duplicate', path: store.selectedElementPath });
+      } else if (altKey && key === 'ArrowUp' && store.selectedElementPath) {
+        sendToCanvas({ type: 'move-up', path: store.selectedElementPath });
+      } else if (altKey && key === 'ArrowDown' && store.selectedElementPath) {
+        sendToCanvas({ type: 'move-down', path: store.selectedElementPath });
+      } else if ((key === 'Delete' || key === 'Backspace') && store.selectedElementPath) {
+        sendToCanvas({ type: 'delete-element', path: store.selectedElementPath });
+        store.selectedElementPath = null;
+        overlayRect.value = null;
+      }
+      break;
+    }
+
     case 'tree-response':
       // Layer Manager picks this up via its own listener
       break;
 
     case 'drop-request':
       if (store.draggedHtml) {
-        sendToCanvas({ type: 'insert-html', path: data.path, position: 'after', html: store.draggedHtml });
+        if (store.rawHtml.includes('data-block-type="placeholder"')) {
+          sendToCanvas({ type: 'replace-html', path: '[data-block-type="placeholder"]', html: store.draggedHtml });
+        } else {
+          sendToCanvas({ type: 'insert-html', path: data.path, position: data.position ?? 'after', html: store.draggedHtml });
+        }
         store.draggedHtml = '';
       }
       break;
@@ -374,11 +423,25 @@ function insertBlockAt(btn: (typeof BUTTONS)[0]) {
   showBlockPicker.value = false;
   const path = store.selectedElementPath;
   if (!path) return;
-  sendToCanvas({ type: 'insert-html', path, position: 'after', html: btn.htmlTemplate });
+  
+  // 🚀 Si el elemento seleccionado es nuestro lienzo vacío, lo REEMPLAZAMOS
+  if (store.selectedElementTagName === 'placeholder') {
+    sendToCanvas({ type: 'replace-html', path: path, html: btn.htmlTemplate });
+  } else {
+    // Si es un bloque normal, lo insertamos DEBAJO (after)
+    sendToCanvas({ type: 'insert-html', path, position: 'after', html: btn.htmlTemplate });
+  }
 }
 
 function handleFormat(command: string, value?: string) {
   sendToCanvas({ type: 'exec-command', command, value: value ?? '' });
+}
+
+function applyLink() {
+  const url = linkUrl.value.trim();
+  if (url) handleFormat('createLink', url);
+  showLinkInput.value = false;
+  linkUrl.value = '';
 }
 
 defineExpose({ sendToCanvas });
@@ -388,13 +451,23 @@ defineExpose({ sendToCanvas });
 watch(
   () => store.rawHtml,
   (html) => {
+    console.debug('[IframeCanvas] rawHtml watcher fired | _suppressWrite:', _suppressWrite, '| overlayRect:', overlayRect.value ? 'set' : 'null');
     if (_suppressWrite) return;
     if (html) {
-      overlayRect.value = null; // Clear stale rect immediately; bridge-ready will re-highlight
+      console.debug('[IframeCanvas] rawHtml watcher: CLEARING overlayRect + rewriting iframe');
+      overlayRect.value = null;
       writeHtmlToIframe(html);
     }
   }
 );
+
+// Diagnóstico: trazar cuándo overlayRect cambia y qué lo cambia
+watch(overlayRect, (val) => {
+  console.debug('[IframeCanvas] overlayRect →', val ? `top:${val.top} left:${val.left} ${val.width}x${val.height}` : 'NULL');
+});
+watch(() => store.selectedElementTagName, (val) => {
+  console.debug('[IframeCanvas] selectedElementTagName →', JSON.stringify(val), '| isTextBlock:', TEXT_BLOCK_TYPES.has(val) || TEXT_HTML_TAGS.has(val.toUpperCase()));
+});
 
 // ── Overlay refresh ──────────────────────────────────────────────────────────
 
