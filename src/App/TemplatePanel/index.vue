@@ -12,7 +12,7 @@
     </template> 
 
     <template #list-trailing>
-      <div :class="['flex w-full justify-end md:gap-x-2', inspectorDrawer.inspectorDrawerOpen ? 'mr-8' : '']">
+      <div class="flex w-full justify-end md:gap-x-2">
         <UTooltip text="Deshacer">
           <UButton
             icon="material-symbols:undo"
@@ -32,12 +32,12 @@
             color="neutral"
           />
         </UTooltip>
-        
+
         <!-- <DownloadJson /> -->
         <ImportJson />
-        
+
         <!-- <VariablesModal /> -->
-        
+
         <UButtonGroup>
           <UTooltip text="Vista de escritorio">
             <UButton
@@ -80,16 +80,13 @@
           v-if="isIframeMode"
           :srcdoc="previewHtml"
           sandbox="allow-same-origin allow-scripts allow-popups allow-popups-to-escape-sandbox"
-          style="width:100%;height:100%;border:none;display:block;min-height:600px;"
+          style="width:100%;height:100%;border:none;display:block;min-height:00px;"
         />
         <Reader v-else :document="processedDocument" root-block-id="root" />
       </div>
     </template>
     <template #html>
       <HtmlPanel />
-    </template>
-    <template #json>
-      <JsonPanel />
     </template>
   </UTabs>
 </template>
@@ -99,9 +96,7 @@ import EditorBlock from '../../documents/editor/EditorBlock.vue'
 import { computed, watch } from 'vue'
 import { useKeyboardShortcuts } from '../../composables/useKeyboardShortcuts'
 import HtmlPanel from './HtmlPanel.vue'
-import JsonPanel from './JsonPanel.vue'
 import ImportJson from './ImportJson/index.vue'
-import DownloadJson from './DownloadJson/index.vue'
 import { useInspectorDrawer } from '../../documents/editor/editor.store'
 import VariablesModal from '../VariablesModal/index.vue'
 import { createProcessedDocument } from '../../utils/documentProcessor'
@@ -163,10 +158,6 @@ const tabs = [
   {
     icon: 'material-symbols:code',
     slot: 'html' as const
-  },
-  {
-    icon: 'material-symbols:data-object',
-    slot: 'json' as const
   }
 ]
 

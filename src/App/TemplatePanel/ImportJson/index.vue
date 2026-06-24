@@ -18,7 +18,7 @@
   
     <template #body>  
       <div class="space-y-4 z-50">  
-        <UTabs :items="importTabs" variant="link">  
+        <UTabs :items="importTabs" variant="link" v-model="activeTab">  
           <template #json>  
             <div class="space-y-4">  
               <p>  
@@ -79,19 +79,34 @@
               <div v-if="zipProcessing" class="text-center">  
                 <p>Procesando archivo ZIP...</p>  
               </div>  
-            </div>  
-          </template>  
-        </UTabs>  
-      </div>  
-    </template>  
-  
+            </div>
+          </template>
+
+          <template #html>
+            <div class="space-y-4">
+              <p>Pega el código HTML de tu plantilla.</p>
+              <UAlert v-if="htmlError" variant="subtle" color="error" :title="htmlError" />
+              <UTextarea
+                variant="outline"
+                :rows="10"
+                class="w-full"
+                v-model="htmlCode"
+                placeholder="<!DOCTYPE html>..."
+              />
+              <p class="text-xs mt-2">Esto sobrescribirá tu plantilla actual.</p>
+            </div>
+          </template>
+        </UTabs>
+      </div>
+    </template>
+
     <template #footer>  
       <div class="flex justify-end w-full gap-2 z-50">  
         <UButton variant="ghost" color="neutral" label="Cancelar" @click="handleCancel" class="cursor-pointer" />  
         <UButton   
           label="Importar"   
           @click="handleSubmit"   
-          :disabled="(activeTab === 'json' && error !== null) || zipProcessing"   
+          :disabled="(activeTab === 'json' && error !== null) || zipProcessing || (activeTab === 'html' && htmlError !== null)"   
           class="cursor-pointer"   
         />  
       </div>  
@@ -117,19 +132,14 @@ const zipProcessing = ref(false);
 const open = ref(false);
 const activeTab = ref('json');
 const zipFileInput = ref<HTMLInputElement | null>(null)
+const htmlCode = ref('')
+const htmlError = ref<string | null>(null)
 
 /** Computed */  
 const importTabs = computed(() => [
-  {
-    key: 'json',
-    label: 'Importar JSON',
-    slot: "json"
-  }, 
-  {
-    key: 'zip',
-    label: 'Importar ZIP',
-    slot: "zip"
-  }
+  { value: 'json', label: 'Importar JSON', slot: 'json' },
+  { value: 'zip',  label: 'Importar ZIP',  slot: 'zip'  },
+  { value: 'html', label: 'Importar HTML', slot: 'html' },
 ]);
 
 /** Functions */
@@ -148,17 +158,26 @@ function handleSubmit() {
 
     inspectorDrawer.resetDocument(data)
     handleCancel();
+  } else if (activeTab.value === 'html') {
+    if (!htmlCode.value.trim()) {
+      htmlError.value = 'El código HTML no puede estar vacío';
+      return;
+    }
+    inspectorDrawer.importRawHtml(htmlCode.value);
+    handleCancel();
   }
 }
 
 function handleCancel() {
   open.value = false;
   value.value = '';
-  error.value = null;  
-  zipError.value = null;  
-  zipSuccess.value = null;  
-  zipProcessing.value = false;  
-  activeTab.value = 'json';  
+  error.value = null;
+  zipError.value = null;
+  zipSuccess.value = null;
+  zipProcessing.value = false;
+  htmlCode.value = '';
+  htmlError.value = null;
+  activeTab.value = 'json';
 }
 
 async function handleZipUpload(event: Event) {
@@ -200,6 +219,17 @@ async function handleZipUpload(event: Event) {
       }));
 
       if (imageMap.size > 0) {
+        // Upload each unique base64 to CDN; fall back to base64 if no token/error
+        const uniqueDataUris = Array.from(new Set(imageMap.values()));
+        const dataUriToCdn = new Map<string, string>();
+        await Promise.all(uniqueDataUris.map(async (dataUri) => {
+          const cdn = await inspectorDrawer.convertBase64ToService(dataUri);
+          dataUriToCdn.set(dataUri, cdn);
+        }));
+        for (const [key, dataUri] of imageMap.entries()) {
+          imageMap.set(key, dataUriToCdn.get(dataUri) ?? dataUri);
+        }
+
         const resolveUri = (src: string) => {
           if (/^(https?:\/\/|data:|cid:)/i.test(src)) return null;
           return imageMap.get(src) ?? imageMap.get(src.replace(/^.*[\\/]/, '')) ?? null;
@@ -223,7 +253,7 @@ async function handleZipUpload(event: Event) {
       }
 
       inspectorDrawer.importRawHtml(htmlContent);
-      zipSuccess.value = `ZIP importado (${imageMap.size} imágenes embebidas)`;
+      zipSuccess.value = 'ZIP importado exitosamente';
       setTimeout(handleCancel, 1500);
 
     } else {
