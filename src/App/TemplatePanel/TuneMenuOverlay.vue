@@ -1,11 +1,18 @@
 <template>
   <div :style="containerStyle" @click.stop>
     <div style="display:flex;flex-direction:column;gap:2px;">
+      
       <button class="tune-btn" title="Subir"           @click="emit('action', 'up')">
         <UIcon name="material-symbols:arrow-upward"   style="font-size:20px;" />
       </button>
       <button class="tune-btn" title="Bajar"           @click="emit('action', 'down')">
         <UIcon name="material-symbols:arrow-downward" style="font-size:20px;" />
+      </button>
+      <button class="tune-btn tune-btn--nav" title="Ir al padre" @click="emit('action', 'parent')">
+        <UIcon name="material-symbols:subdirectory-arrow-left-rounded" style="font-size:20px;transform:rotate(90deg);" />
+      </button>
+      <button class="tune-btn tune-btn--nav" title="Entrar al hijo" @click="emit('action', 'child')">
+        <UIcon name="material-symbols:subdirectory-arrow-right-rounded" style="font-size:20px;" />
       </button>
       <button class="tune-btn" title="Duplicar"        @click="emit('action', 'duplicate')">
         <UIcon name="material-symbols:content-copy"   style="font-size:20px;" />
@@ -59,6 +66,12 @@ const containerStyle = computed(() => ({
 }
 .tune-btn:hover {
   background: rgba(255,255,255,0.12);
+}
+.tune-btn--nav {
+  color: #93c5fd;
+}
+.tune-btn--nav:hover {
+  background: rgba(147,197,253,0.15);
 }
 .tune-btn--delete {
   color: #f87171;

@@ -29,10 +29,6 @@
           <button @click.stop="handleFormat('underline')"     title="Subrayado"          style="width:24px;height:24px;border:none;background:transparent;color:white;font-family:serif;font-size:14px;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;"><u>U</u></button>
           <button @click.stop="handleFormat('strikeThrough')" title="Tachado"            style="width:24px;height:24px;border:none;background:transparent;color:white;font-family:serif;font-size:13px;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;"><s>S</s></button>
           <div style="width:1px;height:16px;background:rgba(255,255,255,0.3);margin:0 2px;flex-shrink:0;" />
-          <button @click.stop="handleFormat('justifyLeft')"   title="Alinear izquierda"  style="width:24px;height:24px;border:none;background:transparent;color:white;font-size:13px;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;">&#8676;</button>
-          <button @click.stop="handleFormat('justifyCenter')" title="Centrar"            style="width:24px;height:24px;border:none;background:transparent;color:white;font-size:13px;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;">&#9776;</button>
-          <button @click.stop="handleFormat('justifyRight')"  title="Alinear derecha"    style="width:24px;height:24px;border:none;background:transparent;color:white;font-size:13px;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;">&#8677;</button>
-          <div style="width:1px;height:16px;background:rgba(255,255,255,0.3);margin:0 2px;flex-shrink:0;" />
           <button @click.stop="showLinkInput = !showLinkInput" title="Enlace" style="width:24px;height:24px;border:none;background:transparent;color:white;font-size:13px;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;">🔗</button>
           <button @click.stop="handleFormat('removeFormat')"  title="Limpiar formato"    style="width:24px;height:24px;border:none;background:transparent;color:white;font-size:11px;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;">T✕</button>
           <!-- Link URL input -->
@@ -60,40 +56,75 @@
       />
 
 
-      <!-- "+" add-block button — shows below selection overlay in iframe mode -->
+      <!-- Placeholder picker — auto-opens when placeholder block is selected -->
       <div
-        v-if="overlayRect && store.selectedElementPath && !isEditing"
+        v-if="showBlockPicker && overlayRect && store.selectedElementTagName === 'placeholder'"
         :style="{
           position: 'absolute',
-          top: (overlayRect.top + overlayRect.height + 4) + 'px',
+          top: (overlayRect.top + overlayRect.height + 8) + 'px',
           left: (overlayRect.left + overlayRect.width / 2) + 'px',
           transform: 'translateX(-50%)',
-          zIndex: 200,
+          zIndex: 300,
+          background: '#0033A0',
+          borderRadius: '14px',
+          padding: '12px',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.32)',
+          width: '360px',
+          maxHeight: '420px',
+          overflowY: 'auto',
+        }"
+        @click.stop
+      >
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+          <div
+            v-for="btn in BUTTONS" :key="btn.label"
+            style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:12px 8px;background:white;border-radius:8px;cursor:pointer;min-height:80px;border:1px solid #c7d8f5;transition:border-color 0.12s,box-shadow 0.12s;"
+            @mouseenter="(($event.currentTarget as HTMLElement).style.boxShadow='0 3px 10px rgba(0,0,0,0.18)'); (($event.currentTarget as HTMLElement).style.borderColor='#0079CC')"
+            @mouseleave="(($event.currentTarget as HTMLElement).style.boxShadow='none'); (($event.currentTarget as HTMLElement).style.borderColor='#c7d8f5')"
+            @click.stop="insertBlockAt(btn)"
+          >
+            <UIcon :name="btn.icon" style="font-size:24px;color:#0033A0;" />
+            <span style="font-size:11px;font-weight:700;color:#0033A0;text-align:center;line-height:1.2;">{{ btn.label }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hover "+" button — appears on bottom edge of any block on mousemove -->
+      <div
+        v-if="addButtonInfo && !isEditing"
+        :style="{
+          position: 'absolute',
+          top: (addButtonInfo.rect.top + addButtonInfo.rect.height - 12) + 'px',
+          left: (addButtonInfo.rect.left + addButtonInfo.rect.width / 2) + 'px',
+          transform: 'translateX(-50%)',
+          zIndex: 198,
+          pointerEvents: 'all',
         }"
         @click.stop
       >
         <button
-          v-show="store.selectedElementTagName !== 'placeholder'"
           style="width:24px;height:24px;border-radius:50%;background:#0079CC;border:2px solid white;color:white;font-size:16px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,0.25);"
-          @click="showBlockPicker = !showBlockPicker"
+          @click.stop="showAddPicker = !showAddPicker; showBlockPicker = false"
         >+</button>
 
-        <!-- Block picker popup -->
         <div
-          v-if="showBlockPicker"
-          style="position:absolute;top:30px;left:50%;transform:translateX(-50%);background:#0033A0;border-radius:14px;padding:12px;box-shadow:0 8px 32px rgba(0,0,0,0.32);z-index:300;width:296px;max-height:380px;overflow-y:auto;"
+          v-if="showAddPicker"
+          style="position:absolute;top:30px;left:50%;transform:translateX(-50%);background:#0033A0;border-radius:8px;padding:16px;box-shadow:0 8px 32px rgba(0,0,0,0.32);z-index:300;width:340px;max-height:400px;overflow-y:auto;"
         >
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
             <div
               v-for="btn in BUTTONS"
               :key="btn.label"
-              style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:10px 4px 8px;background:white;border-radius:8px;cursor:pointer;min-height:72px;"
-              @mouseenter="($event.currentTarget as HTMLElement).style.boxShadow='0 2px 8px rgba(0,0,0,0.18)'"
-              @mouseleave="($event.currentTarget as HTMLElement).style.boxShadow='none'"
-              @click.stop="insertBlockAt(btn)"
+              style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:8px;padding:10px 4px;border-radius:4px;cursor:pointer;border:1px solid transparent;transition:border-color 0.15s;"
+              @mouseenter="($event.currentTarget as HTMLElement).style.borderColor='white'"
+              @mouseleave="($event.currentTarget as HTMLElement).style.borderColor='transparent'"
+              
+              @click.stop="insertBlockFromAdd(btn)"
             >
-              <UIcon :name="btn.icon" style="font-size:22px;color:#0033A0;" />
-              <span style="font-size:9px;font-weight:700;color:#0033A0;text-align:center;line-height:1.2;">{{ btn.label }}</span>
+              <div style="width:38px;height:38px;background:white;border-radius:2px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+                <UIcon :name="btn.icon" style="font-size:22px;color:#111111;" />
+              </div>
+              <span style="font-size:11px;font-weight:600;color:white;text-align:center;line-height:1.2;">{{ btn.label }}</span>
             </div>
           </div>
         </div>
@@ -120,6 +151,8 @@ const editingRect = ref<{ top: number; left: number; width: number; height: numb
 const isEditing = ref(false);
 const bridgeReady = ref(false);
 const showBlockPicker = ref(false);
+const showAddPicker = ref(false);
+const addButtonInfo = ref<{ rect: { top: number; left: number; width: number; height: number }; path: string } | null>(null);
 const showLinkInput = ref(false);
 const linkUrl = ref('');
 
@@ -140,6 +173,9 @@ let _saveTimer: ReturnType<typeof setTimeout> | null = null;
 let _overlayRefreshPending = false;
 // ResizeObserver to catch iframe size changes (window resize, drawer open/close, etc.)
 let _resizeObserver: ResizeObserver | null = null;
+let _scrollEndTimer: ReturnType<typeof setTimeout> | null = null; // used by iframe-internal-scroll backup
+// Debounce ResizeObserver: body-height pushes fire every 300ms → collapses multiple into one highlight
+let _resyncTimer: ReturnType<typeof setTimeout> | null = null;
 
 // ── Styles ───────────────────────────────────────────────────────────────────
 
@@ -167,6 +203,7 @@ const iframeStyle = computed(() => ({
   width: '100%',
   height: iframeHeight.value + 'px',
   border: 'none',
+  pointerEvents: showAddPicker.value ? 'none' : 'auto',
 }));
 
 const overlayWrapperStyle = computed(() => {
@@ -221,11 +258,24 @@ function injectBridge(doc: Document) {
   if (existing) existing.remove();
   try { (doc.defaultView as any).__canvasBridgeActive = false; } catch(e) {}
 
+  const existingPad = doc.getElementById('__canvas-padding__');
+  if (!existingPad) {
+    const style = doc.createElement('style');
+    style.id = '__canvas-padding__';
+    // Force html+body to auto-height so the iframe expands to full content height
+    // instead of scrolling internally (templates often set height:100% which traps scroll inside the iframe)
+    style.textContent = [
+      'html { height: auto !important; overflow-y: visible !important; }',
+      'body { height: auto !important; overflow-y: visible !important; padding-bottom: 160px !important; }',
+      '* { word-break: break-word; overflow-wrap: break-word; }',
+    ].join('\n');
+    (doc.head || doc.body || doc.documentElement).appendChild(style);
+  }
+
   const script = doc.createElement('script');
   script.id = '__canvas-bridge__';
   script.textContent = CANVAS_BRIDGE_CODE;
   (doc.head || doc.body || doc.documentElement).appendChild(script);
-
 }
 
 function updateIframeHeight() {
@@ -236,18 +286,14 @@ function updateIframeHeight() {
     doc.body?.scrollHeight ?? 0,
     400
   );
-  const changed = h !== iframeHeight.value;
   iframeHeight.value = h;
-  // Height changed → element positions shifted → refresh overlay (guarded against re-entry)
-  if (changed && store.selectedElementPath && !_overlayRefreshPending) {
-    _overlayRefreshPending = true;
-    nextTick(() => {
-      _overlayRefreshPending = false;
-      if (store.selectedElementPath) {
-        sendToCanvas({ type: 'highlight', path: store.selectedElementPath });
-      }
-    });
-  }
+  // ResizeObserver on the iframe element fires when height changes and handles overlay resync.
+}
+
+function insertBlockFromAdd(btn: (typeof BUTTONS)[0]) {
+  showAddPicker.value = false;
+  if (!addButtonInfo.value) { return; }
+  sendToCanvas({ type: 'insert-html', path: addButtonInfo.value.path, position: 'after', html: btn.htmlTemplate });
 }
 
 // ── iframe load handler ──────────────────────────────────────────────────────
@@ -287,9 +333,16 @@ function handleMessage(event: MessageEvent) {
       }
       break;
 
+    case 'hover-block-bottom':
+      if (!showAddPicker.value) {
+        addButtonInfo.value = data.rect ? { rect: data.rect, path: data.path } : null;
+      }
+      break;
+
     case 'select':
+      if (showAddPicker.value) break;
       showBlockPicker.value = data.blockType === 'placeholder';
-      
+
       store.selectedElementPath = data.path;
       store.selectedElementStyles = data.styles ?? {};
       store.selectedElementAttrs = data.attrs ?? {};
@@ -314,6 +367,8 @@ function handleMessage(event: MessageEvent) {
 
     case 'deselect':
       showBlockPicker.value = false;
+      showAddPicker.value = false;
+      addButtonInfo.value = null;
       store.selectedElementPath = null;
       store.selectedElementStyles = {};
       store.selectedElementAttrs = {};
@@ -345,6 +400,29 @@ function handleMessage(event: MessageEvent) {
           _saveTimer = null;
         }, 150);
         nextTick(updateIframeHeight);
+      }
+      break;
+
+    case 'image-loaded':
+      nextTick(updateIframeHeight);
+      break;
+
+    case 'iframe-internal-scroll':
+      // Template CSS resisted height:auto — iframe is scrolling internally.
+      // Mirror the same clear-and-resync logic as containerRef scroll.
+      overlayRect.value = null;
+      if (_scrollEndTimer) clearTimeout(_scrollEndTimer);
+      _scrollEndTimer = setTimeout(() => {
+        _scrollEndTimer = null;
+        if (store.selectedElementPath) {
+          sendToCanvas({ type: 'highlight', path: store.selectedElementPath });
+        }
+      }, 150);
+      break;
+
+    case 'body-height':
+      if (data.height && data.height > iframeHeight.value) {
+        iframeHeight.value = data.height;
       }
       break;
 
@@ -384,8 +462,8 @@ function handleMessage(event: MessageEvent) {
 
     case 'drop-request':
       if (store.draggedHtml) {
-        if (store.rawHtml.includes('data-block-type="placeholder"')) {
-          sendToCanvas({ type: 'replace-html', path: '[data-block-type="placeholder"]', html: store.draggedHtml });
+        if (data.isPlaceholder) {
+          sendToCanvas({ type: 'replace-html', path: data.path, html: store.draggedHtml });
         } else {
           sendToCanvas({ type: 'insert-html', path: data.path, position: data.position ?? 'after', html: store.draggedHtml });
         }
@@ -400,6 +478,8 @@ function handleMessage(event: MessageEvent) {
 function handleTuneAction(action: string) {
   const path = store.selectedElementPath;
   if (!path) return;
+  showAddPicker.value = false;
+  showBlockPicker.value = false;
   switch (action) {
     case 'up':        sendToCanvas({ type: 'move-up',   path }); break;
     case 'down':      sendToCanvas({ type: 'move-down', path }); break;
@@ -409,11 +489,14 @@ function handleTuneAction(action: string) {
       overlayRect.value = null;
       break;
     case 'parent':    sendToCanvas({ type: 'select-parent', path }); break;
+    case 'child':     sendToCanvas({ type: 'select-child',  path }); break;
   }
 }
 
 function handleContainerClick() {
   showBlockPicker.value = false;
+  showAddPicker.value = false;
+  addButtonInfo.value = null;
   sendToCanvas({ type: 'deselect' });
   overlayRect.value = null;
   store.selectedElementPath = null;
@@ -451,45 +534,66 @@ defineExpose({ sendToCanvas });
 watch(
   () => store.rawHtml,
   (html) => {
-    console.debug('[IframeCanvas] rawHtml watcher fired | _suppressWrite:', _suppressWrite, '| overlayRect:', overlayRect.value ? 'set' : 'null');
-    if (_suppressWrite) return;
+    if (_suppressWrite) { return; }
     if (html) {
-      console.debug('[IframeCanvas] rawHtml watcher: CLEARING overlayRect + rewriting iframe');
       overlayRect.value = null;
       writeHtmlToIframe(html);
     }
   }
 );
 
-// Diagnóstico: trazar cuándo overlayRect cambia y qué lo cambia
-watch(overlayRect, (val) => {
-  console.debug('[IframeCanvas] overlayRect →', val ? `top:${val.top} left:${val.left} ${val.width}x${val.height}` : 'NULL');
-});
-watch(() => store.selectedElementTagName, (val) => {
-  console.debug('[IframeCanvas] selectedElementTagName →', JSON.stringify(val), '| isTextBlock:', TEXT_BLOCK_TYPES.has(val) || TEXT_HTML_TAGS.has(val.toUpperCase()));
-});
-
 // ── Overlay refresh ──────────────────────────────────────────────────────────
 
+// Drawer open/close shifts the canvas position without changing iframe size → ResizeObserver won't fire
+watch([() => store.inspectorDrawerOpen, () => store.samplesDrawerOpen], () => {
+  nextTick(() => resyncOverlayPosition());
+});
+
+watch(() => store.selectedScreenSize, () => {
+  nextTick(() => {
+    updateIframeHeight();
+    if (store.selectedElementPath) {
+      setTimeout(() => {
+        if (store.selectedElementPath) {
+          sendToCanvas({ type: 'highlight', path: store.selectedElementPath });
+        }
+      }, 80);
+    }
+  });
+});
+
 function refreshOverlayOnScroll() {
+  // The overlay is position:absolute inside the scrollable wrapper — it tracks the block
+  // automatically with no JS needed. Just debounce a resync after scroll settles in case
+  // of layout shifts. Do NOT clear overlayRect here (that causes the flicker).
+  resyncOverlayPosition();
+}
+
+function resyncOverlayPosition() {
+  // Resync coords without hiding (used by ResizeObserver — iframe resize ≠ scroll).
+  // Debounced: body-height pushes fire every 300ms and each one grows the iframe,
+  // causing rapid ResizeObserver fires — collapse them into a single highlight per burst.
   if (!store.selectedElementPath) return;
-  // RAF ensures parent layout has settled before asking bridge for new coords
-  requestAnimationFrame(() => {
+  if (_resyncTimer) clearTimeout(_resyncTimer);
+  _resyncTimer = setTimeout(() => {
+    _resyncTimer = null;
     if (store.selectedElementPath) {
       sendToCanvas({ type: 'highlight', path: store.selectedElementPath });
     }
-  });
+  }, 80);
 }
 
 // ── Lifecycle ────────────────────────────────────────────────────────────────
 
 onMounted(() => {
   window.addEventListener('message', handleMessage);
+  window.addEventListener('resize', resyncOverlayPosition);
   containerRef.value?.addEventListener('scroll', refreshOverlayOnScroll);
+  containerRef.value?.addEventListener('scroll', () => { if (!showAddPicker.value) addButtonInfo.value = null; });
   registerCanvasIframe(iframeRef.value);
 
-  // ResizeObserver covers window resize + drawer open/close + mobile toggle
-  _resizeObserver = new ResizeObserver(() => refreshOverlayOnScroll());
+  // ResizeObserver catches iframe height changes (content grows, images load, etc.)
+  _resizeObserver = new ResizeObserver(() => resyncOverlayPosition());
   if (iframeRef.value) _resizeObserver.observe(iframeRef.value);
 
   if (store.rawHtml) writeHtmlToIframe(store.rawHtml);
@@ -497,10 +601,13 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('message', handleMessage);
+  window.removeEventListener('resize', resyncOverlayPosition);
   containerRef.value?.removeEventListener('scroll', refreshOverlayOnScroll);
   _resizeObserver?.disconnect();
   _resizeObserver = null;
   if (_saveTimer) clearTimeout(_saveTimer);
+  if (_scrollEndTimer) clearTimeout(_scrollEndTimer);
+  if (_resyncTimer) clearTimeout(_resyncTimer);
   registerCanvasIframe(null);
 });
 </script>

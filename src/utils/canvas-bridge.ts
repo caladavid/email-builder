@@ -7,6 +7,7 @@ export const CANVAS_BRIDGE_CODE = `
   const IGNORE_TAGS = new Set(['HTML', 'HEAD', 'BODY', 'STYLE', 'SCRIPT', 'META', 'LINK', 'TITLE', 'NOSCRIPT']);
   // Denylist: any element NOT in this set can be inline-edited on dblclick
   const NON_EDITABLE_TAGS = new Set(['TABLE', 'THEAD', 'TBODY', 'TFOOT', 'TR', 'COLGROUP', 'COL', 'IMG', 'VIDEO', 'AUDIO', 'CANVAS', 'SVG', 'IFRAME', 'OBJECT', 'EMBED', 'FORM', 'INPUT', 'SELECT', 'TEXTAREA', 'BUTTON', 'BR', 'HR', 'WBR']);
+  const TABLE_INT = new Set(['TR', 'TD', 'TH', 'TBODY', 'THEAD', 'TFOOT', 'COLGROUP', 'COL']);
 
   var hoveredEl = null;
   var selectedEl = null;
@@ -15,6 +16,8 @@ export const CANVAS_BRIDGE_CODE = `
   var prevSelOutline = '';
   var prevSelOutlineOffset = '';
   var _internalDragEl = null;
+  var _selectGen = 0; // cancels stale selectAfterImagesLoad callbacks
+
 
   // Walk up to data-block-type; if not found, use the clicked element directly
   // (imported templates have no data-block-type so we allow individual element selection)
@@ -24,7 +27,6 @@ export const CANVAS_BRIDGE_CODE = `
       cur = cur.parentElement;
     }
     if (cur && cur !== document.body && cur !== document.documentElement) {
-      console.debug('[bridge] findBlockEl: data-block-type', cur.tagName, cur.getAttribute('data-block-type'));
       return cur;
     }
     // No data-block-type — select the clicked element itself (skip ignored tags)
@@ -32,7 +34,6 @@ export const CANVAS_BRIDGE_CODE = `
     while (target && (IGNORE_TAGS.has(target.tagName) || target === document.body || target === document.documentElement)) {
       target = target.parentElement;
     }
-    console.debug('[bridge] findBlockEl: fallback direct', target ? target.tagName : 'null', target ? (target.className || target.id || '') : '');
     return target || null;
   }
 
@@ -66,7 +67,7 @@ export const CANVAS_BRIDGE_CODE = `
       fontFamily: pick(s.fontFamily, cs.fontFamily),
       fontWeight: pick(s.fontWeight, cs.fontWeight),
       fontStyle: pick(s.fontStyle, cs.fontStyle),
-      textAlign: pick(s.textAlign, cs.textAlign),
+      textAlign: (function(v){ return v==='start'?'left':v==='end'?'right':v; })(pick(s.textAlign, cs.textAlign)),
       lineHeight: pick(s.lineHeight, cs.lineHeight),
       letterSpacing: pick(s.letterSpacing, cs.letterSpacing),
       paddingTop: pick(s.paddingTop, cs.paddingTop),
@@ -85,6 +86,7 @@ export const CANVAS_BRIDGE_CODE = `
       borderStyle: pick(s.borderStyle, cs.borderStyle),
       borderRadius: pick(s.borderRadius, cs.borderRadius),
       textDecoration: pick(s.textDecoration, cs.textDecoration),
+      display: pick(s.display, cs.display),
     };
   }
 
@@ -110,6 +112,21 @@ export const CANVAS_BRIDGE_CODE = `
     parent.postMessage({ type: 'dom-changed', html: html }, '*');
   }
 
+  // Debounced version for rapid-fire style changes (slider drag).
+  // Style applies immediately; DOM sync + overlay update fire once drag settles.
+  var _styleDebTimer = null;
+  var _styleDebTarget = null;
+  function notifyStyleDebounced(target) {
+    _styleDebTarget = target;
+    clearTimeout(_styleDebTimer);
+    _styleDebTimer = setTimeout(function() {
+      _styleDebTimer = null;
+      notifyDomChanged();
+      if (_styleDebTarget && _styleDebTarget === selectedEl) selectElement(_styleDebTarget);
+      _styleDebTarget = null;
+    }, 120);
+  }
+
   function clearOutline(el, outline, outlineOffset) {
     if (!el) return;
     el.style.outline = outline || '';
@@ -118,7 +135,6 @@ export const CANVAS_BRIDGE_CODE = `
 
   function selectElement(el) {
     if (!el) return;
-    console.debug('[bridge] selectElement:', el.tagName, '| data-block-type:', el.getAttribute('data-block-type'), '| depth from body:', (function(e){var d=0;while(e&&e!==document.body){d++;e=e.parentElement;}return d;})(el));
     // clear previous selection — always restore to empty, never back to a saved blue outline
     if (selectedEl && selectedEl !== el) {
       clearOutline(selectedEl, '', '');
@@ -131,21 +147,56 @@ export const CANVAS_BRIDGE_CODE = `
     var staleHovers = el.querySelectorAll('[style*="outline"]');
     for (var si = 0; si < staleHovers.length; si++) { staleHovers[si].style.outline = ''; }
     try { el.setAttribute('draggable', 'true'); } catch(err) {}
-    el.style.outline = '2px solid rgba(0,121,204,1)';
-    el.style.outlineOffset = '-1px';
 
     var rect = el.getBoundingClientRect();
     var blockType = el.getAttribute('data-block-type');
     var childData = { _tag: el.tagName.toLowerCase() };
     if (blockType === 'Botón') {
       var btnA = el.querySelector('a');
-      if (btnA) { childData.text = (btnA.innerText || '').trim(); childData.href = btnA.getAttribute('href') || ''; childData.bg = btnA.style.backgroundColor || btnA.style.background || ''; childData.color = btnA.style.color || ''; }
+      if (btnA) {
+        childData.text = (btnA.innerText || '').trim();
+        childData.href = btnA.getAttribute('href') || '';
+        childData.bg = btnA.style.backgroundColor || btnA.style.background || '';
+        childData.color = btnA.style.color || '';
+        childData.btnPaddingH = btnA.style.paddingLeft || '20';
+        childData.btnPaddingV = btnA.style.paddingTop || '12';
+        childData.target = btnA.getAttribute('target') || '_self';
+        childData.borderRadius = btnA.style.borderRadius || '4px';
+      }
     } else if (blockType === 'Imagen') {
       var btnImg = el.querySelector('img');
-      if (btnImg) { childData.src = btnImg.getAttribute('src') || ''; childData.alt = btnImg.getAttribute('alt') || ''; }
+      if (btnImg) {
+        childData.src = btnImg.getAttribute('src') || '';
+        childData.alt = btnImg.getAttribute('alt') || '';
+        var linkA = el.querySelector('a');
+        childData.linkHref = linkA ? (linkA.getAttribute('href') || '') : '';
+      }
     } else if (blockType === 'Separador') {
       var btnHr = el.querySelector('hr');
       if (btnHr) { childData.borderColor = btnHr.style.borderTopColor || btnHr.style.borderColor || '#CCCCCC'; childData.borderWidth = btnHr.style.borderTopWidth || '1px'; }
+    } else if (blockType === 'Avatar') {
+      var avImg = el.querySelector('img');
+      if (avImg) {
+        childData.src = avImg.getAttribute('src') || '';
+        childData.alt = avImg.getAttribute('alt') || '';
+        childData.size = (avImg.style.width || avImg.getAttribute('width') || '64').replace('px', '');
+        var br = avImg.style.borderRadius || '';
+        childData.shape = br === '50%' ? 'circle' : (br && br !== '0' && br !== '0px') ? 'rounded' : 'square';
+      }
+    } else if (blockType === 'Columnas') {
+      var colTds = el.querySelectorAll('tr:first-child > td, tr:first-child > th');
+      childData.columnsCount = String(colTds.length);
+      childData.colGap = colTds[0] ? (colTds[0].style.paddingLeft || '8').replace('px', '') : '8';
+      for (var ci = 0; ci < colTds.length; ci++) {
+        childData['col_' + ci + '_width'] = colTds[ci].style.width || '';
+      }
+    } else if (blockType === 'Table') {
+      var firstTd = el.querySelector('td');
+      if (firstTd) {
+        childData.cellBorderColor = firstTd.style.borderColor || firstTd.style.borderTopColor || '#cccccc';
+        childData.cellBorderWidth = (firstTd.style.borderWidth || firstTd.style.borderTopWidth || '1').replace('px', '');
+        childData.cellPadding = (firstTd.style.padding || firstTd.style.paddingTop || '8').replace('px', '');
+      }
     }
     parent.postMessage({
       type: 'select',
@@ -170,7 +221,16 @@ export const CANVAS_BRIDGE_CODE = `
     var el = e.target;
     if (!el || IGNORE_TAGS.has(el.tagName)) return;
     if (el === selectedEl || el === editingEl) return;
-    if (selectedEl && selectedEl.contains(el)) return;
+    if (selectedEl && selectedEl.contains(el)) {
+      // Allow hover on distinct child blocks inside a selected parent (e.g. heading inside Columnas)
+      var nb = el;
+      while (nb && nb !== selectedEl) {
+        if (nb.getAttribute && nb.getAttribute('data-block-type')) break;
+        nb = nb.parentElement;
+      }
+      if (!nb || nb === selectedEl) return;
+      el = nb; // hover the child block root, not the inner leaf
+    }
     if (hoveredEl && hoveredEl !== selectedEl && hoveredEl !== editingEl) {
       if (hoveredEl.style.outline.includes('dashed')) {
         hoveredEl.style.outline = prevHoverOutline || '';
@@ -191,6 +251,34 @@ export const CANVAS_BRIDGE_CODE = `
     }
   }, true);
 
+  // INPUT while editing → debounce re-measure overlay rect as block grows
+  var _editResizeTimer = null;
+  document.addEventListener('input', function() {
+    if (!editingEl) return;
+    clearTimeout(_editResizeTimer);
+    _editResizeTimer = setTimeout(function() {
+      _editResizeTimer = null;
+      if (editingEl) selectElement(editingEl);
+    }, 80);
+  }, true);
+
+  // DBLCLICK → enter edit mode for palette blocks (data-block-type) that are text-editable
+  document.addEventListener('dblclick', function (e) {
+    var el = e.target;
+    if (!el || IGNORE_TAGS.has(el.tagName)) return;
+    if (editingEl) return;
+    var block = findBlockEl(el);
+    if (!block) return;
+    if (NON_EDITABLE_TAGS.has(block.tagName)) return;
+    e.stopPropagation();
+    editingEl = block;
+    try { block.removeAttribute('draggable'); } catch(err) {}
+    block.contentEditable = 'true';
+    block.focus();
+    var er = block.getBoundingClientRect();
+    parent.postMessage({ type: 'editing-start', path: getElementPath(block), rect: { top: er.top + window.scrollY, left: er.left + window.scrollX, width: er.width, height: er.height } }, '*');
+  }, true);
+
   // CLICK → SELECT (walk up to block root, fallback to direct body child for imported templates)
   document.addEventListener('click', function (e) {
     var el = e.target;
@@ -199,22 +287,28 @@ export const CANVAS_BRIDGE_CODE = `
       if (!editingEl.contains(el)) {
         exitEditing();
       } else {
-        return; // click inside editing element → just move cursor, no re-select
+        // Click inside editing element — if it's a distinct named sub-block, escape and select it
+        var innerBlock = findBlockEl(el);
+        if (innerBlock && innerBlock !== editingEl && innerBlock.getAttribute('data-block-type')) {
+          exitEditing();
+          // fall through to selectElement(innerBlock) below
+        } else {
+          return; // just move cursor
+        }
       }
     }
     e.stopPropagation();
     var block = findBlockEl(el);
-    if (!block) return;
-    selectElement(block);
-    // For imported templates (no data-block-type), auto-enter edit mode on click for text elements
-    if (!block.getAttribute('data-block-type') && !NON_EDITABLE_TAGS.has(block.tagName) && !editingEl) {
-      editingEl = block;
-      try { block.removeAttribute('draggable'); } catch(err) {}
-      block.contentEditable = 'true';
-      block.focus();
-      var er2 = block.getBoundingClientRect();
-      parent.postMessage({ type: 'editing-start', path: getElementPath(block), rect: { top: er2.top + window.scrollY, left: er2.left + window.scrollX, width: er2.width, height: er2.height } }, '*');
+    if (!block) {
+      if (selectedEl) {
+        clearOutline(selectedEl, '', '');
+        try { selectedEl.removeAttribute('draggable'); } catch(err) {}
+        selectedEl = null;
+        parent.postMessage({ type: 'deselect' }, '*');
+      }
+      return;
     }
+    selectElement(block);
   }, true);
 
 
@@ -226,11 +320,8 @@ export const CANVAS_BRIDGE_CODE = `
     exiting.blur();
     notifyDomChanged();
     parent.postMessage({ type: 'editing-end' }, '*');
-    // Re-select to restore blue outline (exitEditing may have cleared it)
-    if (exiting === selectedEl) {
-      exiting.style.outline = '2px solid rgba(0,121,204,1)';
-      exiting.style.outlineOffset = '-1px';
-    }
+    // Do NOT re-select exiting: it sends a stale 'select' for the old element right before
+    // the new click's 'select' arrives, causing the overlay to flash to the wrong position.
   }
 
   document.addEventListener('keydown', function (e) {
@@ -259,6 +350,26 @@ export const CANVAS_BRIDGE_CODE = `
     parent.postMessage({ type: 'keydown', key: e.key, ctrlKey: !!e.ctrlKey, shiftKey: !!e.shiftKey, altKey: !!e.altKey }, '*');
   }, true);
 
+  // Defers selectElement until all <img> in el have loaded (or errored).
+  // Prevents stale/tiny overlayRect when image hasn't loaded yet.
+  function selectAfterImagesLoad(el) {
+    var gen = ++_selectGen;
+    var imgs = el.querySelectorAll('img');
+    if (imgs.length === 0) {
+      if (gen === _selectGen) selectElement(el);
+      return;
+    }
+    var pending = imgs.length;
+    function done() {
+      pending--;
+      if (pending <= 0 && gen === _selectGen) selectElement(el);
+    }
+    for (var i = 0; i < imgs.length; i++) {
+      if (imgs[i].complete) { done(); }
+      else { imgs[i].addEventListener('load', done, { once: true }); imgs[i].addEventListener('error', done, { once: true }); }
+    }
+  }
+
   // COMMANDS FROM PARENT
   window.addEventListener('message', function (e) {
     if (!e.data || !e.data.type) return;
@@ -275,8 +386,7 @@ export const CANVAS_BRIDGE_CODE = `
     switch (cmd.type) {
       case 'set-style':
         if (target) { target.style[cmd.property] = cmd.value; }
-        notifyDomChanged();
-        if (target && target === selectedEl) selectElement(target);
+        notifyStyleDebounced(target);
         break;
 
       case 'remove-style':
@@ -318,7 +428,7 @@ export const CANVAS_BRIDGE_CODE = `
           var chSt = target.querySelector(cmd.selector);
           if (chSt) chSt.style[cmd.property] = cmd.value;
         }
-        notifyDomChanged();
+        notifyStyleDebounced(target);
         break;
 
       case 'set-child-text':
@@ -329,6 +439,16 @@ export const CANVAS_BRIDGE_CODE = `
         notifyDomChanged();
         break;
 
+      case 'set-children-style':
+        if (target) {
+          var chAllSt = target.querySelectorAll(cmd.selector);
+          for (var csi = 0; csi < chAllSt.length; csi++) {
+            chAllSt[csi].style[cmd.property] = cmd.value;
+          }
+        }
+        notifyStyleDebounced(target);
+        break;
+
       case 'change-tag': {
         if (target) {
           var newEl = document.createElement(cmd.tag);
@@ -337,6 +457,9 @@ export const CANVAS_BRIDGE_CODE = `
             newEl.setAttribute(a.name, a.value);
           }
           newEl.innerHTML = target.innerHTML;
+          var headingSizes = { h1:'36px', h2:'28px', h3:'22px', h4:'18px', h5:'16px', h6:'14px' };
+          var hSize = headingSizes[cmd.tag.toLowerCase()];
+          if (hSize) newEl.style.fontSize = hSize;
           target.parentElement.replaceChild(newEl, target);
           notifyDomChanged();
           selectElement(newEl);
@@ -351,6 +474,14 @@ export const CANVAS_BRIDGE_CODE = `
             selectedEl = null;
           }
           target.remove();
+          var remaining = [].slice.call(document.body.children).filter(function(c) { return c.tagName !== 'SCRIPT'; });
+          if (remaining.length === 0) {
+            var ph = document.createElement('div');
+            ph.setAttribute('data-block-type', 'placeholder');
+            ph.setAttribute('style', 'margin:0 auto;width:100%;min-height:60px;border:2px dashed #c7d8f5;border-radius:6px;background:#ffffff;display:flex;align-items:center;justify-content:center;cursor:pointer;');
+            ph.innerHTML = '<svg width="24" height="24" viewBox="0 0 40 40" fill="none" style="pointer-events:none;"><path d="M20 11v18M11 20h18" stroke="#0045B0" stroke-width="2.5" stroke-linecap="round"/></svg>';
+            document.body.appendChild(ph);
+          }
           notifyDomChanged();
           parent.postMessage({ type: 'deselect' }, '*');
         }
@@ -392,9 +523,27 @@ export const CANVAS_BRIDGE_CODE = `
         break;
 
       case 'select-parent':
+        if (editingEl) exitEditing();
         if (target) {
           var par = target.parentElement;
           if (par && !IGNORE_TAGS.has(par.tagName)) selectElement(par);
+        }
+        break;
+
+      case 'select-child':
+        if (editingEl) exitEditing();
+        if (target) {
+          var _findChild = function(el) {
+            for (var i = 0; i < el.children.length; i++) {
+              var c = el.children[i];
+              if (!IGNORE_TAGS.has(c.tagName) && !TABLE_INT.has(c.tagName)) return c;
+              var deeper = _findChild(c);
+              if (deeper) return deeper;
+            }
+            return null;
+          };
+          var ch = _findChild(target);
+          if (ch) selectElement(ch);
         }
         break;
 
@@ -402,7 +551,7 @@ export const CANVAS_BRIDGE_CODE = `
         var wrapper = document.createElement('div');
         wrapper.innerHTML = cmd.html || '';
         var newEl = wrapper.firstElementChild;
-        if (!newEl) break;
+        if (!newEl) { break; }
         var ref = target || document.body;
         if (ref === document.body) {
           var lastChild = document.body.lastElementChild;
@@ -416,7 +565,7 @@ export const CANVAS_BRIDGE_CODE = `
           ref.after(newEl);
         }
         notifyDomChanged();
-        selectElement(newEl);
+        selectAfterImagesLoad(newEl);
         break;
       }
 
@@ -435,7 +584,7 @@ export const CANVAS_BRIDGE_CODE = `
         if (rNewEl && target && target.parentElement) {
           target.parentElement.replaceChild(rNewEl, target);
           notifyDomChanged();
-          selectElement(rNewEl);
+          selectAfterImagesLoad(rNewEl);
         }
         break;
       }
@@ -524,7 +673,7 @@ export const CANVAS_BRIDGE_CODE = `
     var el = document.createElement('div');
     el.id = '__drop-indicator__';
     el.style.cssText = 'position:fixed;pointer-events:none;z-index:9999;box-sizing:border-box;border:2px dashed rgba(0,69,176,0.55);border-radius:8px;background:rgba(0,69,176,0.05);';
-    document.body.appendChild(el);
+    document.documentElement.appendChild(el);
     return el;
   }
 
@@ -582,10 +731,37 @@ export const CANVAS_BRIDGE_CODE = `
     var el = e.target;
     while (el && el !== document.body && IGNORE_TAGS.has(el.tagName)) el = el.parentElement;
     if (!el || el === document.documentElement || el === dropIndicator) return;
-    if (el === document.body) el = document.body.lastElementChild || document.body;
+    if (el === document.body) {
+      var bodyKids = document.body.children;
+      var lastContent = null;
+      for (var bki = bodyKids.length - 1; bki >= 0; bki--) {
+        if (bodyKids[bki].id !== '__drop-indicator__') { lastContent = bodyKids[bki]; break; }
+      }
+      el = lastContent || document.body;
+    }
     if (_internalDragEl && (_internalDragEl === el || _internalDragEl.contains(el))) return;
     var candidate = findBlockEl(el);
     if (!candidate) return;
+
+    // If candidate is a child inside a Columnas block, check if cursor is near the
+    // top/bottom edge of the whole table. If so, reroute to drop before/after the
+    // entire Columnas block instead of inside a column cell.
+    var columnsAncestor = null;
+    var walkUpEl = candidate.parentElement;
+    while (walkUpEl && walkUpEl !== document.body) {
+      if (walkUpEl.getAttribute && walkUpEl.getAttribute('data-block-type') === 'Columnas') {
+        columnsAncestor = walkUpEl;
+        break;
+      }
+      walkUpEl = walkUpEl.parentElement;
+    }
+    if (columnsAncestor) {
+      var caRect = columnsAncestor.getBoundingClientRect();
+      var EDGE_PX = 24;
+      if (e.clientY < caRect.top + EDGE_PX || e.clientY > caRect.bottom - EDGE_PX) {
+        candidate = columnsAncestor;
+      }
+    }
 
     // Walk up to find placeholder ancestor
     var phEl = candidate;
@@ -635,7 +811,8 @@ export const CANVAS_BRIDGE_CODE = `
     } else {
       if (!dropTarget) return;
       var path = getElementPath(dropTarget);
-      parent.postMessage({ type: 'drop-request', path: path, position: _dropPosition }, '*');
+      var isPlaceholder = dropTarget.getAttribute('data-block-type') === 'placeholder';
+      parent.postMessage({ type: 'drop-request', path: path, position: _dropPosition, isPlaceholder: isPlaceholder }, '*');
       dropTarget = null;
     }
   });
@@ -646,6 +823,97 @@ export const CANVAS_BRIDGE_CODE = `
     while (el && el.tagName !== 'A') el = el.parentElement;
     if (el && el.tagName === 'A') e.preventDefault();
   }, true);
+
+  // HOVER BOTTOM EDGE → notify parent to show "+" add button
+  var _hoverBottomEl = null;
+  document.addEventListener('mousemove', function(e) {
+    var el = e.target;
+    // Only block hover-bottom detection when cursor is INSIDE the editing element.
+    // If cursor moved outside (to another block), still detect "+" so it stays usable.
+    if (editingEl && el && editingEl.contains(el)) {
+      if (_hoverBottomEl !== null) {
+        _hoverBottomEl = null;
+        parent.postMessage({ type: 'hover-block-bottom', rect: null, path: null }, '*');
+      }
+      return;
+    }
+    var block = null;
+    var _dbgStep = 'none';
+    if (el && el !== document.body && el !== document.documentElement) {
+      var cur = el;
+      while (cur && cur !== document.body) {
+        if (cur.getAttribute && cur.getAttribute('data-block-type')) { block = cur; break; }
+        cur = cur.parentElement;
+      }
+      if (block && block.getAttribute('data-block-type') === 'placeholder') block = null;
+      if (block) _dbgStep = 'data-block-type';
+      // Fallback for imported templates: walk up from e.target and find the first
+      // non-IGNORE, non-TABLE_INT element the cursor is hovering in/near.
+      // TABLE_INT (TD/TR/TH etc.) are excluded because inserting after them breaks table structure.
+      // Everything else (SPAN, STRONG, DIV, P, H1-H6, IMG, A…) is a valid insert target.
+      if (!block) {
+        var wb = el;
+        while (wb && wb !== document.body && wb !== document.documentElement) {
+          var wbType = wb.getAttribute && wb.getAttribute('data-block-type');
+          if (!IGNORE_TAGS.has(wb.tagName) && !TABLE_INT.has(wb.tagName) && wbType !== 'placeholder') {
+            var wbBr = wb.getBoundingClientRect();
+            // max(50%, 30px): short elements (single-line span/p) always get a 30px zone
+            var wbZone = Math.max(wbBr.height * 0.5, 30);
+            if (wbBr.height > 5 && e.clientY >= wbBr.bottom - wbZone && e.clientY <= wbBr.bottom + 10) {
+              block = wb; _dbgStep = 'walk-bottom'; break;
+            }
+          }
+          wb = wb.parentElement;
+        }
+      }
+      // Last resort: selected element — trigger in the bottom half
+      // Exclude TABLE_INT (TD/TR etc.) — inserting after a table cell is invalid HTML
+      var _fromFallback = false;
+      if (!block && selectedEl && !IGNORE_TAGS.has(selectedEl.tagName) && !TABLE_INT.has(selectedEl.tagName)) {
+        var selBr = selectedEl.getBoundingClientRect();
+        var selThresh = Math.min(selBr.top + selBr.height * 0.5, selBr.bottom - 10);
+        if (e.clientY >= selThresh) { block = selectedEl; _dbgStep = 'selectedEl'; _fromFallback = true; }
+      }
+      // For data-block-type blocks, use lower-50% threshold (much easier to hit than strict 20px).
+      // Fallback blocks already have their own threshold — skip the gate.
+      if (block && !_fromFallback && _dbgStep === 'data-block-type') {
+        var br = block.getBoundingClientRect();
+        var addThresh = Math.min(br.top + br.height * 0.5, br.bottom - 10);
+        if (e.clientY < addThresh) { block = null; _dbgStep = 'cleared-not-near-bottom'; }
+      }
+    }
+    if (block !== _hoverBottomEl) {
+      _hoverBottomEl = block;
+      if (block) {
+        var r = block.getBoundingClientRect();
+        parent.postMessage({ type: 'hover-block-bottom', rect: { top: r.top, left: r.left, width: r.width, height: r.height }, path: getElementPath(block) }, '*');
+      } else {
+        parent.postMessage({ type: 'hover-block-bottom', rect: null, path: null }, '*');
+      }
+    }
+  });
+
+  // Push body height to parent — runs every 300ms for 6s after load, then stops.
+  // Covers late image loads, fonts, and dynamic content without relying on parent timing.
+  // Backup: if template CSS resists the height:auto override and the iframe still scrolls
+  // internally, notify parent so it can clear the overlay and resync after scroll settles.
+  var _iframeScrollTimer = null;
+  window.addEventListener('scroll', function() {
+    parent.postMessage({ type: 'iframe-internal-scroll' }, '*');
+    clearTimeout(_iframeScrollTimer);
+    _iframeScrollTimer = setTimeout(function() {
+      _iframeScrollTimer = null;
+      if (selectedEl) selectElement(selectedEl);
+    }, 150);
+  });
+
+  var _heightPushCount = 0;
+  var _heightPushTimer = setInterval(function() {
+    _heightPushCount++;
+    var h = Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0);
+    parent.postMessage({ type: 'body-height', height: h }, '*');
+    if (_heightPushCount >= 20) clearInterval(_heightPushTimer);
+  }, 300);
 
   parent.postMessage({ type: 'bridge-ready' }, '*');
 })();
