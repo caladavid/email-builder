@@ -7,20 +7,9 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const API_BASE = env.VITE_API_BASE ?? 'https://services.celcom.cl';
 
   return {
     plugins: [vue(), tailwindcss(), ui(), vueJsx()],
-    server: {
-      proxy: {
-        '/api-zip': {
-          target: `${API_BASE}/rest/protected/flex_email/addFileZip`,
-          changeOrigin: true,
-          secure: false,
-          rewrite: (path) => path.replace(/^\/api-zip/, '')
-        }
-      }
-    },
     build: {
       rollupOptions: {
         output: {

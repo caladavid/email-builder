@@ -6,11 +6,43 @@ type TButtonProps = {
   block: () => TEditorBlock;
   htmlTemplate: string;
 };
+
+// 1. Placeholder punteado para el interior de las columnas
+const emptyPlaceholder = `<div data-block-type="placeholder" style="margin:0 auto;width:100%;min-height:60px;border:2px dashed #c7d8f5;border-radius:6px;background:#ffffff;display:flex;align-items:center;justify-content:center;cursor:pointer;"><svg width="24" height="24" viewBox="0 0 40 40" fill="none" style="pointer-events:none;"><path d="M20 11v18M11 20h18" stroke="#0045B0" stroke-width="2.5" stroke-linecap="round"/></svg></div>`;
+
+// 2. Función maestra para crear el HTML de la tabla con N columnas exactas
+function createColumnsTemplate(count: number) {
+  // table-layout:fixed es crucial para que respeten los anchos porcentuales
+  const percentage = (100 / count).toFixed(2) + '%';
+  let tds = '';
+  
+  for (let i = 0; i < count; i++) {
+    tds += `<td width="${percentage}" style="padding:8px; vertical-align:top; border: 1px dashed transparent;">${emptyPlaceholder}</td>`;
+  }
+  
+  return `<table data-block-type="Columnas" style="width:100%;max-width:600px;border-collapse:collapse;margin:0 auto;background:#ffffff;table-layout:fixed;"><tbody><tr>${tds}</tr></tbody></table>`;
+}
+
+// 3. Función auxiliar para cumplir con el tipo TEditorBlock (Retro-compatibilidad)
+function createColumnsBlock(count: number): () => TEditorBlock {
+  return () => ({
+    type: 'ColumnsContainer',
+    data: {
+      props: {
+        columnsGap: 16,
+        columnsCount: count,
+        columns: Array.from({ length: count }, () => ({ childrenIds: [] })),
+      },
+      style: { padding: { top: 16, bottom: 16, left: 24, right: 24 } },
+    },
+  });
+}
+
 export const BUTTONS: TButtonProps[] = [
   {
     label: 'Encabezado',
     icon: 'material-symbols:h-mobiledata-badge-outline',
-    htmlTemplate: '<h2 data-block-type="Encabezado" style="font-family:inherit;font-size:24px;font-weight:bold;padding:16px 24px;color:inherit;margin:0 auto;max-width:600px;display:block;background:#ffffff;">Encabezado</h2>',
+    htmlTemplate: '<h2 data-block-type="Encabezado" style="font-family:inherit;font-size:24px;font-weight:bold;padding:16px 24px;color:inherit;margin:0 auto;max-width:600px;display:block;background:#ffffff;word-break:break-word;overflow-wrap:break-word;">Encabezado</h2>',
     block: () => ({
       type: 'Heading',
       data: {
@@ -24,7 +56,7 @@ export const BUTTONS: TButtonProps[] = [
   {
     label: 'Texto',
     icon: 'material-symbols:notes',
-    htmlTemplate: '<p data-block-type="Texto" style="font-family:inherit;font-size:16px;line-height:1.5;padding:16px 24px;color:inherit;margin:0 auto;max-width:600px;background:#ffffff;">Escribe tu texto aquí.</p>',
+    htmlTemplate: '<p data-block-type="Texto" style="font-family:inherit;font-size:16px;line-height:1.5;padding:16px 24px;color:inherit;margin:0 auto;max-width:600px;background:#ffffff;word-break:break-word;overflow-wrap:break-word;">Escribe tu texto aquí.</p>',
     block: () => ({
       type: 'Text',
       data: {
@@ -123,6 +155,43 @@ export const BUTTONS: TButtonProps[] = [
     }),
   },
   {
+    label: '2 Columnas',
+    icon: 'material-symbols:view-column-2-outline',
+    htmlTemplate: createColumnsTemplate(2),
+    block: createColumnsBlock(2),
+  },
+  {
+    label: '3 Columnas',
+    icon: 'material-symbols:view-column-outline',
+    htmlTemplate: createColumnsTemplate(3),
+    block: createColumnsBlock(3),
+  },
+  {
+    label: '4 Columnas',
+    icon: 'material-symbols:view-week-outline',
+    htmlTemplate: createColumnsTemplate(4),
+    block: createColumnsBlock(4),
+  },
+  {
+    label: '5 Columnas',
+    icon: 'material-symbols:view-week-outline',
+    htmlTemplate: createColumnsTemplate(5),
+    block: createColumnsBlock(5),
+  },
+  {
+    label: '6 Columnas',
+    icon: 'material-symbols:view-week-outline',
+    htmlTemplate: createColumnsTemplate(6),
+    block: createColumnsBlock(6),
+  },
+  /* {
+    label: 'Custom',
+    icon: 'material-symbols:dashboard-customize-outline',
+    // Usamos table-layout: auto para que las celdas se adapten libremente al contenido o al ancho manual que le pongan
+    htmlTemplate: `<table data-block-type="Columnas" style="width:100%;max-width:600px;border-collapse:collapse;margin:0 auto;background:#ffffff;table-layout:auto;"><tbody><tr><td style="width:100%;padding:8px; vertical-align:top; border: 1px dashed transparent;">${emptyPlaceholder}</td></tr></tbody></table>`,
+    block: createColumnsBlock(1),
+  }, */
+  /* {
     label: 'Columnas',
     icon: 'material-symbols:view-column-outline',
     htmlTemplate: '<table data-block-type="Columnas" style="width:100%;max-width:600px;border-collapse:collapse;margin:0 auto;background:#ffffff;"><tbody><tr><td style="width:33.33%;padding:8px;vertical-align:top;">Columna 1</td><td style="width:33.33%;padding:8px;vertical-align:top;">Columna 2</td><td style="width:33.33%;padding:8px;vertical-align:top;">Columna 3</td></tr></tbody></table>',
@@ -137,11 +206,11 @@ export const BUTTONS: TButtonProps[] = [
         style: { padding: { top: 16, bottom: 16, left: 24, right: 24 } },
       },
     }),
-  },
+  }, */
   {
     label: 'Contenedor',
     icon: 'material-symbols:library-add-outline',
-    htmlTemplate: '<div data-block-type="Contenedor" style="padding:16px 24px;background:#ffffff;border:1px dashed #cccccc;max-width:600px;margin:0 auto;"><p style="margin:0;color:#999;font-size:14px;font-family:inherit;text-align:center;">Contenedor</p></div>',
+    htmlTemplate: `<div data-block-type="Contenedor" style="padding:16px 24px;background:#ffffff;border:1px dashed #cccccc;max-width:600px;margin:0 auto;"><p style="margin:0;color:#999;font-size:14px;font-family:inherit;text-align:center;">${emptyPlaceholder}</p></div>`,
     block: () => ({
       type: 'Container',
       data: {
@@ -149,7 +218,7 @@ export const BUTTONS: TButtonProps[] = [
       },
     }),
   },
-  {
+  /* {
     label: 'Enlace',
     icon: 'material-symbols:link',
     htmlTemplate: '<div data-block-type="Enlace" style="padding:16px 24px;max-width:600px;margin:0 auto;background:#ffffff;"><a href="#" style="display:inline-block;color:#007bff;font-family:inherit;font-size:14px;text-decoration:underline;">Texto del enlace</a></div>',
@@ -160,8 +229,8 @@ export const BUTTONS: TButtonProps[] = [
         style: {},
       },
     }),
-  },
-  {
+  }, */
+  /* {
     label: 'Table',
     icon: 'material-symbols:table',
     htmlTemplate: '<table data-block-type="Table" style="width:100%;max-width:600px;border-collapse:collapse;font-family:sans-serif;font-size:14px;margin:0 auto;background:#ffffff;"><tbody><tr><td style="padding:8px;border:1px solid #cccccc;">Celda 1</td><td style="padding:8px;border:1px solid #cccccc;">Celda 2</td></tr><tr><td style="padding:8px;border:1px solid #cccccc;">Celda 3</td><td style="padding:8px;border:1px solid #cccccc;">Celda 4</td></tr></tbody></table>',
@@ -180,5 +249,5 @@ export const BUTTONS: TButtonProps[] = [
         style: { width: '100%' }
       }
     })
-  },
+  }, */
 ];

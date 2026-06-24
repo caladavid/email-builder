@@ -53,7 +53,7 @@ function saveVariablesToStorage(variables: Record<string, string>) {
   }
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? 'https://dos.multinetlabs.com';
+const API_BASE = import.meta.env.VITE_API_BASE ?? 'https://dos.multinetlabs.com/sms_services';
 /* const API_BASE = import.meta.env.VITE_API_BASE ?? 'https://services.celcom.cl'; */
 
 export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
@@ -399,7 +399,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-      const response = await fetch(`${API_BASE}/sms_services/rest/protected/flex_email/addFileZip`, {
+      const response = await fetch(`${API_BASE}/rest/protected/flex_email/addFileZip`, {
         method: "POST",
         body: formData,
         signal: controller.signal
@@ -465,6 +465,8 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
+        const errBody = await response.text().catch(() => '');
+        console.error('❌ uploadImage error body:', errBody);
         throw new Error(`Error HTTP: ${response.status}`);
       }
 
