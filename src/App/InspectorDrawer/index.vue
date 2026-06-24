@@ -16,7 +16,7 @@
   >
     <!-- Pill switch tabs -->
     <div style="padding:12px 12px 0;flex-shrink:0;">
-      <div style="display:flex;background:#e8edf3;border-radius:10px;padding:3px;gap:2px;">
+      <div style="display:flex;background:var(--color-primary);border-radius:10px;padding:3px;gap:2px;">
         <button
           v-for="(tab, i) in tabs"
           :key="tab.slot"
@@ -31,8 +31,8 @@
             fontSize: '12px',
             letterSpacing: '0.01em',
             transition: 'all 0.15s',
-            background: activeTab === String(i) ? 'white' : 'transparent',
-            color: activeTab === String(i) ? '#0045B0' : 'var(--color-primary)',
+            background: activeTab === String(i) ? 'var(--color-gray)' : 'transparent',
+            color: activeTab === String(i) ? 'var(--ui-text-inverted)' : 'var(--ui-text-muted)',
             boxShadow: activeTab === String(i) ? '0 1px 4px rgba(0,0,0,0.10)' : 'none',
           }"
           @click="activeTab = String(i)"

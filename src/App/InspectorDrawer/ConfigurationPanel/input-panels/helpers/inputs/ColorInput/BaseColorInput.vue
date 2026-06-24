@@ -1,12 +1,12 @@
 <template>
   <div style="display:flex;flex-direction:column;gap:5px;">
-    <label style="font-size:11px;font-weight:600;color:#0045B0;line-height:1.2;">{{ label }}</label>
+    <label style="font-size:11px;font-weight:600;color:var(--color-primary);line-height:1.2;">{{ label }}</label>
     <div style="display:flex;gap:6px;align-items:center;">
       <!-- "Elegir color" trigger button with native color picker overlaid -->
       <div style="position:relative;flex-shrink:0;">
         <button
           type="button"
-          style="display:flex;align-items:center;gap:6px;background:#0045B0;color:white;border:none;border-radius:7px;padding:6px 10px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;"
+          style="display:flex;align-items:center;gap:6px;background:var(--color-primary);color:white;border:none;border-radius:7px;padding:6px 10px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;"
         >
           <span :style="{
             width: '14px', height: '14px', borderRadius: '50%',

@@ -1,10 +1,10 @@
 <template>
   <div style="display:flex;flex-direction:column;gap:6px;">
-    <label style="font-size:11px;font-weight:600;color:#0045B0;line-height:1.2;">{{ label }}</label>
+    <label style="font-size:11px;font-weight:600;color:var(--color-primary);line-height:1.2;">{{ label }}</label>
     <div style="position:relative;">
       <select
         :value="value"
-        style="width:100%;font-size:12px;font-weight:600;padding:8px 32px 8px 12px;border:none;border-radius:8px;background:#0045B0;color:white;cursor:pointer;appearance:none;-webkit-appearance:none;outline:none;"
+        style="width:100%;font-size:12px;font-weight:600;padding:8px 32px 8px 12px;border:none;border-radius:8px;background:var(--color-primary);color:white;cursor:pointer;appearance:none;-webkit-appearance:none;outline:none;"
         @change="handleChange(($event.target as HTMLSelectElement).value)"
       >
         <option v-for="opt in options" :key="opt.value" :value="opt.value"

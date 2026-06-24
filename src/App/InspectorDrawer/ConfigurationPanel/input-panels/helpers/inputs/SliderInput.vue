@@ -1,6 +1,6 @@
 <template>
   <div style="display:flex;flex-direction:column;gap:6px;">
-    <label style="font-size:11px;font-weight:600;color:#0045B0;line-height:1.2;">{{ label }}</label>
+    <label style="font-size:11px;font-weight:600;color:var(--color-primary);line-height:1.2;">{{ label }}</label>
     <RawSliderInput
       v-bind="rest"
       :model-value="value ?? undefined"
