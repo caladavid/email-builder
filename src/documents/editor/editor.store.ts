@@ -53,8 +53,8 @@ function saveVariablesToStorage(variables: Record<string, string>) {
   }
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? 'https://dos.multinetlabs.com/sms_services';
-/* const API_BASE = import.meta.env.VITE_API_BASE ?? 'https://services.celcom.cl'; */
+/* const API_BASE = import.meta.env.VITE_API_BASE ?? 'https://dos.multinetlabs.com/sms_services'; */
+const API_BASE = import.meta.env.VITE_API_BASE ?? 'https://services.celcom.cl';
 
 export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   const document = ref<TValue['document']>(getConfiguration(typeof window !== 'undefined' ? window.location.hash : ''))
