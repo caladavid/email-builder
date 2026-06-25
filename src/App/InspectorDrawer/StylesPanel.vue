@@ -21,6 +21,13 @@
     <!-- HEADING -->
     <StyleSection v-else-if="blockType === 'heading'" title="Contenido">
       <StyleRow label="Texto" type="text" :value="store.selectedElementInnerText" placeholder="Texto del encabezado" @change="setInnerText" />
+      <div v-if="variableItems.length > 0" style="display:flex;flex-wrap:wrap;align-items:center;gap:4px;">
+        <span style="font-size:10px;color:#94a3b8;white-space:nowrap;">Vars:</span>
+        <button v-for="v in variableItems" :key="v.key" @mousedown.prevent="appendVar(v.key)"
+          style="font-size:10px;padding:1px 7px;border-radius:10px;border:1px solid #c7d8f5;background:#f0f5ff;color:var(--color-primary);cursor:pointer;font-family:monospace;">
+          {{ '{' + v.key + '}' }}
+        </button>
+      </div>
       <div style="display:flex;flex-direction:column;gap:5px;">
         <label style="font-size:11px;font-weight:600;color:var(--color-primary);">Nivel</label>
         <div style="display:flex;gap:6px;">
@@ -40,11 +47,25 @@
     <!-- TEXT / PARAGRAPH -->
     <StyleSection v-else-if="blockType === 'text'" title="Contenido">
       <StyleRow label="Texto" type="text" :value="store.selectedElementInnerText" placeholder="Texto del párrafo" @change="setInnerText" />
+      <div v-if="variableItems.length > 0" style="display:flex;flex-wrap:wrap;align-items:center;gap:4px;">
+        <span style="font-size:10px;color:#94a3b8;white-space:nowrap;">Vars:</span>
+        <button v-for="v in variableItems" :key="v.key" @mousedown.prevent="appendVar(v.key)"
+          style="font-size:10px;padding:1px 7px;border-radius:10px;border:1px solid #c7d8f5;background:#f0f5ff;color:var(--color-primary);cursor:pointer;font-family:monospace;">
+          {{ '{' + v.key + '}' }}
+        </button>
+      </div>
     </StyleSection>
 
     <!-- BUTTON -->
     <StyleSection v-else-if="blockType === 'button'" title="Contenido">
       <StyleRow label="Texto del botón" type="text" :value="childData.text" placeholder="Texto del botón" @change="setChildInnerText('a', $event)" />
+      <div v-if="variableItems.length > 0" style="display:flex;flex-wrap:wrap;align-items:center;gap:4px;">
+        <span style="font-size:10px;color:#94a3b8;white-space:nowrap;">Vars:</span>
+        <button v-for="v in variableItems" :key="v.key" @mousedown.prevent="appendVarToChild('a', v.key)"
+          style="font-size:10px;padding:1px 7px;border-radius:10px;border:1px solid #c7d8f5;background:#f0f5ff;color:var(--color-primary);cursor:pointer;font-family:monospace;">
+          {{ '{' + v.key + '}' }}
+        </button>
+      </div>
       <StyleRow label="URL" type="text" :value="childData.href" placeholder="https://..." @change="setChildAttr('a', 'href', $event)" />
       <StyleRow label="Color botón" type="color" :value="childData.bg" @change="setChildStyle('a', 'background', $event)" />
       <StyleRow label="Color texto" type="color" :value="childData.color" @change="setChildStyle('a', 'color', $event)" />
@@ -60,12 +81,17 @@
     <StyleSection v-else-if="blockType === 'image-block'" title="Imagen">
       <div style="display:flex;flex-direction:column;gap:6px;">
         <label style="font-size:11px;font-weight:600;color:var(--color-primary);">Subir imagen</label>
-        <input type="file" accept="image/*" style="font-size:11px;width:100%;" @change="onImageFileChange" />
+        <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;padding:5px 12px;border-radius:6px;border:1.5px solid var(--color-primary);background:white;color:var(--color-primary);font-size:11px;font-weight:600;width:fit-content;user-select:none;">
+          ↑ Elegir archivo
+          <input type="file" accept="image/*" style="display:none;" @change="onImageFileChange" />
+        </label>
         <div v-if="uploadWarning" style="font-size:11px;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;padding:6px 8px;">
           ⚠️ Sin token — imagen guardada como base64.
         </div>
       </div>
-      <StyleRow label="URL de origen" type="text" :value="currentImgSrc" placeholder="https://..." @change="setChildAttr('img', 'src', $event)" />
+      <div style="border:1.5px solid #c7d8f5;border-radius:8px;padding:4px 6px;background:#f8faff;">
+        <StyleRow label="URL de origen" type="text" :value="currentImgSrc" placeholder="https://..." @change="setChildAttr('img', 'src', $event)" />
+      </div>
       <StyleRow label="Alt" type="text" :value="childData.alt" placeholder="Descripción" @change="setChildAttr('img', 'alt', $event)" />
       <StyleRow label="Alineación" type="select" :value="styles.textAlign||'center'"
         :options="alignOptions" @change="setStyle('textAlign', $event)" />
@@ -76,24 +102,34 @@
     <StyleSection v-else-if="store.selectedElementTagName === 'IMG'" title="Imagen">
       <div style="display:flex;flex-direction:column;gap:6px;">
         <label style="font-size:11px;font-weight:600;color:var(--color-primary);">Subir imagen</label>
-        <input type="file" accept="image/*" style="font-size:11px;width:100%;" @change="onImageFileChange" />
+        <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;padding:5px 12px;border-radius:6px;border:1.5px solid var(--color-primary);background:white;color:var(--color-primary);font-size:11px;font-weight:600;width:fit-content;user-select:none;">
+          ↑ Elegir archivo
+          <input type="file" accept="image/*" style="display:none;" @change="onImageFileChange" />
+        </label>
         <div v-if="uploadWarning" style="font-size:11px;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;padding:6px 8px;">
           ⚠️ Sin token — imagen guardada como base64.
         </div>
       </div>
-      <StyleRow label="URL de origen" type="text" :value="currentImgSrc" placeholder="https://..." @change="setAttr('src', $event)" />
+      <div style="border:1.5px solid #c7d8f5;border-radius:8px;padding:4px 6px;background:#f8faff;">
+        <StyleRow label="URL de origen" type="text" :value="currentImgSrc" placeholder="https://..." @change="setAttr('src', $event)" />
+      </div>
     </StyleSection>
 
     <!-- AVATAR -->
     <StyleSection v-else-if="blockType === 'avatar'" title="Avatar">
       <div style="display:flex;flex-direction:column;gap:6px;">
         <label style="font-size:11px;font-weight:600;color:var(--color-primary);">Subir imagen</label>
-        <input type="file" accept="image/*" style="font-size:11px;width:100%;" @change="onAvatarFileChange" />
+        <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;padding:5px 12px;border-radius:6px;border:1.5px solid var(--color-primary);background:white;color:var(--color-primary);font-size:11px;font-weight:600;width:fit-content;user-select:none;">
+          ↑ Elegir archivo
+          <input type="file" accept="image/*" style="display:none;" @change="onAvatarFileChange" />
+        </label>
         <div v-if="uploadWarning" style="font-size:11px;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;padding:6px 8px;">
           ⚠️ Sin token — imagen guardada como base64.
         </div>
       </div>
-      <StyleRow label="URL de origen" type="text" :value="currentImgSrc" placeholder="https://..." @change="setChildAttr('img', 'src', $event)" />
+      <div style="border:1.5px solid #c7d8f5;border-radius:8px;padding:4px 6px;background:#f8faff;">
+        <StyleRow label="URL de origen" type="text" :value="currentImgSrc" placeholder="https://..." @change="setChildAttr('img', 'src', $event)" />
+      </div>
       <StyleRow label="Alt" type="text" :value="childData.alt" placeholder="Descripción" @change="setChildAttr('img', 'alt', $event)" />
       <StyleRow label="Tamaño" type="slider" :max="256" :value="childData.size ? childData.size+'px' : '64px'" @change="setAvatarSize" />
       <StyleRow label="Forma" type="select" :value="childData.shape||'circle'"
@@ -106,6 +142,13 @@
     <!-- LINK -->
     <StyleSection v-else-if="blockType === 'link'" title="Contenido">
       <StyleRow label="Texto" type="text" :value="store.selectedElementInnerText" placeholder="Texto del enlace" @change="setInnerText" />
+      <div v-if="variableItems.length > 0" style="display:flex;flex-wrap:wrap;align-items:center;gap:4px;">
+        <span style="font-size:10px;color:#94a3b8;white-space:nowrap;">Vars:</span>
+        <button v-for="v in variableItems" :key="v.key" @mousedown.prevent="appendVar(v.key)"
+          style="font-size:10px;padding:1px 7px;border-radius:10px;border:1px solid #c7d8f5;background:#f0f5ff;color:var(--color-primary);cursor:pointer;font-family:monospace;">
+          {{ '{' + v.key + '}' }}
+        </button>
+      </div>
       <StyleRow label="URL" type="text" :value="store.selectedElementAttrs?.href" placeholder="https://..." @change="setAttr('href', $event)" />
     </StyleSection>
 
@@ -256,6 +299,18 @@ const styles = computed(() => store.selectedElementStyles ?? {});
 const childData = computed(() => (store.selectedElementChildData ?? {}) as Record<string, string>);
 
 const uploadWarning = ref(false);
+
+const variableItems = computed(() =>
+  Object.entries(store.globalVariables || {}).map(([key, value]) => ({ key, value }))
+);
+
+function appendVar(key: string) {
+  setInnerText((store.selectedElementInnerText || '') + `{${key}}`);
+}
+
+function appendVarToChild(selector: string, key: string) {
+  setChildInnerText(selector, (childData.value.text || '') + `{${key}}`);
+}
 
 const currentImgSrc = computed(() => {
   if (blockType.value === 'image-block' || blockType.value === 'avatar') return childData.value.src || '';
