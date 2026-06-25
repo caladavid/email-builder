@@ -31,6 +31,25 @@
           <div style="width:1px;height:16px;background:rgba(255,255,255,0.3);margin:0 2px;flex-shrink:0;" />
           <button @click.stop="showLinkInput = !showLinkInput" title="Enlace" style="width:24px;height:24px;border:none;background:transparent;color:white;font-size:13px;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;">🔗</button>
           <button @click.stop="handleFormat('removeFormat')"  title="Limpiar formato"    style="width:24px;height:24px;border:none;background:transparent;color:white;font-size:11px;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;">T✕</button>
+          <!-- Variables button -->
+          <div style="width:1px;height:16px;background:rgba(255,255,255,0.3);margin:0 2px;flex-shrink:0;" />
+          <div style="position:relative;">
+            <button @click.stop="showVarsDropdown = !showVarsDropdown; showLinkInput = false" title="Insertar variable"
+              style="width:24px;height:24px;border:none;background:transparent;color:white;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;">
+              <UIcon name="material-symbols:variable-insert" style="font-size:16px;" />
+            </button>
+            <div v-if="showVarsDropdown" @click.stop
+              style="position:absolute;top:28px;right:0;background:#001f6e;border:1px solid rgba(255,255,255,0.2);border-radius:8px;padding:4px;box-shadow:0 8px 24px rgba(0,0,0,0.4);z-index:500;min-width:140px;max-height:200px;overflow-y:auto;">
+              <div v-if="variableItems.length === 0" style="padding:6px 10px;color:rgba(255,255,255,0.6);font-size:11px;white-space:nowrap;">No hay variables disponibles</div>
+              <div v-for="v in variableItems" :key="v.key"
+                @mousedown.prevent="insertVariableAtCursor(v.key)"
+                style="padding:5px 10px;border-radius:4px;cursor:pointer;color:white;font-size:11px;font-family:monospace;white-space:nowrap;transition:background 0.1s;"
+                @mouseenter="($event.currentTarget as HTMLElement).style.background='rgba(255,255,255,0.15)'"
+                @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'">
+                {{ '{' + v.key + '}' }}
+              </div>
+            </div>
+          </div>
           <!-- Link URL input -->
           <div v-if="showLinkInput" style="display:flex;gap:3px;align-items:center;margin-left:4px;">
             <input
@@ -155,6 +174,16 @@ const showAddPicker = ref(false);
 const addButtonInfo = ref<{ rect: { top: number; left: number; width: number; height: number }; path: string } | null>(null);
 const showLinkInput = ref(false);
 const linkUrl = ref('');
+const showVarsDropdown = ref(false);
+
+const variableItems = computed(() =>
+  Object.entries(store.globalVariables || {}).map(([key, value]) => ({ key, value }))
+);
+
+function insertVariableAtCursor(key: string) {
+  sendToCanvas({ type: 'exec-command', command: 'insertText', value: `{${key}}` });
+  showVarsDropdown.value = false;
+}
 
 const TEXT_BLOCK_TYPES = new Set(['Encabezado', 'Texto', 'Botón', 'Html', 'Enlace', 'Contenedor']);
 const TEXT_HTML_TAGS = new Set(['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'TD', 'TH', 'LI', 'A', 'SPAN', 'DIV']);
@@ -368,6 +397,7 @@ function handleMessage(event: MessageEvent) {
     case 'deselect':
       showBlockPicker.value = false;
       showAddPicker.value = false;
+      showVarsDropdown.value = false;
       addButtonInfo.value = null;
       store.selectedElementPath = null;
       store.selectedElementStyles = {};

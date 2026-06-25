@@ -79,7 +79,7 @@
         <iframe
           v-if="isIframeMode"
           :srcdoc="previewHtml"
-          sandbox="allow-same-origin allow-scripts allow-popups allow-popups-to-escape-sandbox"
+          sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
           style="width:100%;height:100%;border:none;display:block;min-height:00px;"
         />
         <Reader v-else :document="processedDocument" root-block-id="root" />
@@ -141,6 +141,11 @@ const previewHtml = computed(() => {
   html = html.replace(/\s*contenteditable="[^"]*"/gi, '');
   // Remove draggable attribute set by bridge
   html = html.replace(/\s*draggable="[^"]*"/gi, '');
+  // Substitute {variableName} with actual values
+  const vars = inspectorDrawer.globalVariables || {};
+  if (Object.keys(vars).length > 0) {
+    html = html.replace(/\{(\w+)\}/g, (match, key) => (vars as Record<string, string>)[key] ?? match);
+  }
   return html;
 });
 
