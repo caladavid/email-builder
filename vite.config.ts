@@ -7,9 +7,11 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
+  const API_BASE = env.VITE_API_BASE ?? 'https://services.celcom.cl';
 
   return {
     plugins: [vue(), tailwindcss(), ui(), vueJsx()],
+    server: {
     build: {
       rollupOptions: {
         output: {
@@ -19,5 +21,5 @@ export default defineConfig(({ mode }) => {
         }
       }
     }
-  };
+  }};
 })

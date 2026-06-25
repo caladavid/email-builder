@@ -18,6 +18,13 @@ export const CANVAS_BRIDGE_CODE = `
   var _internalDragEl = null;
   var _selectGen = 0; // cancels stale selectAfterImagesLoad callbacks
 
+  function makePlaceholder() {
+    var _ph = document.createElement('div');
+    _ph.setAttribute('data-block-type', 'placeholder');
+    _ph.setAttribute('style', 'margin:0 auto;width:100%;min-height:60px;border:2px dashed #c7d8f5;border-radius:6px;background:#ffffff;display:flex;align-items:center;justify-content:center;cursor:pointer;');
+    _ph.innerHTML = '<svg width="24" height="24" viewBox="0 0 40 40" fill="none" style="pointer-events:none;"><path d="M20 11v18M11 20h18" stroke="#0045B0" stroke-width="2.5" stroke-linecap="round"/></svg>';
+    return _ph;
+  }
 
   // Walk up to data-block-type; if not found, use the clicked element directly
   // (imported templates have no data-block-type so we allow individual element selection)
@@ -467,25 +474,30 @@ export const CANVAS_BRIDGE_CODE = `
         break;
       }
 
-      case 'delete-element':
+      case 'delete-element': {
         if (target) {
           if (target === selectedEl) {
             clearOutline(selectedEl, '', '');
             selectedEl = null;
           }
+          var deleteParent = target.parentElement;
+          var deleteParentType = deleteParent && deleteParent.getAttribute && deleteParent.getAttribute('data-block-type');
+          var deleteIsNested = deleteParent && (deleteParent.tagName === 'TD' || deleteParentType === 'Contenedor');
           target.remove();
-          var remaining = [].slice.call(document.body.children).filter(function(c) { return c.tagName !== 'SCRIPT'; });
-          if (remaining.length === 0) {
-            var ph = document.createElement('div');
-            ph.setAttribute('data-block-type', 'placeholder');
-            ph.setAttribute('style', 'margin:0 auto;width:100%;min-height:60px;border:2px dashed #c7d8f5;border-radius:6px;background:#ffffff;display:flex;align-items:center;justify-content:center;cursor:pointer;');
-            ph.innerHTML = '<svg width="24" height="24" viewBox="0 0 40 40" fill="none" style="pointer-events:none;"><path d="M20 11v18M11 20h18" stroke="#0045B0" stroke-width="2.5" stroke-linecap="round"/></svg>';
-            document.body.appendChild(ph);
+          if (deleteIsNested) {
+            var nestedKids = [].slice.call(deleteParent.children).filter(function(c) {
+              return c.tagName !== 'SCRIPT' && c.getAttribute('data-block-type') !== 'placeholder';
+            });
+            if (nestedKids.length === 0) deleteParent.appendChild(makePlaceholder());
+          } else {
+            var remaining = [].slice.call(document.body.children).filter(function(c) { return c.tagName !== 'SCRIPT'; });
+            if (remaining.length === 0) document.body.appendChild(makePlaceholder());
           }
           notifyDomChanged();
           parent.postMessage({ type: 'deselect' }, '*');
         }
         break;
+      }
 
       case 'duplicate':
         if (target) {
@@ -558,6 +570,8 @@ export const CANVAS_BRIDGE_CODE = `
           if (lastChild) { lastChild.after(newEl); }
           else { document.body.appendChild(newEl); }
         } else if (cmd.position === 'inside' || cmd.position === 'center') {
+          var insidePh = ref.querySelector('[data-block-type="placeholder"]');
+          if (insidePh) insidePh.remove();
           ref.appendChild(newEl);
         } else if (cmd.position === 'before') {
           ref.before(newEl);
@@ -743,6 +757,52 @@ export const CANVAS_BRIDGE_CODE = `
     var candidate = findBlockEl(el);
     if (!candidate) return;
 
+    var candidateBlockType = candidate.getAttribute && candidate.getAttribute('data-block-type');
+    console.log('[DROP] el.tagName:', el.tagName, '| candidate blockType:', candidateBlockType, '| cursor:', Math.round(e.clientX), Math.round(e.clientY));
+
+    // Columnas block: check if cursor is inside any TD rect (both X+Y).
+    // Inside TD → drop inside that cell. Outside all TDs → before/after whole block.
+    if (candidateBlockType === 'Columnas') {
+      var colTds = candidate.querySelectorAll('td');
+      console.log('[DROP] Columnas found, TDs count:', colTds.length);
+      var targetTd = null;
+      for (var ci = 0; ci < colTds.length; ci++) {
+        var tdR = colTds[ci].getBoundingClientRect();
+        console.log('[DROP] TD[' + ci + '] rect:', Math.round(tdR.left), Math.round(tdR.top), Math.round(tdR.right), Math.round(tdR.bottom));
+        if (e.clientX >= tdR.left && e.clientX <= tdR.right &&
+            e.clientY >= tdR.top  && e.clientY <= tdR.bottom) {
+          targetTd = colTds[ci]; break;
+        }
+      }
+      if (targetTd) {
+        console.log('[DROP] → inside TD, index:', Array.from(colTds).indexOf(targetTd));
+        removeDropIndicator();
+        if (_rafId) { cancelAnimationFrame(_rafId); _rafId = null; }
+        highlightPlaceholderForDrop(targetTd);
+        dropTarget = targetTd;
+        _dropPosition = 'inside';
+        return;
+      }
+      console.log('[DROP] → outside all TDs, fallthrough to before/after Columnas');
+    }
+
+    // Contenedor block: 8px border zone → before/after; inside → drop as child
+    if (candidateBlockType === 'Contenedor') {
+      var contRect = candidate.getBoundingClientRect();
+      console.log('[DROP] Contenedor rect:', Math.round(contRect.left), Math.round(contRect.top), Math.round(contRect.right), Math.round(contRect.bottom));
+      if (e.clientX > contRect.left + 8 && e.clientX < contRect.right - 8 &&
+          e.clientY > contRect.top  + 8 && e.clientY < contRect.bottom - 8) {
+        console.log('[DROP] → inside Contenedor');
+        removeDropIndicator();
+        if (_rafId) { cancelAnimationFrame(_rafId); _rafId = null; }
+        highlightPlaceholderForDrop(candidate);
+        dropTarget = candidate;
+        _dropPosition = 'inside';
+        return;
+      }
+      console.log('[DROP] → Contenedor border zone, fallthrough before/after');
+    }
+
     // If candidate is a child inside a Columnas block, check if cursor is near the
     // top/bottom edge of the whole table. If so, reroute to drop before/after the
     // entire Columnas block instead of inside a column cell.
@@ -776,6 +836,7 @@ export const CANVAS_BRIDGE_CODE = `
       if (_rafId) { cancelAnimationFrame(_rafId); _rafId = null; }
       highlightPlaceholderForDrop(phEl);
       dropTarget = phEl;
+      _dropPosition = 'inside';
       return;
     }
 
@@ -802,7 +863,29 @@ export const CANVAS_BRIDGE_CODE = `
     if (_dragleaveTimer) { clearTimeout(_dragleaveTimer); _dragleaveTimer = null; }
     if (_internalDragEl) {
       if (dropTarget && dropTarget !== _internalDragEl && !_internalDragEl.contains(dropTarget)) {
-        dropTarget.after(_internalDragEl);
+        var dragSourceParent = _internalDragEl.parentElement;
+        var dragSourceType = dragSourceParent && dragSourceParent.getAttribute && dragSourceParent.getAttribute('data-block-type');
+        var dragSourceIsContainer = dragSourceParent && (dragSourceParent.tagName === 'TD' || dragSourceType === 'Contenedor');
+        if (_dropPosition === 'inside') {
+          if (dropTarget.getAttribute('data-block-type') === 'placeholder') {
+            dropTarget.parentElement.replaceChild(_internalDragEl, dropTarget);
+          } else {
+            var dragInsidePh = dropTarget.querySelector('[data-block-type="placeholder"]');
+            if (dragInsidePh) dragInsidePh.remove();
+            dropTarget.appendChild(_internalDragEl);
+          }
+        } else if (_dropPosition === 'before') {
+          dropTarget.before(_internalDragEl);
+        } else {
+          dropTarget.after(_internalDragEl);
+        }
+        // If block moved out of a TD/Contenedor, restore placeholder if now empty
+        if (dragSourceIsContainer && dragSourceParent !== _internalDragEl.parentElement) {
+          var srcKids = [].slice.call(dragSourceParent.children).filter(function(c) {
+            return c.tagName !== 'SCRIPT' && c.getAttribute('data-block-type') !== 'placeholder';
+          });
+          if (srcKids.length === 0) dragSourceParent.appendChild(makePlaceholder());
+        }
         notifyDomChanged();
         selectElement(_internalDragEl);
       }
