@@ -11,15 +11,18 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [vue(), tailwindcss(), ui(), vueJsx()],
-    server: {
     build: {
       rollupOptions: {
         output: {
           manualChunks(id) {
+            if (id.includes('node_modules/vue') || id.includes('node_modules/@vue')) return 'vue';
+            if (id.includes('node_modules/pinia')) return 'vue';
+            if (id.includes('node_modules/@nuxt') || id.includes('node_modules/reka-ui')) return 'nuxt-ui';
+            if (id.includes('node_modules/highlight.js')) return 'highlight';
             if (id.includes('HTMLToBlockParser') || id.includes('matchers') || id.includes('CSSParser')) return 'parser';
           }
         }
       }
     }
-  }};
+  };
 })
