@@ -196,15 +196,28 @@ async function handleZipUpload(event: Event) {
       const JSZip = (await import('jszip')).default;
       const zip = await JSZip.loadAsync(file);
 
-      const isMacJunk = (name: string) => name.startsWith('__MACOSX/') || name.startsWith('._') || name.includes('/._');
-      const htmlFile = (!isMacJunk('index.html') && zip.file('index.html'))
-        ?? zip.file(/\.html$/i).find(f => !isMacJunk(f.name))
-        ?? null;
+      const isMacJunk = (name: string) =>
+        name.startsWith('__MACOSX/') || name.startsWith('._') ||
+        name.startsWith('./._') || name.includes('/._') || name.includes('\x00');
+
+      // Find first HTML file whose content actually starts with HTML (not binary metadata)
+      const isValidHtml = (content: string) => content.trimStart().startsWith('<');
+
+      const htmlCandidates = [
+        zip.file('index.html'),
+        ...zip.file(/\.html$/i).filter(f => !isMacJunk(f.name)),
+      ].filter(Boolean) as JSZip.JSZipObject[];
+
+      let htmlContent = '';
+      let htmlFile: JSZip.JSZipObject | null = null;
+      for (const candidate of htmlCandidates) {
+        const content = await candidate.async('string');
+        if (isValidHtml(content)) { htmlFile = candidate; htmlContent = content; break; }
+      }
       if (!htmlFile) {
-        zipError.value = 'No se encontró un archivo HTML en el ZIP';
+        zipError.value = 'No se encontró un archivo HTML válido en el ZIP';
         return;
       }
-      let htmlContent = await htmlFile.async('string');
 
       // Build image map: full path + basename for flexible lookup
       const imageMap = new Map<string, string>();
