@@ -26,7 +26,7 @@ onMounted(() => {
   <EditorInspectorDrawer />
   
   <div
-    class="transition-all duration-200 h-full"
+    class="h-full"
     :style="{
       marginLeft: inspectorDrawer.samplesDrawerOpen ? `${inspectorDrawer.SAMPLES_DRAWER_WIDTH}px` : '0', 
       marginRight: inspectorDrawer.inspectorDrawerOpen ? `${inspectorDrawer.INSPECTOR_DRAWER_WIDTH}px` : `0`,

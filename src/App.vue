@@ -12,7 +12,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { onMounted, onUnmounted } from 'vue';
 import Editor from './App/index.vue'
 import { useInspectorDrawer } from './documents/editor/editor.store';
 import { isOriginAllowed } from './utils/allowedOrigins';
@@ -20,52 +20,19 @@ import getConfiguration from './getConfiguration';
 
 const editorStore = useInspectorDrawer();
 
-function handleKeyboardShortcuts(event: KeyboardEvent){
-  const activeElement = document.activeElement;
-
-  const isTextEditor = activeElement?.classList.contains('inline-text-editor') ||
-                      activeElement?.classList.contains('rich-text-editable');
-
-  if (isTextEditor) return;
-  // Ctrl+Z para undo  
-  if (event.ctrlKey && event.key === "z" && !event.shiftKey){
-    event.preventDefault();
-
-    if (editorStore.canUndo()){
-      editorStore.undo();
-    }
-  }
-
-   // Ctrl+Y
-   if(event.ctrlKey && event.key === "y"){
-    event.preventDefault();
-
-    if (editorStore.canRedo()){
-      editorStore.redo();
-    }
-   } 
-}
-
 // Escuchar los mensajes desde el padre (página principal)
 onMounted(() => {
   window.addEventListener('message', async (event) => {
-    // El origen del mensaje DEBE COINCIDIR con la URL del padre.
-    // Si tu app padre está en http://localhost:3000, ese es el origen correcto.
-/*     if (event.origin !== 'http://localhost:3000' && event.origin !== 'http://email-builder.celcomlatam.com/ && event.origin !== "http://localhost:5173") {
+    if (!isOriginAllowed(event.origin)) {
       console.warn('Mensaje ignorado, origen no seguro:', event.origin);
       return;
-    } */
-
-/*    if (!isOriginAllowed(event.origin)){
-    console.warn('Mensaje ignorado, origen no seguro:', event.origin);
-    return;
-   } */
+    }
 
     const data = event.data;
 
-    if (!data.type || !['updateVariables', 'addVariable', 'requestHtml', 'loadTemplate', "requestJson", "requestHtmlAndJson", "clearTemplate", "setToken"].includes(data.type)) {    
-      return;  
-    } 
+    if (!data.type || !['updateVariables', 'addVariable', 'requestHtml', 'loadTemplate', "requestJson", "requestHtmlAndJson", "clearTemplate", "setToken"].includes(data.type)) {
+      return;
+    }
 
      switch (data.type) {  
       case 'updateVariables':  
@@ -92,22 +59,18 @@ onMounted(() => {
       case 'clearTemplate':  
         editorStore.resetDocument(getConfiguration(''));  
         break; 
-      case 'setToken':  
-        /* console.log('🎯 Case setToken ejecutado');  
-        console.log('🔑 Token recibido:', data.token); */  
-        editorStore.setAuthToken(data.token);  
-        break; 
-      default:  
-        /* console.log('Mensaje no reconocido:', data); */ 
+      case 'setToken':
+        /* console.log('🎯 Case setToken ejecutado');
+        console.log('🔑 Token recibido:', data.token); */
+        editorStore.setAuthToken(data.token);
+        break;
+      default:
+        /* console.log('Mensaje no reconocido:', data); */
      }
   });
-
-  window.addEventListener('keydown', handleKeyboardShortcuts);
 });
 
-onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeyboardShortcuts);
-})
+onUnmounted(() => {})
 </script>
 
 <style scoped>

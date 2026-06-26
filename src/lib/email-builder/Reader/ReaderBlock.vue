@@ -25,6 +25,9 @@ import TableRowReader, { TableRowPropsSchema } from '../blocks/TableRow';
 import TableCellReader, { TableCellPropsSchema } from '../blocks/TableCell';
 import TableSectionReader from '../blocks/TableSection/TableSectionReader.vue';
 import { TableSectionPropsSchema } from '../../../documents/blocks/TableSection/TableSectionPropsSchema';
+import VideoReader, { VideoPropsSchema } from '../blocks/Video/VideoReader.vue';
+import ListReader, { ListPropsSchema } from '../blocks/List/ListReader.vue';
+import ListItemReader, { ListItemPropsSchema } from '../blocks/List/ListItemReader.vue';
 
 
 const props = defineProps<TReaderBlockProps>();
@@ -109,6 +112,18 @@ const READER_DICTIONARY = {
   TableSection: {
     schema: TableSectionPropsSchema,
     Component: TableSectionReader
-  }
+  },
+  Video: {
+    schema: VideoPropsSchema,
+    Component: VideoReader,
+  },
+  List: {
+    schema: ListPropsSchema,
+    Component: ListReader,
+  },
+  ListItem: {
+    schema: ListItemPropsSchema,
+    Component: ListItemReader,
+  },
 };
 </script>

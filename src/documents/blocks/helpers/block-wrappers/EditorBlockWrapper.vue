@@ -37,20 +37,20 @@
       </div>    
     </div>  -->
 
-    <div       
-      v-if="dragAndDrop.showDropIndicator.value"       
-      :style="dragAndDrop.dropIndicatorStyle.value"      
-    >      
-      <div v-if="isDraggingFromSidebar() && getDraggedBlockPreview()" style="text-align: center;">      
-        <UIcon :name="getDraggedBlockPreview()?.icon || ''" style="font-size: 24px; opacity: 0.6;" />      
-        <div style="margin-top: 4px; font-size: 10px;">      
-          {{ getDraggedBlockPreview()?.displayName }}      
-        </div>      
-      </div>      
+    <div
+      v-if="dragAndDrop.showDropIndicator.value"
+      :style="dragAndDrop.dropIndicatorStyle.value"
+    >
+      <div v-if="isDraggingFromSidebar() && getDraggedBlockPreview()" style="text-align: center;">
+        <UIcon :name="getDraggedBlockPreview()?.icon || ''" style="font-size: 24px; opacity: 0.6;" />
+        <div style="margin-top: 4px; font-size: 10px;">
+          {{ getDraggedBlockPreview()?.displayName }}
+        </div>
+      </div>
     </div>
 
     <!-- <div v-if="dragAndDrop.showDropIndicator.value" :style="dragAndDrop.dropIndicatorStyle.value" />   -->
-    <TuneMenu v-if="inspectorDrawer.selectedBlockId === currentBlockId" :block-id="currentBlockId" />  
+    <TuneMenu v-if="inspectorDrawer.selectedBlockId === currentBlockId" :block-id="currentBlockId" />
     <slot />  
   </div>  
 </template>  
@@ -309,9 +309,9 @@ function handleDragOver(event: DragEvent) {
 } 
 
 
-function handleClick() {  
-  inspectorDrawer.setSelectedBlockId(currentBlockId);  
-} 
+function handleClick() {
+  inspectorDrawer.setSelectedBlockId(currentBlockId);
+}
 
 function getBlockPreview(): string {  
   const draggedData = dragAndDrop.draggedBlockId.value;  

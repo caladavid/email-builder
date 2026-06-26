@@ -12,32 +12,32 @@
     </template> 
 
     <template #list-trailing>
-      <div :class="['flex w-full justify-end md:gap-x-2', inspectorDrawer.inspectorDrawerOpen ? 'mr-8' : '']">
+      <div class="flex w-full justify-end md:gap-x-2">
         <UTooltip text="Deshacer">
-          <UButton   
-            icon="material-symbols:undo"  
-            :disabled="!inspectorDrawer.canUndo()"  
-            @click="inspectorDrawer.undo()"  
-            variant="ghost"  
-            color="neutral"  
-          />  
+          <UButton
+            icon="material-symbols:undo"
+            :disabled="isIframeMode ? !inspectorDrawer.canUndoHtml() : !inspectorDrawer.canUndo()"
+            @click="isIframeMode ? inspectorDrawer.undoHtml() : inspectorDrawer.undo()"
+            variant="ghost"
+            color="neutral"
+          />
         </UTooltip>
-        
+
         <UTooltip text="Rehacer">
-          <UButton   
-            icon="material-symbols:redo"  
-            :disabled="!inspectorDrawer.canRedo()"  
-            @click="inspectorDrawer.redo()"  
-            variant="ghost"  
-            color="neutral"  
-          />  
+          <UButton
+            icon="material-symbols:redo"
+            :disabled="isIframeMode ? !inspectorDrawer.canRedoHtml() : !inspectorDrawer.canRedo()"
+            @click="isIframeMode ? inspectorDrawer.redoHtml() : inspectorDrawer.redo()"
+            variant="ghost"
+            color="neutral"
+          />
         </UTooltip>
-        
+
         <!-- <DownloadJson /> -->
         <ImportJson />
-        
+
         <!-- <VariablesModal /> -->
-        
+
         <UButtonGroup>
           <UTooltip text="Vista de escritorio">
             <UButton
@@ -69,45 +69,87 @@
       </div>
     </template>
     <template #editor>
-      <div :style="mainBoxStyle">
+      <IframeCanvas v-if="isIframeMode" />
+      <div v-else :style="mainBoxStyle">
         <EditorBlock id="root" />
       </div>
     </template>
     <template #preview>
       <div :style="mainBoxStyle">
-        <Reader :document="processedDocument" root-block-id="root" />
+        <iframe
+          v-if="isIframeMode"
+          :srcdoc="previewHtml"
+          sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
+          style="width:100%;height:100%;border:none;display:block;min-height:00px;"
+        />
+        <Reader v-else :document="processedDocument" root-block-id="root" />
       </div>
     </template>
     <template #html>
       <HtmlPanel />
-    </template>
-    <template #json>
-      <JsonPanel />
     </template>
   </UTabs>
 </template>
 
 <script setup lang="ts">
 import EditorBlock from '../../documents/editor/EditorBlock.vue'
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
+import { useKeyboardShortcuts } from '../../composables/useKeyboardShortcuts'
 import HtmlPanel from './HtmlPanel.vue'
-import JsonPanel from './JsonPanel.vue'
 import ImportJson from './ImportJson/index.vue'
-import DownloadJson from './DownloadJson/index.vue'
-/* import { Reader } from '@flyhub/email-builder' */
 import { useInspectorDrawer } from '../../documents/editor/editor.store'
 import VariablesModal from '../VariablesModal/index.vue'
 import { createProcessedDocument } from '../../utils/documentProcessor'
-/* import { Reader } from '../../lib/@flyhub/email-builder' */
-import { Reader } from '../../lib/email-builder/index'
-
-
-// FIXME: implement
-// import ShareButton from './ShareButton.vue'
-
-// FIXME: implement handleChangeSelectedScreenSize
+import { Reader, renderToStaticMarkup } from '../../lib/email-builder/index'
+import IframeCanvas from './IframeCanvas.vue'
 
 const inspectorDrawer = useInspectorDrawer()
+
+const isIframeMode = computed(() => !!inspectorDrawer.rawHtml)
+
+// Blank canvas for new empty templates — placeholder block only, not real email content
+const BLANK_EMAIL_HTML = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"/><style>*{box-sizing:border-box;}body{margin:0;padding:0;background:#f5f5f5;font-family:Arial,sans-serif;}.material-symbols-outlined{font-family:'Material Symbols Outlined';font-weight:normal;font-style:normal;font-size:1.2rem;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;word-wrap:normal;direction:ltr;-webkit-font-smoothing:antialiased;}</style></head><body><div data-block-type="placeholder" style="margin:0 auto;max-width:600px;min-height:48px;border:2px dashed #c7d8f5;border-radius:10px;background:#ffffff;display:flex;align-items:center;justify-content:center;cursor:pointer;"><div style="width:24px;height:24px;border-radius:50%;background:#0045B0;display:flex;align-items:center;justify-content:center;pointer-events:none;"><span class="material-symbols-outlined" style="font-size:1.2rem;color:white;pointer-events:none;user-select:none;">add</span></div></div></body></html>`;
+
+// Auto-convert block mode to iframe mode whenever rawHtml is cleared
+watch(() => inspectorDrawer.rawHtml, async (html) => {
+  if (html) return; // already in iframe mode
+  try {
+    const doc = createProcessedDocument(inspectorDrawer.document, inspectorDrawer.globalVariables || {});
+    const rootBlock = (doc as any)['root'];
+    const childrenIds: string[] = rootBlock?.data?.props?.childrenIds ?? rootBlock?.data?.childrenIds ?? [];
+    // Empty template → start with a clean blank canvas instead of rendering the EmailLayout wrapper
+    if (!childrenIds.length) {
+      inspectorDrawer.importRawHtml(BLANK_EMAIL_HTML);
+      return;
+    }
+    const rendered = await renderToStaticMarkup(doc, { rootBlockId: 'root' });
+    inspectorDrawer.importRawHtml(rendered);
+  } catch (e) {
+    console.warn('Block→iframe auto-convert failed', e);
+  }
+}, { immediate: true })
+
+// Strip bridge script + editor-only inline styles and attributes so preview is clean
+const previewHtml = computed(() => {
+  let html = inspectorDrawer.rawHtml;
+  if (!html) return '';
+  // Remove bridge script
+  html = html.replace(/<script[^>]+id="__canvas-bridge__"[^>]*>[\s\S]*?<\/script>/gi, '');
+  // Remove selection/hover outlines (outline and outline-offset, with optional leading ;)
+  html = html.replace(/;?\s*outline(?:-offset)?\s*:[^;}"]*;?/gi, '');
+  // Remove contenteditable attribute set by bridge editing mode
+  html = html.replace(/\s*contenteditable="[^"]*"/gi, '');
+  // Remove draggable attribute set by bridge
+  html = html.replace(/\s*draggable="[^"]*"/gi, '');
+  // Substitute {variableName} with actual values
+  const vars = inspectorDrawer.globalVariables || {};
+  if (Object.keys(vars).length > 0) {
+    html = html.replace(/\{(\w+)\}/g, (match, key) => (vars as Record<string, string>)[key] ?? match);
+  }
+  return html;
+});
+
+useKeyboardShortcuts()
 
 const tabs = [
   {
@@ -121,10 +163,6 @@ const tabs = [
   {
     icon: 'material-symbols:code',
     slot: 'html' as const
-  },
-  {
-    icon: 'material-symbols:data-object',
-    slot: 'json' as const
   }
 ]
 

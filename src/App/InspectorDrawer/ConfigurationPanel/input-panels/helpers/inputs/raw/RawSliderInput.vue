@@ -1,39 +1,32 @@
 <template>
-  <div class="flex gap-2 items-center justify-between w-full">
-    <UIcon :name="iconLabel" class="text-3xl" />
-    <USlider
-      v-bind="rest"
-      @update:model-value="emit('update:model-value', $event as number)"
+  <div style="display:flex;align-items:center;gap:8px;width:100%;">
+    <UIcon :name="iconLabel" style="font-size:22px;color:var(--color-primary);flex-shrink:0;" />
+    <input
+      type="range"
+      :min="min ?? 0"
+      :max="max ?? 100"
+      :step="step ?? 1"
+      :value="modelValue ?? 0"
+      style="flex:1;accent-color:var(--color-primary);height:4px;cursor:pointer;"
+      @input="emit('update:model-value', +($event.target as HTMLInputElement).value)"
     />
-    <div>
-      <span class="text-right">{{ modelValue }}{{ units }}</span>
-    </div>
+    <span style="min-width:36px;font-size:11px;font-weight:600;color:var(--color-primary);text-align:right;flex-shrink:0;">
+      {{ modelValue ?? 0 }}{{ units }}
+    </span>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-
-type SliderInputProps = {
-  iconLabel: string,
-
-  step?: number,
-  units?: string,
-  min?: number,
-  max?: number,
-
-  modelValue: number | undefined,
-}
-
-const props = defineProps<SliderInputProps>()
+defineProps<{
+  iconLabel: string;
+  step?: number;
+  units?: string;
+  min?: number;
+  max?: number;
+  modelValue: number | undefined;
+}>();
 
 const emit = defineEmits<{
-  (e: 'update:model-value', args: number): void
-}>()
-
-const rest = computed(() => {
-  const { iconLabel: _1, units: _2, ...rest} = props;
-
-  return rest
-})
+  (e: 'update:model-value', value: number): void;
+}>();
 </script>

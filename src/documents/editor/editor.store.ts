@@ -1,8 +1,5 @@
-/* import { HTMLToBlockParser } from "../../App/TemplatePanel/ImportJson/htmlParser"; */
-
 import getConfiguration from "../../getConfiguration";
 import { isOriginAllowed } from "../../utils/allowedOrigins";
-import { HTMLToBlockParser } from "../../utils/parsers/HTMLToBlockParser";
 import type { TEditorConfiguration } from "./core";
 import { defineStore } from "pinia";
 import { computed, nextTick, onScopeDispose, ref, render } from "vue";
@@ -53,7 +50,8 @@ function saveVariablesToStorage(variables: Record<string, string>) {
   }
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? 'https://services.celcom.cl';
+const API_BASE = import.meta.env.VITE_API_BASE ?? 'https://dos.multinetlabs.com/sms_services';
+/* const API_BASE = import.meta.env.VITE_API_BASE ?? 'https://services.celcom.cl'; */
 
 export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   const document = ref<TValue['document']>(getConfiguration(typeof window !== 'undefined' ? window.location.hash : ''))
@@ -83,9 +81,21 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   const authToken = ref<string | null>(null);
   let debounceTimer: NodeJS.Timeout | null = null;
 
-  /* const globalVariables = ref<TValue['globalVariables']>(loadVariablesFromStorage()); */
-  // Limpiar variables
-  const globalVariables = ref<TValue['globalVariables']>({}); 
+  // ── IFRAME CANVAS STATE ──────────────────────────────────────────────────
+  const rawHtml = ref<string>('');
+  const htmlHistory = ref<string[]>([]);
+  const htmlHistoryIndex = ref<number>(-1);
+  const selectedElementPath = ref<string | null>(null);
+  const selectedElementStyles = ref<Record<string, string>>({});
+  const selectedElementAttrs = ref<Record<string, string>>({});
+  const selectedElementTagName = ref<string>('');
+  const selectedElementInnerText = ref<string>('');
+  const selectedElementChildData = ref<Record<string, string> | null>(null);
+  const htmlClipboard = ref<string>('');
+  const draggedHtml = ref<string>('');
+  // ────────────────────────────────────────────────────────────────────────
+
+  const globalVariables = ref<TValue['globalVariables']>(loadVariablesFromStorage());
 
   function initializeGlobalVariables(variables: Record<string, string>) {
     /* const merged = { ...loadVariablesFromStorage(), ...variables }
@@ -102,6 +112,11 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   const handleMessage = (event: MessageEvent) => {
     if (!isOriginAllowed(event.origin)) return;
 
+<<<<<<< HEAD
+=======
+    // Only capture parent origin from cross-origin messages.
+    // Same-origin messages (Vite HMR, canvas bridge, etc.) must not overwrite it.
+>>>>>>> 1baeef6ed7d57359aef01b24f108c1cd64851c47
     if (!parentOrigin && event.origin !== window.location.origin) {
       parentOrigin = event.origin;
     }
@@ -109,12 +124,13 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     const data = event.data as TReceivedMessage;
 
     if (data.type === 'loadDocument') {
-      if (data.document) {
+      if (data.html) {
+        importRawHtml(data.html);
+      } else if (data.document) {
         resetDocument(data.document);
       }
       if (data.variables) {
         receivedVariables.value = data.variables;
-        console.log('Variables recibidas desde la app principal:', data.variables);
       }
     }
   };
@@ -129,15 +145,14 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     window.removeEventListener('resize', handleResize);
   });
 
-  if (window.parent !== window) {
-    window.parent.postMessage({ type: 'iframeReady' }, '*');
-  }
 
   // Función para enviar datos a la aplicación padre
   function sendToParent(data: TReceivedMessage) {
-    if (window.parent) {
-      window.parent.postMessage(data, parentOrigin ?? '*');
-    }
+    if (!window.parent || window.parent === window) return;
+    // Priority: 1) captured from first cross-origin message, 2) env var, 3) drop (never '*')
+    const target = parentOrigin ?? import.meta.env.VITE_PARENT_ORIGIN ?? null;
+    if (!target) return;
+    window.parent.postMessage(data, target);
   }
   
 
@@ -167,17 +182,24 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   }
 
   function resetDocument(newDocument: TValue['document']) {
-    document.value = newDocument
-    selectedSidebarTab.value = 'styles'
-    selectedBlockId.value = null
+    // Exit iframe mode — switch back to block editor
+    rawHtml.value = '';
+    htmlHistory.value = [];
+    htmlHistoryIndex.value = -1;
+    selectedElementPath.value = null;
+    selectedElementStyles.value = {};
+    selectedElementAttrs.value = {};
+    selectedElementTagName.value = '';
+    selectedElementInnerText.value = '';
+    selectedElementChildData.value = null;
 
-    /* // Limpiar variables globales  
-    globalVariables.value = {}  
-    saveVariablesToStorage({}) */
+    document.value = newDocument;
+    selectedSidebarTab.value = 'styles';
+    selectedBlockId.value = null;
 
-    // Inicializar historial con el primer estado  
-    history.value = [JSON.parse(JSON.stringify(newDocument))];  
-    historyIndex.value = 0;  
+    // Inicializar historial con el primer estado
+    history.value = [structuredClone(newDocument)];
+    historyIndex.value = 0;
   }
 
   // Agregar función para recibir variables individuales  
@@ -216,6 +238,9 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   }
 
   async function getHtmlFromDocument(): Promise<string> {
+    // En modo iframe, el rawHtml ya es el HTML final 1:1
+    if (rawHtml.value) return rawHtml.value;
+
     const { default: renderToStaticMarkup } = await import("../../lib/email-builder/renderers/renderToStaticMarkup");
     const { createProcessedDocument } = await import("../../utils/documentProcessor");
 
@@ -224,6 +249,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
       globalVariables.value
     )
 
+<<<<<<< HEAD
     let html = await renderToStaticMarkup(proccessedDocument, { rootBlockId: 'root' })
 
   const tempDiv = window.document.createElement('div');
@@ -239,6 +265,9 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
       html = html.replace(/&lt;br&gt;/g, '<br>').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');  
     }  
   }  
+=======
+    const html = await renderToStaticMarkup(proccessedDocument, { rootBlockId: 'root' })
+>>>>>>> 1baeef6ed7d57359aef01b24f108c1cd64851c47
 
     return html;
   }
@@ -263,12 +292,13 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
 
     sendToParent({
       type: 'jsonResponse',
-      html: jsonContent
+      json: jsonContent
     })
 
   }
 
   async function exportHtmlAndJsonToParent() {
+<<<<<<< HEAD
     console.log('[Builder] exportHtmlAndJsonToParent called');
     let html = '';
     let jsonContent = '{}';
@@ -284,6 +314,17 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
       console.error('❌ exportHtmlAndJsonToParent error before sendToParent:', error);
     }
     console.log('[Builder] Sending htmlAndJsonResponse, html.length:', html.length);
+=======
+    const html = await getHtmlFromDocument();
+    // json must always be valid JSON so wrappers can JSON.parse() it.
+    // In iframe mode: wrap rawHtml in a JSON envelope { mode:'iframe', rawHtml }
+    //   → parent can restore via loadTemplate({ mode:'iframe', rawHtml })
+    // In block mode: standard block document JSON
+    const jsonContent = rawHtml.value
+      ? JSON.stringify({ mode: 'iframe', rawHtml: rawHtml.value })
+      : JSON.stringify(document.value, null, 2);
+
+>>>>>>> 1baeef6ed7d57359aef01b24f108c1cd64851c47
     sendToParent({
       type: 'htmlAndJsonResponse',
       html,
@@ -292,25 +333,25 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   }
 
   async function loadTemplateFromParent(template: TEditorConfiguration) {
-    // Usar resetDocument para reemplazar completamente el documento actual  
+    const t = template as any;
+
+    // Detect iframe-mode envelope saved by exportHtmlAndJsonToParent
+    if (t.mode === 'iframe' && typeof t.rawHtml === 'string') {
+      importRawHtml(t.rawHtml);
+      inspectorDrawerOpen.value = true;
+      return;
+    }
+
+    // Block mode: standard block document
     resetDocument(template);
-
-    // Convertir imágenes base64 existentes  
     await convertAllBase64Images(template);
-
-    // Abrir el inspector drawer para que el usuario vea que está en modo edición  
     inspectorDrawerOpen.value = true;
 
     const rootBlock = template['root'];
-
-    if (rootBlock.type === 'EmailLayout' && rootBlock.data.childrenIds && rootBlock.data.childrenIds.length > 0) {
-      // Seleccionar el primer bloque para indicar que está listo para editar
+    if (rootBlock && rootBlock.type === 'EmailLayout' && rootBlock.data.childrenIds?.length > 0) {
       const firstChildId = rootBlock.data.childrenIds[0];
-      nextTick(() => {
-        setSelectedBlockId(firstChildId)
-      })
+      nextTick(() => { setSelectedBlockId(firstChildId); });
     }
-
   }
 
   function setAuthToken(token: string){
@@ -320,7 +361,6 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
 
   
   function saveToHistory(){
-      // Clonar el estado actual del documento  
       const currentState = JSON.parse(JSON.stringify(document.value));
 
       // Eliminar estados futuros si no estamos al final  
@@ -356,7 +396,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
           document.value = JSON.parse(JSON.stringify(history.value[historyIndex.value]));
       }
   }
-  
+
   function redo(){
       if (canRedo()){
           historyIndex.value++;
@@ -418,26 +458,9 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
         // Opcional: Si a veces viene con comillas dobles en el CSS
         htmlContent = htmlContent.replace(/url\("images\/(https?:\/\/)/g, 'url("$1');
         
-        const parser = new HTMLToBlockParser();
-        const parseResult = await parser.parseHtmlStringToBlocks(htmlContent);  
-        
-        /* console.log(parseResult); */
-
-      // Manejar errores críticos  
-      const criticalErrors = parseResult.errors.filter(e => !e.recoverable);  
-      if (criticalErrors.length > 0) {  
-        console.error('❌ Errores críticos:', criticalErrors);  
-        return;  
-      }  
-        
-      // Cargar configuración en el editor  
-      if (parseResult.configuration) {  
-        resetDocument(parseResult.configuration);  
-        console.log('✅ Plantilla importada y lista para editar');  
-      } 
-
-        /* loadTemplateFromParent(result.data);  */ 
-        console.log('✅ ZIP procesado y cargado exitosamente');  
+        // Modo iframe: cargar HTML directo sin parsear a bloques
+        importRawHtml(htmlContent);
+        console.log('✅ ZIP importado como HTML directo (modo iframe)');
       } else {  
         console.error('❌ Error procesando ZIP:', result);  
       }  
@@ -447,15 +470,26 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     }
   }
 
-  async function uploadImage(file: File): Promise<string | null>{  
-    try {  
-      const token = authToken.value;  
+  async function uploadImage(file: File): Promise<string | null>{
+    try {
+      const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml']);
+      if (!ALLOWED_TYPES.has(file.type)) {
+        console.error('❌ Tipo de archivo no permitido:', file.type);
+        return null;
+      }
+      const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+      if (file.size > MAX_SIZE) {
+        console.error('❌ Archivo demasiado grande (máx 5MB):', file.size);
+        return null;
+      }
 
-      if (!token) {  
-        console.error('❌ No hay token disponible');  
-        return null;  
-      }  
-      
+      const token = authToken.value;
+
+      if (!token) {
+        console.error('❌ No hay token disponible');
+        return null;
+      }
+
       const formData = new FormData();
       formData.append('TOKEN', token);
       formData.append('image', file);
@@ -471,6 +505,8 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
+        const errBody = await response.text().catch(() => '');
+        console.error('❌ uploadImage error body:', errBody);
         throw new Error(`Error HTTP: ${response.status}`);
       }
 
@@ -497,26 +533,94 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
 
   async function convertBase64ToService(base64Url: string): Promise<string> {
     try {
-      
-      if (!base64Url.startsWith("data:image/")){
+      if (!base64Url.startsWith("data:image/")) {
         return base64Url;
       }
 
-      const response = await fetch(base64Url);
-      const blob = await response.blob();
-      const file = new File([blob], 'image.png', { type: blob.type });
+      // Use atob() instead of fetch() — fetch() on data: URLs is blocked by CSP connect-src
+      const [header, base64Data] = base64Url.split(',');
+      const mimeType = header.split(':')[1].split(';')[0];
+      const binaryStr = atob(base64Data);
+      const bytes = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) {
+        bytes[i] = binaryStr.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: mimeType });
+      const ext = mimeType.split('/')[1] || 'png';
+      const file = new File([blob], `image.${ext}`, { type: mimeType });
 
       const serviceUrl = await uploadImage(file);
-
       if (serviceUrl) return serviceUrl;
 
       return base64Url;
-
     } catch (error) {
-      console.error('❌ Error convirtiendo base64:', error);  
+      console.error('❌ Error convirtiendo base64:', error);
       return base64Url;
     }
   }
+
+  // ── IFRAME CANVAS FUNCTIONS ──────────────────────────────────────────────
+
+  function importRawHtml(html: string) {
+    rawHtml.value = html;
+    selectedElementPath.value = null;
+    selectedElementStyles.value = {};
+    selectedElementAttrs.value = {};
+    selectedElementTagName.value = '';
+    selectedElementInnerText.value = '';
+    selectedElementChildData.value = null;
+    htmlHistory.value = [html];
+    htmlHistoryIndex.value = 0;
+  }
+
+  function saveHtmlSnapshot(html: string) {
+    if (htmlHistoryIndex.value < htmlHistory.value.length - 1) {
+      htmlHistory.value = htmlHistory.value.slice(0, htmlHistoryIndex.value + 1);
+    }
+    htmlHistory.value.push(html);
+    htmlHistoryIndex.value++;
+    if (htmlHistory.value.length > 50) {
+      htmlHistory.value.shift();
+      htmlHistoryIndex.value--;
+    }
+    rawHtml.value = html;
+  }
+
+  function undoHtml() {
+    if (htmlHistoryIndex.value > 0) {
+      htmlHistoryIndex.value--;
+      rawHtml.value = htmlHistory.value[htmlHistoryIndex.value];
+    }
+  }
+
+  function redoHtml() {
+    if (htmlHistoryIndex.value < htmlHistory.value.length - 1) {
+      htmlHistoryIndex.value++;
+      rawHtml.value = htmlHistory.value[htmlHistoryIndex.value];
+    }
+  }
+
+  function canUndoHtml(): boolean {
+    return htmlHistoryIndex.value > 0;
+  }
+
+  function canRedoHtml(): boolean {
+    return htmlHistoryIndex.value < htmlHistory.value.length - 1;
+  }
+
+  function clearRawHtml() {
+    rawHtml.value = '';
+    htmlHistory.value = [];
+    htmlHistoryIndex.value = -1;
+    selectedElementPath.value = null;
+    selectedElementStyles.value = {};
+    selectedElementAttrs.value = {};
+    selectedElementTagName.value = '';
+    selectedElementInnerText.value = '';
+    selectedElementChildData.value = null;
+  }
+
+  // ────────────────────────────────────────────────────────────────────────
 
   async function convertAllBase64Images(config: TEditorConfiguration) {
     const conversions: Promise<void>[] = [];
@@ -525,10 +629,12 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
       const block = config[blockId];
 
       if (block.type === 'Image' && block.data.props?.url?.startsWith('data:image/')) {
+        const originalUrl = block.data.props.url;
         conversions.push(
-          convertBase64ToService(block.data.props.url).then(convertedUrl => {
-            if (convertedUrl !== block.data.props.url) {
-              block.data.props.url = convertedUrl;
+          convertBase64ToService(originalUrl).then(convertedUrl => {
+            // Guard: block may have been deleted before conversion completed
+            if (convertedUrl !== originalUrl && config[blockId]?.data?.props) {
+              config[blockId].data.props.url = convertedUrl;
             }
           })
         );
@@ -588,6 +694,25 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     sendZip,
     getHtmlFromDocument,
     uploadImage,
-    convertBase64ToService
+    convertBase64ToService,
+    // iframe canvas
+    rawHtml,
+    htmlHistory,
+    htmlHistoryIndex,
+    selectedElementPath,
+    selectedElementStyles,
+    selectedElementAttrs,
+    selectedElementTagName,
+    selectedElementInnerText,
+    selectedElementChildData,
+    htmlClipboard,
+    draggedHtml,
+    importRawHtml,
+    saveHtmlSnapshot,
+    undoHtml,
+    redoHtml,
+    canUndoHtml,
+    canRedoHtml,
+    clearRawHtml,
   }
 });

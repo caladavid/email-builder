@@ -24,14 +24,9 @@ export function interpolateVariables(text: string, variables: Record<string, str
 
     const result = text.replace(/\{\{(\w+)\}\}/g, (match, key) => {
         const replacement = variables[key];
-        /* console.log('🔄 Replacing:', {
-            match,
-            key,
-            replacement,
-            hasVariable: key in variables,
-            variableValue: variables[key]
-        }); */
-        return replacement || match;
+        if (replacement === undefined) return match;
+        // Escape $ to prevent String.replace() treating values like $1/$& as backreferences
+        return String(replacement).replace(/\$/g, '$$$$');
     });
 
     /* console.log('✅ Final result:', result); */
