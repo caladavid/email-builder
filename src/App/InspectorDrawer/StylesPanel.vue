@@ -21,13 +21,6 @@
     <!-- HEADING -->
     <StyleSection v-else-if="blockType === 'heading'" title="Contenido">
       <StyleRow label="Texto" type="text" :value="store.selectedElementInnerText" placeholder="Texto del encabezado" @change="setInnerText" />
-      <div v-if="variableItems.length > 0" style="display:flex;flex-wrap:wrap;align-items:center;gap:4px;">
-        <span style="font-size:10px;color:#94a3b8;white-space:nowrap;">Vars:</span>
-        <button v-for="v in variableItems" :key="v.key" @mousedown.prevent="appendVar(v.key)"
-          style="font-size:10px;padding:1px 7px;border-radius:10px;border:1px solid #c7d8f5;background:#f0f5ff;color:var(--color-primary);cursor:pointer;font-family:monospace;">
-          {{ '{' + v.key + '}' }}
-        </button>
-      </div>
       <div style="display:flex;flex-direction:column;gap:5px;">
         <label style="font-size:11px;font-weight:600;color:var(--color-primary);">Nivel</label>
         <div style="display:flex;gap:6px;">
@@ -47,13 +40,6 @@
     <!-- TEXT / PARAGRAPH -->
     <StyleSection v-else-if="blockType === 'text'" title="Contenido">
       <StyleRow label="Texto" type="text" :value="store.selectedElementInnerText" placeholder="Texto del párrafo" @change="setInnerText" />
-      <div v-if="variableItems.length > 0" style="display:flex;flex-wrap:wrap;align-items:center;gap:4px;">
-        <span style="font-size:10px;color:#94a3b8;white-space:nowrap;">Vars:</span>
-        <button v-for="v in variableItems" :key="v.key" @mousedown.prevent="appendVar(v.key)"
-          style="font-size:10px;padding:1px 7px;border-radius:10px;border:1px solid #c7d8f5;background:#f0f5ff;color:var(--color-primary);cursor:pointer;font-family:monospace;">
-          {{ '{' + v.key + '}' }}
-        </button>
-      </div>
     </StyleSection>
 
     <!-- BUTTON -->
@@ -112,6 +98,38 @@
       </div>
       <div style="border:1.5px solid #c7d8f5;border-radius:8px;padding:4px 6px;background:#f8faff;">
         <StyleRow label="URL de origen" type="text" :value="currentImgSrc" placeholder="https://..." @change="setAttr('src', $event)" />
+      </div>
+    </StyleSection>
+
+    <!-- VIDEO -->
+    <StyleSection v-else-if="blockType === 'video'" title="Video">
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <label style="font-size:11px;font-weight:600;color:var(--color-primary);">Subir video</label>
+        <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;padding:5px 12px;border-radius:6px;border:1.5px solid var(--color-primary);background:white;color:var(--color-primary);font-size:11px;font-weight:600;width:fit-content;user-select:none;">
+          ↑ Elegir archivo
+          <input type="file" accept="video/*" style="display:none;" @change="onVideoFileChange" />
+        </label>
+        <div v-if="uploadWarning" style="font-size:11px;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;padding:6px 8px;">
+          ⚠️ Sin token — video guardado como base64.
+        </div>
+      </div>
+      <div style="border:1.5px solid #c7d8f5;border-radius:8px;padding:4px 6px;background:#f8faff;">
+        <StyleRow label="URL de origen (src)" type="text" :value="videoChildData.src || ''" placeholder="https://example.com/video.mp4"
+          @change="setVideoAttr('src', $event)" />
+      </div>
+      <StyleRow label="Poster (imagen previa)" type="text" :value="videoChildData.poster || ''" placeholder="https://example.com/poster.jpg"
+        @change="setVideoAttr('poster', $event)" />
+      <div style="display:flex;gap:16px;padding:4px 0;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--color-primary);cursor:pointer;">
+          <input type="checkbox" :checked="!!videoChildData.controls" @change="setVideoControls(($event.target as HTMLInputElement).checked)"
+            style="width:14px;height:14px;accent-color:var(--color-primary);" />
+          Controles
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--color-primary);cursor:pointer;">
+          <input type="checkbox" :checked="!!videoChildData.autoplay" @change="setVideoControls(($event.target as HTMLInputElement).checked, 'autoplay')"
+            style="width:14px;height:14px;accent-color:var(--color-primary);" />
+          Autoplay
+        </label>
       </div>
     </StyleSection>
 
@@ -235,6 +253,32 @@
     <!-- Fondo -->
     <StyleSection title="Fondo">
       <StyleRow label="Color de fondo" type="color" :value="styles.backgroundColor" @change="setStyle('backgroundColor', $event)" />
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        <label style="font-size:11px;font-weight:600;color:var(--color-primary);">Imagen de fondo</label>
+        <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;padding:5px 12px;border-radius:6px;border:1.5px solid var(--color-primary);background:white;color:var(--color-primary);font-size:11px;font-weight:600;width:fit-content;user-select:none;">
+          ↑ Elegir archivo
+          <input type="file" accept="image/*" style="display:none;" @change="onBgFileChange" />
+        </label>
+        <div v-if="uploadWarning" style="font-size:11px;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;padding:6px 8px;">
+          ⚠️ Sin token — imagen guardada como base64.
+        </div>
+        <input
+          type="text"
+          :value="bgImageUrl"
+          placeholder="https://example.com/bg.jpg"
+          style="font-size:11px;padding:6px 8px;border:1px solid #c7d8f5;border-radius:7px;color:#111;background:white;outline:none;width:100%;box-sizing:border-box;"
+          @change="onBgImageChange(($event.target as HTMLInputElement).value)"
+        />
+      </div>
+      <StyleRow label="Tamaño fondo" type="select" :value="styles.backgroundSize||''"
+        :options="[{label:'Auto',value:'auto'},{label:'Cover',value:'cover'},{label:'Contain',value:'contain'},{label:'100% auto',value:'100% auto'}]"
+        @change="setStyle('backgroundSize', $event)" />
+      <StyleRow label="Posición fondo" type="select" :value="styles.backgroundPosition||''"
+        :options="[{label:'Center',value:'center'},{label:'Top',value:'top'},{label:'Bottom',value:'bottom'},{label:'Left',value:'left'},{label:'Right',value:'right'}]"
+        @change="setStyle('backgroundPosition', $event)" />
+      <StyleRow label="Repetición" type="select" :value="styles.backgroundRepeat||''"
+        :options="[{label:'No repeat',value:'no-repeat'},{label:'Repeat',value:'repeat'},{label:'Repeat-X',value:'repeat-x'},{label:'Repeat-Y',value:'repeat-y'}]"
+        @change="setStyle('backgroundRepeat', $event)" />
     </StyleSection>
 
     <!-- Padding -->
@@ -297,6 +341,11 @@ const store = useInspectorDrawer();
 const block = computed(() => store.document.root);
 const styles = computed(() => store.selectedElementStyles ?? {});
 const childData = computed(() => (store.selectedElementChildData ?? {}) as Record<string, string>);
+// For video: when wrapper div selected, attrs come from child <video>; when video element itself, from selectedElementAttrs
+const videoChildData = computed(() => {
+  if (store.selectedElementTagName === 'VIDEO') return (store.selectedElementAttrs ?? {}) as Record<string, any>;
+  return (store.selectedElementChildData ?? {}) as Record<string, any>;
+});
 
 const uploadWarning = ref(false);
 
@@ -339,6 +388,7 @@ const blockType = computed(() => {
   if (t === 'Texto' || t === 'P') return 'text';
   if (t === 'Botón') return 'button';
   if (t === 'Imagen') return 'image-block';
+  if (t === 'VIDEO' || t === 'video' || t === 'Video') return 'video';
   if (t === 'Avatar') return 'avatar';
   if (t === 'Enlace' || t === 'A') return 'link';
   if (t === 'Separador') return 'separator';
@@ -394,6 +444,31 @@ async function onAvatarFileChange(event: Event) {
   sendToCanvas({ type: 'set-child-attr', path: store.selectedElementPath, selector: 'img', property: 'src', value: url });
 }
 
+async function onVideoFileChange(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+  uploadWarning.value = false;
+  const url = await new Promise<string>(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target!.result as string);
+    reader.readAsDataURL(file);
+  });
+  setVideoAttr('src', url);
+}
+
+function setVideoAttr(property: string, value: string) {
+  if (!store.selectedElementPath) return;
+  if (store.selectedElementTagName === 'VIDEO') {
+    setAttr(property, value);
+  } else {
+    setChildAttr('video', property, value);
+  }
+}
+
+function setVideoControls(checked: boolean, attr = 'controls') {
+  setVideoAttr(attr, checked ? attr : '');
+}
+
 // ── Content setters ───────────────────────────────────────────────────────────
 
 function setInnerText(value: string) {
@@ -438,6 +513,34 @@ function setChildInnerText(selector: string, value: string) {
 }
 
 // ── Style setter ─────────────────────────────────────────────────────────────
+
+const bgImageUrl = computed(() => {
+  const raw = styles.value.backgroundImage as string | null | undefined;
+  if (!raw) return '';
+  const m = raw.match(/url\(['"]?([^'"]+)['"]?\)/);
+  return m ? m[1] : raw;
+});
+
+function onBgImageChange(url: string) {
+  const trimmed = url.trim();
+  const cssValue = trimmed ? `url('${trimmed}')` : '';
+  setStyle('backgroundImage', cssValue);
+}
+
+async function onBgFileChange(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+  let url = await store.uploadImage(file);
+  if (!url) {
+    uploadWarning.value = true;
+    url = await new Promise<string>(resolve => {
+      const reader = new FileReader();
+      reader.onload = e => resolve(e.target!.result as string);
+      reader.readAsDataURL(file);
+    });
+  }
+  onBgImageChange(url);
+}
 
 function setStyle(property: string, value: string) {
   if (!store.selectedElementPath) return;

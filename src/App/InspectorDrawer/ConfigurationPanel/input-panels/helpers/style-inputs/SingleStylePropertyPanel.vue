@@ -1,5 +1,15 @@
 <template>
   <NullableColorInput v-if="name === 'backgroundColor'" label="Color de fondo" :default-value="defaultValue" @change="handleChange" />
+  <div v-else-if="name === 'backgroundImage'" style="display:flex;flex-direction:column;gap:5px;">
+    <label style="font-size:11px;font-weight:600;color:var(--color-primary);">Imagen de fondo (URL)</label>
+    <input
+      type="text"
+      :value="bgImageUrl"
+      placeholder="https://example.com/bg.jpg"
+      style="font-size:11px;padding:6px 8px;border:1px solid #c7d8f5;border-radius:7px;color:#111;background:white;outline:none;width:100%;box-sizing:border-box;"
+      @change="onBgImageChange(($event.target as HTMLInputElement).value)"
+    />
+  </div>
   <NullableColorInput v-else-if="name === 'borderColor'" label="Color del borde" :default-value="defaultValue" @change="handleChange" />
   <SliderInput
     v-else-if="name === 'borderRadius'"
@@ -48,10 +58,18 @@ const defaultValue = computed(() => {
 
   if (value === "transparent") {
     return null
-  } 
+  }
 
   return value ?? null;
 })
+
+// backgroundImage: strip url('...') wrapper for display, re-add on save
+const bgImageUrl = computed(() => {
+  const raw = props.modelValue['backgroundImage'] as string | null | undefined;
+  if (!raw) return '';
+  const m = raw.match(/url\(['"]?([^'"]+)['"]?\)/);
+  return m ? m[1] : raw;
+});
 
 /** Functions */
 
@@ -61,5 +79,13 @@ function handleChange(newValue: unknown) {
     ...props.modelValue,
     [props.name]: finalValue,
   })
+}
+
+function onBgImageChange(url: string) {
+  const trimmed = url.trim();
+  emit('update:model-value', {
+    ...props.modelValue,
+    backgroundImage: trimmed ? `url('${trimmed}')` : null,
+  });
 }
 </script>
