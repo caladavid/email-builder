@@ -4,6 +4,18 @@
     <meta charset="UTF-8" />
     <link rel="icon" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval';
+      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+      img-src 'self' data: https: blob:;
+      media-src 'self' data: https: blob:;
+      font-src 'self' https://fonts.gstatic.com data:;
+      connect-src 'self' https://dos.multinetlabs.com https://services.celcom.cl https://api.iconify.design https://api.unisvg.com https://api.simplesvg.com wss://localhost:5173 ws://localhost:5173;
+      frame-src 'self' blob:;
+      object-src 'none';
+      base-uri 'self';
+    " />
     <title>Email Builder - Celcom</title>
     <meta name="title" content="Email Builder - Celcom" />
 
