@@ -8,6 +8,11 @@ export const ALLOWED_ORIGINS = [
   'http://localhost:3000',
 ] as const;
 
-export function isOriginAllowed(origin: string): boolean {
-  return ALLOWED_ORIGINS.includes(origin as any);
+export function isOriginAllowed(origin: unknown): boolean {
+  if (typeof origin !== 'string') return false;
+  // In production, strip localhost entries to prevent local-origin spoofing
+  const list = import.meta.env.PROD
+    ? ALLOWED_ORIGINS.filter(o => !o.includes('localhost'))
+    : ALLOWED_ORIGINS;
+  return (list as readonly string[]).includes(origin);
 }

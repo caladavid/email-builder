@@ -20,10 +20,11 @@ export const SUPPORTED_BLOCK_TYPES = new Set([
 ]);
 
 // Semantic mappings for unsupported types
+// Note: Script is intentionally NOT mapped — script blocks are dropped entirely
+// to prevent arbitrary JS execution when importing external HTML templates.
 const TYPE_MAP: Record<string, string> = {
   Separator: 'Divider',
   Espaciador: 'Spacer',
-  Script: 'Html',
 };
 
 export function sanitizeBlocks(
