@@ -196,7 +196,10 @@ async function handleZipUpload(event: Event) {
       const JSZip = (await import('jszip')).default;
       const zip = await JSZip.loadAsync(file);
 
-      const htmlFile = zip.file('index.html') ?? zip.file(/\.html$/i)[0] ?? null;
+      const isMacJunk = (name: string) => name.startsWith('__MACOSX/') || name.startsWith('._') || name.includes('/._');
+      const htmlFile = (!isMacJunk('index.html') && zip.file('index.html'))
+        ?? zip.file(/\.html$/i).find(f => !isMacJunk(f.name))
+        ?? null;
       if (!htmlFile) {
         zipError.value = 'No se encontró un archivo HTML en el ZIP';
         return;
@@ -206,7 +209,7 @@ async function handleZipUpload(event: Event) {
       // Build image map: full path + basename for flexible lookup
       const imageMap = new Map<string, string>();
       const imageEntries = Object.entries(zip.files).filter(
-        ([name]) => isImageFile(name) && !zip.files[name].dir
+        ([name]) => isImageFile(name) && !zip.files[name].dir && !isMacJunk(name)
       );
       await Promise.all(imageEntries.map(async ([name, entry]) => {
         try {
