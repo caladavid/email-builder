@@ -615,11 +615,13 @@ function resyncOverlayPosition() {
 
 // ── Lifecycle ────────────────────────────────────────────────────────────────
 
+const _hideAddPickerOnScroll = () => { if (!showAddPicker.value) addButtonInfo.value = null; };
+
 onMounted(() => {
   window.addEventListener('message', handleMessage);
   window.addEventListener('resize', resyncOverlayPosition);
   containerRef.value?.addEventListener('scroll', refreshOverlayOnScroll);
-  containerRef.value?.addEventListener('scroll', () => { if (!showAddPicker.value) addButtonInfo.value = null; });
+  containerRef.value?.addEventListener('scroll', _hideAddPickerOnScroll);
   registerCanvasIframe(iframeRef.value);
 
   // ResizeObserver catches iframe height changes (content grows, images load, etc.)
@@ -633,6 +635,7 @@ onUnmounted(() => {
   window.removeEventListener('message', handleMessage);
   window.removeEventListener('resize', resyncOverlayPosition);
   containerRef.value?.removeEventListener('scroll', refreshOverlayOnScroll);
+  containerRef.value?.removeEventListener('scroll', _hideAddPickerOnScroll);
   _resizeObserver?.disconnect();
   _resizeObserver = null;
   if (_saveTimer) clearTimeout(_saveTimer);
