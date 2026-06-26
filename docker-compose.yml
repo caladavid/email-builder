@@ -5,6 +5,9 @@ services:
     build:
       context: .        # Ruta donde está tu Dockerfile
       dockerfile: Dockerfile
+      args:
+        VITE_API_BASE: https://services.celcom.cl
+        VITE_PARENT_ORIGIN: "https://flex.celcomlatam.com"
     container_name: email-builder-container  # Nombre fijo del contenedor
     ports:
       - "8080:80"       # Exponer puerto 80 del contenedor en el puerto 8080 de tu máquina
