@@ -973,18 +973,23 @@ export class HTMLToBlockParser {
         const currentStyles = this.extractStyles(element, inheritedStyles);
 
 
-        // Si es una de estas etiquetas, la convertimos a Markdown y paramos aquí.
-        const markdownTags = ['blockquote', 'ul', 'ol'];
-
-        if (markdownTags.includes(tagName)) {
-            // 1. Convertimos todo el árbol interno a Markdown
+        if (tagName === 'ul' || tagName === 'ol') {
+            const listId = this.createListBlock(element, currentStyles);
+            if (listId) return listId;
+            // Fallback to markdown text if no li items found
             const markdownText = this.nodeToMarkdown(element).trim();
-
-            // 2. Creamos el bloque de Texto con ese contenido
-            if (markdownText) {
-                return this.createTextBlock(markdownText, [], currentStyles, true);
-            }
+            if (markdownText) return this.createTextBlock(markdownText, [], currentStyles, true);
             return null;
+        }
+
+        if (tagName === 'blockquote') {
+            const markdownText = this.nodeToMarkdown(element).trim();
+            if (markdownText) return this.createTextBlock(markdownText, [], currentStyles, true);
+            return null;
+        }
+
+        if (tagName === 'video') {
+            return this.createVideoBlock(element);
         }
 
         if (tagName === "table" && this.isColumnsTable(element)) {
@@ -2449,62 +2454,62 @@ export class HTMLToBlockParser {
         return id;
     }
 
-    /*     private createVideoBlock(element: Element): string | null {
-            const src = element.getAttribute("src") || "";
-            if (!src) return null;
-    
-            const dataUrl = this.mediaMap.get(src) || src;
-            const id = uuidv4();
-            const styles = this.extractStyles(element, {});
-    
-            this.blocks[id] = {
-                type: "Video",
-                data: {
-                    style: { ...styles, padding: { top: 16, bottom: 16, left: 24, right: 24 } },
-                    props: {
-                        url: dataUrl,
-                        poster: element.getAttribute("poster") || "",
-                        controls: element.hasAttribute("controls"),
-                        autoplay: element.hasAttribute("autoplay"),
-                        width: element.getAttribute("width") ? parseInt(element.getAttribute("width")!) : undefined,
-                        height: element.getAttribute("height") ? parseInt(element.getAttribute("height")!) : undefined
-                    }
-                }
-            };
-            return id;
-        } */
+    private createVideoBlock(element: Element): string | null {
+        const src = element.getAttribute("src") || "";
+        if (!src) return null;
 
-    /*     private createListBlock(element: Element, styles: any): string | null {
-            const items: string[] = [];
-            const isOrdered = element.tagName.toLowerCase() === 'ol';
-    
-            Array.from(element.querySelectorAll(':scope > li')).forEach(li => {
-                const { text, formats } = this.processInlineContent(li, styles);
-                if (text.trim()) {
-                    const itemId = uuidv4();
-                    this.blocks[itemId] = {
-                        type: "ListItem",
-                        data: {
-                            props: { text, formats, ordered: isOrdered },
-                            style: { ...styles }
-                        }
-                    };
-                    items.push(itemId);
+        const dataUrl = this.mediaMap.get(src) || src;
+        const id = uuidv4();
+        const styles = this.extractStyles(element, {});
+
+        this.blocks[id] = {
+            type: "Video",
+            data: {
+                style: { ...styles, padding: { top: 16, bottom: 16, left: 24, right: 24 } },
+                props: {
+                    url: dataUrl,
+                    poster: element.getAttribute("poster") || "",
+                    controls: element.hasAttribute("controls"),
+                    autoplay: element.hasAttribute("autoplay"),
+                    width: element.getAttribute("width") ? parseInt(element.getAttribute("width")!) : undefined,
+                    height: element.getAttribute("height") ? parseInt(element.getAttribute("height")!) : undefined
                 }
-            });
-    
-            if (items.length === 0) return null;
-    
-            const id = uuidv4();
-            this.blocks[id] = {
-                type: "List",
-                data: {
-                    style: { ...styles, padding: { top: 16, bottom: 16, left: 24, right: 24 } },
-                    childrenIds: items
-                }
-            };
-            return id;
-        }
+            }
+        };
+        return id;
+    }
+
+    private createListBlock(element: Element, styles: any): string | null {
+        const items: string[] = [];
+        const isOrdered = element.tagName.toLowerCase() === 'ol';
+
+        Array.from(element.querySelectorAll(':scope > li')).forEach(li => {
+            const { text, formats } = this.processInlineContent(li, styles);
+            if (text.trim()) {
+                const itemId = uuidv4();
+                this.blocks[itemId] = {
+                    type: "ListItem",
+                    data: {
+                        props: { text, formats, ordered: isOrdered },
+                        style: { ...styles }
+                    }
+                };
+                items.push(itemId);
+            }
+        });
+
+        if (items.length === 0) return null;
+
+        const id = uuidv4();
+        this.blocks[id] = {
+            type: "List",
+            data: {
+                style: { ...styles, padding: { top: 16, bottom: 16, left: 24, right: 24 } },
+                props: { childrenIds: items, ordered: isOrdered }
+            }
+        };
+        return id;
+    }
     
         private createFormBlock(element: Element, styles: any): string | null {
             const formItems: string[] = [];
