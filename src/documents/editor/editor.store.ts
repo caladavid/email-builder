@@ -1,8 +1,5 @@
-/* import { HTMLToBlockParser } from "../../App/TemplatePanel/ImportJson/htmlParser"; */
-
 import getConfiguration from "../../getConfiguration";
 import { isOriginAllowed } from "../../utils/allowedOrigins";
-import { HTMLToBlockParser } from "../../utils/parsers/HTMLToBlockParser";
 import type { TEditorConfiguration } from "./core";
 import { defineStore } from "pinia";
 import { computed, nextTick, onScopeDispose, ref, render } from "vue";
@@ -53,8 +50,8 @@ function saveVariablesToStorage(variables: Record<string, string>) {
   }
 }
 
-/* const API_BASE = import.meta.env.VITE_API_BASE ?? 'https://dos.multinetlabs.com/sms_services'; */
-const API_BASE = import.meta.env.VITE_API_BASE ?? 'https://services.celcom.cl';
+const API_BASE = import.meta.env.VITE_API_BASE ?? 'https://dos.multinetlabs.com/sms_services';
+/* const API_BASE = import.meta.env.VITE_API_BASE ?? 'https://services.celcom.cl'; */
 
 export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   const document = ref<TValue['document']>(getConfiguration(typeof window !== 'undefined' ? window.location.hash : ''))
@@ -98,9 +95,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   const draggedHtml = ref<string>('');
   // ────────────────────────────────────────────────────────────────────────
 
-  /* const globalVariables = ref<TValue['globalVariables']>(loadVariablesFromStorage()); */
-  // Limpiar variables
-  const globalVariables = ref<TValue['globalVariables']>({}); 
+  const globalVariables = ref<TValue['globalVariables']>(loadVariablesFromStorage());
 
   function initializeGlobalVariables(variables: Record<string, string>) {
     /* const merged = { ...loadVariablesFromStorage(), ...variables }
@@ -147,10 +142,6 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     window.removeEventListener('resize', handleResize);
   });
 
-  if (window.parent !== window) {
-    const target = import.meta.env.VITE_PARENT_ORIGIN ?? '*';
-    window.parent.postMessage({ type: 'iframeReady' }, target);
-  }
 
   // Función para enviar datos a la aplicación padre
   function sendToParent(data: TReceivedMessage) {
@@ -204,7 +195,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     selectedBlockId.value = null;
 
     // Inicializar historial con el primer estado
-    history.value = [JSON.parse(JSON.stringify(newDocument))];
+    history.value = [structuredClone(newDocument)];
     historyIndex.value = 0;
   }
 
@@ -331,7 +322,6 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
 
   
   function saveToHistory(){
-      // Clonar el estado actual del documento  
       const currentState = JSON.parse(JSON.stringify(document.value));
 
       // Eliminar estados futuros si no estamos al final  
@@ -367,7 +357,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
           document.value = JSON.parse(JSON.stringify(history.value[historyIndex.value]));
       }
   }
-  
+
   function redo(){
       if (canRedo()){
           historyIndex.value++;
@@ -441,15 +431,26 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     }
   }
 
-  async function uploadImage(file: File): Promise<string | null>{  
-    try {  
-      const token = authToken.value;  
+  async function uploadImage(file: File): Promise<string | null>{
+    try {
+      const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml']);
+      if (!ALLOWED_TYPES.has(file.type)) {
+        console.error('❌ Tipo de archivo no permitido:', file.type);
+        return null;
+      }
+      const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+      if (file.size > MAX_SIZE) {
+        console.error('❌ Archivo demasiado grande (máx 5MB):', file.size);
+        return null;
+      }
 
-      if (!token) {  
-        console.error('❌ No hay token disponible');  
-        return null;  
-      }  
-      
+      const token = authToken.value;
+
+      if (!token) {
+        console.error('❌ No hay token disponible');
+        return null;
+      }
+
       const formData = new FormData();
       formData.append('TOKEN', token);
       formData.append('image', file);
@@ -493,23 +494,28 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
 
   async function convertBase64ToService(base64Url: string): Promise<string> {
     try {
-      
-      if (!base64Url.startsWith("data:image/")){
+      if (!base64Url.startsWith("data:image/")) {
         return base64Url;
       }
 
-      const response = await fetch(base64Url);
-      const blob = await response.blob();
-      const file = new File([blob], 'image.png', { type: blob.type });
+      // Use atob() instead of fetch() — fetch() on data: URLs is blocked by CSP connect-src
+      const [header, base64Data] = base64Url.split(',');
+      const mimeType = header.split(':')[1].split(';')[0];
+      const binaryStr = atob(base64Data);
+      const bytes = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) {
+        bytes[i] = binaryStr.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: mimeType });
+      const ext = mimeType.split('/')[1] || 'png';
+      const file = new File([blob], `image.${ext}`, { type: mimeType });
 
       const serviceUrl = await uploadImage(file);
-
       if (serviceUrl) return serviceUrl;
 
       return base64Url;
-
     } catch (error) {
-      console.error('❌ Error convirtiendo base64:', error);  
+      console.error('❌ Error convirtiendo base64:', error);
       return base64Url;
     }
   }
@@ -584,10 +590,12 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
       const block = config[blockId];
 
       if (block.type === 'Image' && block.data.props?.url?.startsWith('data:image/')) {
+        const originalUrl = block.data.props.url;
         conversions.push(
-          convertBase64ToService(block.data.props.url).then(convertedUrl => {
-            if (convertedUrl !== block.data.props.url) {
-              block.data.props.url = convertedUrl;
+          convertBase64ToService(originalUrl).then(convertedUrl => {
+            // Guard: block may have been deleted before conversion completed
+            if (convertedUrl !== originalUrl && config[blockId]?.data?.props) {
+              config[blockId].data.props.url = convertedUrl;
             }
           })
         );
