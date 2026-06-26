@@ -1,8 +1,25 @@
 export const CANVAS_BRIDGE_CODE = `
 (function () {
   'use strict';
+  if (window.__canvasBridgeCleanup) { try { window.__canvasBridgeCleanup(); } catch(e) {} }
   if (window.__canvasBridgeActive) return;
   window.__canvasBridgeActive = true;
+
+  // Capture parent origin from first incoming message so postMessage calls are not sent with '*'
+  var _parentOrigin = '*';
+  var _parentOriginCaptured = false;
+
+  // Basic XSS sanitizer — strips <script> tags, javascript: protocol, and inline event handlers.
+  // DOMPurify is not available in this iframe context; origin validation is the primary guard.
+  // IMPORTANT: inside this template literal, regex meta-escapes need \\ so that \s/\w/\b
+  // survive template-literal evaluation as \s/\w/\b in the injected script.
+  // \/ also needs \\ so the slash does not prematurely close the regex.
+  function sanitizeHtml(html) {
+    return (html || '')
+      .replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, '')
+      .replace(/\\bon\\w+\\s*=\\s*["'][^"']*["']/gi, '')
+      .replace(/javascript:/gi, 'javascript_disabled:');
+  }
 
   const IGNORE_TAGS = new Set(['HTML', 'HEAD', 'BODY', 'STYLE', 'SCRIPT', 'META', 'LINK', 'TITLE', 'NOSCRIPT']);
   // Denylist: any element NOT in this set can be inline-edited on dblclick
@@ -107,7 +124,20 @@ export const CANVAS_BRIDGE_CODE = `
   }
 
   function notifyDomChanged() {
+    // Strip editor hover/selection outlines before snapshot — they must not leak into exported HTML
+    var outlineEls = document.querySelectorAll('[style*="dashed"]');
+    var savedOutlines = [];
+    for (var oi = 0; oi < outlineEls.length; oi++) {
+      var _oel = outlineEls[oi];
+      if (_oel.style && _oel.style.outline && _oel.style.outline.indexOf('dashed') !== -1) {
+        savedOutlines.push([_oel, _oel.style.outline]);
+        _oel.style.outline = '';
+      }
+    }
     var html = document.documentElement.outerHTML;
+    for (var ri = 0; ri < savedOutlines.length; ri++) {
+      savedOutlines[ri][0].style.outline = savedOutlines[ri][1];
+    }
     var bridgeStart = html.indexOf('<script id="__canvas-bridge__"');
     if (bridgeStart >= 0) {
       var closeTag = '<' + '/script>';
@@ -116,7 +146,7 @@ export const CANVAS_BRIDGE_CODE = `
         html = html.slice(0, bridgeStart) + html.slice(bridgeEnd + closeTag.length);
       }
     }
-    parent.postMessage({ type: 'dom-changed', html: html }, '*');
+    parent.postMessage({ type: 'dom-changed', html: html }, _parentOrigin);
   }
 
   // Debounced version for rapid-fire style changes (slider drag).
@@ -204,6 +234,14 @@ export const CANVAS_BRIDGE_CODE = `
         childData.cellBorderWidth = (firstTd.style.borderWidth || firstTd.style.borderTopWidth || '1').replace('px', '');
         childData.cellPadding = (firstTd.style.padding || firstTd.style.paddingTop || '8').replace('px', '');
       }
+    } else if (blockType === 'video') {
+      var vidEl = el.querySelector('video');
+      if (vidEl) {
+        childData.src = vidEl.getAttribute('src') || '';
+        childData.poster = vidEl.getAttribute('poster') || '';
+        childData.controls = vidEl.hasAttribute('controls') ? 'controls' : null;
+        childData.autoplay = vidEl.hasAttribute('autoplay') ? 'autoplay' : null;
+      }
     }
     parent.postMessage({
       type: 'select',
@@ -220,7 +258,7 @@ export const CANVAS_BRIDGE_CODE = `
         width: rect.width,
         height: rect.height
       }
-    }, '*');
+    }, _parentOrigin);
   }
 
   // HOVER
@@ -283,7 +321,7 @@ export const CANVAS_BRIDGE_CODE = `
     block.contentEditable = 'true';
     block.focus();
     var er = block.getBoundingClientRect();
-    parent.postMessage({ type: 'editing-start', path: getElementPath(block), rect: { top: er.top + window.scrollY, left: er.left + window.scrollX, width: er.width, height: er.height } }, '*');
+    parent.postMessage({ type: 'editing-start', path: getElementPath(block), rect: { top: er.top + window.scrollY, left: er.left + window.scrollX, width: er.width, height: er.height } }, _parentOrigin);
   }, true);
 
   // CLICK → SELECT (walk up to block root, fallback to direct body child for imported templates)
@@ -311,7 +349,7 @@ export const CANVAS_BRIDGE_CODE = `
         clearOutline(selectedEl, '', '');
         try { selectedEl.removeAttribute('draggable'); } catch(err) {}
         selectedEl = null;
-        parent.postMessage({ type: 'deselect' }, '*');
+        parent.postMessage({ type: 'deselect' }, _parentOrigin);
       }
       return;
     }
@@ -325,8 +363,26 @@ export const CANVAS_BRIDGE_CODE = `
     editingEl = null;
     exiting.contentEditable = 'false';
     exiting.blur();
+    // Sanitize <br> inside Botón blocks — email clients render them as hard line breaks
+    var exitBlock = exiting;
+    while (exitBlock && exitBlock !== document.body) {
+      if (exitBlock.getAttribute && exitBlock.getAttribute('data-block-type') === 'Botón') break;
+      exitBlock = exitBlock.parentElement;
+    }
+    if (exitBlock && exitBlock !== document.body) {
+      var brs = exitBlock.querySelectorAll('br');
+      for (var bi = brs.length - 1; bi >= 0; bi--) {
+        var br = brs[bi];
+        var isTrailing = !br.nextSibling || (br.nextSibling.nodeType === 3 && br.nextSibling.nodeValue.trim() === '');
+        if (isTrailing) {
+          br.parentNode.removeChild(br);
+        } else {
+          br.parentNode.replaceChild(document.createTextNode(' '), br);
+        }
+      }
+    }
     notifyDomChanged();
-    parent.postMessage({ type: 'editing-end' }, '*');
+    parent.postMessage({ type: 'editing-end' }, _parentOrigin);
     // Do NOT re-select exiting: it sends a stale 'select' for the old element right before
     // the new click's 'select' arrives, causing the overlay to flash to the wrong position.
   }
@@ -340,7 +396,7 @@ export const CANVAS_BRIDGE_CODE = `
       try { selectedEl.removeAttribute('draggable'); } catch(err) {}
       clearOutline(selectedEl, prevSelOutline, prevSelOutlineOffset);
       selectedEl = null;
-      parent.postMessage({ type: 'deselect' }, '*');
+      parent.postMessage({ type: 'deselect' }, _parentOrigin);
     }
   }, true);
 
@@ -354,7 +410,7 @@ export const CANVAS_BRIDGE_CODE = `
     if (!fwd) return;
     e.preventDefault();
     e.stopPropagation();
-    parent.postMessage({ type: 'keydown', key: e.key, ctrlKey: !!e.ctrlKey, shiftKey: !!e.shiftKey, altKey: !!e.altKey }, '*');
+    parent.postMessage({ type: 'keydown', key: e.key, ctrlKey: !!e.ctrlKey, shiftKey: !!e.shiftKey, altKey: !!e.altKey }, _parentOrigin);
   }, true);
 
   // Defers selectElement until all <img> in el have loaded (or errored).
@@ -373,13 +429,24 @@ export const CANVAS_BRIDGE_CODE = `
     }
     for (var i = 0; i < imgs.length; i++) {
       if (imgs[i].complete) { done(); }
-      else { imgs[i].addEventListener('load', done, { once: true }); imgs[i].addEventListener('error', done, { once: true }); }
+      else {
+        (function(img) {
+          var t = setTimeout(done, 5000);
+          img.addEventListener('load', function() { clearTimeout(t); done(); }, { once: true });
+          img.addEventListener('error', function() { clearTimeout(t); done(); }, { once: true });
+        })(imgs[i]);
+      }
     }
   }
 
   // COMMANDS FROM PARENT
-  window.addEventListener('message', function (e) {
+  var _msgHandler = function (e) {
     if (!e.data || !e.data.type) return;
+    // Capture parent origin from first incoming message
+    if (!_parentOriginCaptured && e.origin !== window.location.origin) {
+      _parentOrigin = e.origin;
+      _parentOriginCaptured = true;
+    }
     var cmd = e.data;
     var target = null;
     try {
@@ -412,7 +479,7 @@ export const CANVAS_BRIDGE_CODE = `
         break;
 
       case 'set-innerHTML':
-        if (target) { target.innerHTML = cmd.value || ''; }
+        if (target) { target.innerHTML = sanitizeHtml(cmd.value); }
         notifyDomChanged();
         break;
 
@@ -425,7 +492,13 @@ export const CANVAS_BRIDGE_CODE = `
       case 'set-child-attr':
         if (target) {
           var chAttr = target.querySelector(cmd.selector);
-          if (chAttr) chAttr.setAttribute(cmd.property, cmd.value);
+          if (chAttr) {
+            if (cmd.value === '') {
+              chAttr.removeAttribute(cmd.property);
+            } else {
+              chAttr.setAttribute(cmd.property, cmd.value);
+            }
+          }
         }
         notifyDomChanged();
         break;
@@ -494,7 +567,7 @@ export const CANVAS_BRIDGE_CODE = `
             if (remaining.length === 0) document.body.appendChild(makePlaceholder());
           }
           notifyDomChanged();
-          parent.postMessage({ type: 'deselect' }, '*');
+          parent.postMessage({ type: 'deselect' }, _parentOrigin);
         }
         break;
       }
@@ -561,7 +634,7 @@ export const CANVAS_BRIDGE_CODE = `
 
       case 'insert-html': {
         var wrapper = document.createElement('div');
-        wrapper.innerHTML = cmd.html || '';
+        wrapper.innerHTML = sanitizeHtml(cmd.html);
         var newEl = wrapper.firstElementChild;
         if (!newEl) { break; }
         var ref = target || document.body;
@@ -584,16 +657,16 @@ export const CANVAS_BRIDGE_CODE = `
       }
 
       case 'get-html':
-        parent.postMessage({ type: 'html-response', html: document.documentElement.outerHTML }, '*');
+        parent.postMessage({ type: 'html-response', html: document.documentElement.outerHTML }, _parentOrigin);
         break;
 
       case 'get-outerhtml':
-        if (target) parent.postMessage({ type: 'outerhtml-response', html: target.outerHTML }, '*');
+        if (target) parent.postMessage({ type: 'outerhtml-response', html: target.outerHTML }, _parentOrigin);
         break;
 
       case 'replace-html': {
         var rWrapper = document.createElement('div');
-        rWrapper.innerHTML = cmd.html || '';
+        rWrapper.innerHTML = sanitizeHtml(cmd.html);
         var rNewEl = rWrapper.firstElementChild;
         if (rNewEl && target && target.parentElement) {
           target.parentElement.replaceChild(rNewEl, target);
@@ -621,7 +694,7 @@ export const CANVAS_BRIDGE_CODE = `
             children: kids
           };
         }
-        parent.postMessage({ type: 'tree-response', tree: buildNode(document.body) }, '*');
+        parent.postMessage({ type: 'tree-response', tree: buildNode(document.body) }, _parentOrigin);
         break;
       }
 
@@ -639,7 +712,7 @@ export const CANVAS_BRIDGE_CODE = `
           target.contentEditable = 'true';
           target.focus();
           var er = target.getBoundingClientRect();
-          parent.postMessage({ type: 'editing-start', path: getElementPath(target), rect: { top: er.top + window.scrollY, left: er.left + window.scrollX, width: er.width, height: er.height } }, '*');
+          parent.postMessage({ type: 'editing-start', path: getElementPath(target), rect: { top: er.top + window.scrollY, left: er.left + window.scrollX, width: er.width, height: er.height } }, _parentOrigin);
         }
         try { document.execCommand(cmd.command, false, cmd.value || null); } catch(err) {}
         notifyDomChanged();
@@ -649,7 +722,8 @@ export const CANVAS_BRIDGE_CODE = `
         if (target) selectElement(target);
         break;
     }
-  });
+  };
+  window.addEventListener('message', _msgHandler);
 
   // ── Drag-drop (palette external + internal canvas reorder) ───────────────
   var dropIndicator = null;
@@ -758,24 +832,20 @@ export const CANVAS_BRIDGE_CODE = `
     if (!candidate) return;
 
     var candidateBlockType = candidate.getAttribute && candidate.getAttribute('data-block-type');
-    console.log('[DROP] el.tagName:', el.tagName, '| candidate blockType:', candidateBlockType, '| cursor:', Math.round(e.clientX), Math.round(e.clientY));
 
     // Columnas block: check if cursor is inside any TD rect (both X+Y).
     // Inside TD → drop inside that cell. Outside all TDs → before/after whole block.
     if (candidateBlockType === 'Columnas') {
       var colTds = candidate.querySelectorAll('td');
-      console.log('[DROP] Columnas found, TDs count:', colTds.length);
       var targetTd = null;
       for (var ci = 0; ci < colTds.length; ci++) {
         var tdR = colTds[ci].getBoundingClientRect();
-        console.log('[DROP] TD[' + ci + '] rect:', Math.round(tdR.left), Math.round(tdR.top), Math.round(tdR.right), Math.round(tdR.bottom));
         if (e.clientX >= tdR.left && e.clientX <= tdR.right &&
             e.clientY >= tdR.top  && e.clientY <= tdR.bottom) {
           targetTd = colTds[ci]; break;
         }
       }
       if (targetTd) {
-        console.log('[DROP] → inside TD, index:', Array.from(colTds).indexOf(targetTd));
         removeDropIndicator();
         if (_rafId) { cancelAnimationFrame(_rafId); _rafId = null; }
         highlightPlaceholderForDrop(targetTd);
@@ -783,16 +853,13 @@ export const CANVAS_BRIDGE_CODE = `
         _dropPosition = 'inside';
         return;
       }
-      console.log('[DROP] → outside all TDs, fallthrough to before/after Columnas');
     }
 
     // Contenedor block: 8px border zone → before/after; inside → drop as child
     if (candidateBlockType === 'Contenedor') {
       var contRect = candidate.getBoundingClientRect();
-      console.log('[DROP] Contenedor rect:', Math.round(contRect.left), Math.round(contRect.top), Math.round(contRect.right), Math.round(contRect.bottom));
       if (e.clientX > contRect.left + 8 && e.clientX < contRect.right - 8 &&
           e.clientY > contRect.top  + 8 && e.clientY < contRect.bottom - 8) {
-        console.log('[DROP] → inside Contenedor');
         removeDropIndicator();
         if (_rafId) { cancelAnimationFrame(_rafId); _rafId = null; }
         highlightPlaceholderForDrop(candidate);
@@ -800,7 +867,6 @@ export const CANVAS_BRIDGE_CODE = `
         _dropPosition = 'inside';
         return;
       }
-      console.log('[DROP] → Contenedor border zone, fallthrough before/after');
     }
 
     // If candidate is a child inside a Columnas block, check if cursor is near the
@@ -895,7 +961,7 @@ export const CANVAS_BRIDGE_CODE = `
       if (!dropTarget) return;
       var path = getElementPath(dropTarget);
       var isPlaceholder = dropTarget.getAttribute('data-block-type') === 'placeholder';
-      parent.postMessage({ type: 'drop-request', path: path, position: _dropPosition, isPlaceholder: isPlaceholder }, '*');
+      parent.postMessage({ type: 'drop-request', path: path, position: _dropPosition, isPlaceholder: isPlaceholder }, _parentOrigin);
       dropTarget = null;
     }
   });
@@ -916,7 +982,7 @@ export const CANVAS_BRIDGE_CODE = `
     if (editingEl && el && editingEl.contains(el)) {
       if (_hoverBottomEl !== null) {
         _hoverBottomEl = null;
-        parent.postMessage({ type: 'hover-block-bottom', rect: null, path: null }, '*');
+        parent.postMessage({ type: 'hover-block-bottom', rect: null, path: null }, _parentOrigin);
       }
       return;
     }
@@ -969,9 +1035,9 @@ export const CANVAS_BRIDGE_CODE = `
       _hoverBottomEl = block;
       if (block) {
         var r = block.getBoundingClientRect();
-        parent.postMessage({ type: 'hover-block-bottom', rect: { top: r.top, left: r.left, width: r.width, height: r.height }, path: getElementPath(block) }, '*');
+        parent.postMessage({ type: 'hover-block-bottom', rect: { top: r.top, left: r.left, width: r.width, height: r.height }, path: getElementPath(block) }, _parentOrigin);
       } else {
-        parent.postMessage({ type: 'hover-block-bottom', rect: null, path: null }, '*');
+        parent.postMessage({ type: 'hover-block-bottom', rect: null, path: null }, _parentOrigin);
       }
     }
   });
@@ -981,23 +1047,37 @@ export const CANVAS_BRIDGE_CODE = `
   // Backup: if template CSS resists the height:auto override and the iframe still scrolls
   // internally, notify parent so it can clear the overlay and resync after scroll settles.
   var _iframeScrollTimer = null;
-  window.addEventListener('scroll', function() {
-    parent.postMessage({ type: 'iframe-internal-scroll' }, '*');
+  var _scrollHandler = function() {
+    parent.postMessage({ type: 'iframe-internal-scroll' }, _parentOrigin);
     clearTimeout(_iframeScrollTimer);
     _iframeScrollTimer = setTimeout(function() {
       _iframeScrollTimer = null;
       if (selectedEl) selectElement(selectedEl);
     }, 150);
-  });
+  };
+  window.addEventListener('scroll', _scrollHandler);
 
   var _heightPushCount = 0;
   var _heightPushTimer = setInterval(function() {
     _heightPushCount++;
     var h = Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0);
-    parent.postMessage({ type: 'body-height', height: h }, '*');
+    parent.postMessage({ type: 'body-height', height: h }, _parentOrigin);
     if (_heightPushCount >= 20) clearInterval(_heightPushTimer);
   }, 300);
 
-  parent.postMessage({ type: 'bridge-ready' }, '*');
+  var _unloadHandler = function() {
+    if (_heightPushTimer) clearInterval(_heightPushTimer);
+  };
+  window.addEventListener('beforeunload', _unloadHandler);
+
+  window.__canvasBridgeCleanup = function() {
+    window.removeEventListener('message', _msgHandler);
+    window.removeEventListener('scroll', _scrollHandler);
+    window.removeEventListener('beforeunload', _unloadHandler);
+    window.__canvasBridgeActive = false;
+    window.__canvasBridgeCleanup = null;
+  };
+
+  parent.postMessage({ type: 'bridge-ready' }, _parentOrigin);
 })();
 `;
