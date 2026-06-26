@@ -112,11 +112,8 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   const handleMessage = (event: MessageEvent) => {
     if (!isOriginAllowed(event.origin)) return;
 
-<<<<<<< HEAD
-=======
     // Only capture parent origin from cross-origin messages.
     // Same-origin messages (Vite HMR, canvas bridge, etc.) must not overwrite it.
->>>>>>> 1baeef6ed7d57359aef01b24f108c1cd64851c47
     if (!parentOrigin && event.origin !== window.location.origin) {
       parentOrigin = event.origin;
     }
@@ -249,25 +246,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
       globalVariables.value
     )
 
-<<<<<<< HEAD
-    let html = await renderToStaticMarkup(proccessedDocument, { rootBlockId: 'root' })
-
-  const tempDiv = window.document.createElement('div');
-  tempDiv.innerHTML = html;
-  html = tempDiv.textContent || tempDiv.innerHTML || html;
-    
-  // Si lo anterior no funciona, intentar con decodeURIComponent  
-  if (html.includes('&lt;')) {  
-    try {  
-      html = decodeURIComponent(html.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'));  
-    } catch (e) {  
-      // Fallback a replace simple  
-      html = html.replace(/&lt;br&gt;/g, '<br>').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');  
-    }  
-  }  
-=======
     const html = await renderToStaticMarkup(proccessedDocument, { rootBlockId: 'root' })
->>>>>>> 1baeef6ed7d57359aef01b24f108c1cd64851c47
 
     return html;
   }
@@ -298,33 +277,11 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   }
 
   async function exportHtmlAndJsonToParent() {
-<<<<<<< HEAD
-    console.log('[Builder] exportHtmlAndJsonToParent called');
-    let html = '';
-    let jsonContent = '{}';
-    try {
-      const { default: renderToStaticMarkup } = await import("../../lib/email-builder/renderers/renderToStaticMarkup");
-      jsonContent = JSON.stringify(document.value, null, 2);
-      try {
-        html = await renderToStaticMarkup(document.value, { rootBlockId: 'root' });
-      } catch (error) {
-        console.error('❌ Error en renderToStaticMarkup:', error);
-      }
-    } catch (error) {
-      console.error('❌ exportHtmlAndJsonToParent error before sendToParent:', error);
-    }
-    console.log('[Builder] Sending htmlAndJsonResponse, html.length:', html.length);
-=======
     const html = await getHtmlFromDocument();
-    // json must always be valid JSON so wrappers can JSON.parse() it.
-    // In iframe mode: wrap rawHtml in a JSON envelope { mode:'iframe', rawHtml }
-    //   → parent can restore via loadTemplate({ mode:'iframe', rawHtml })
-    // In block mode: standard block document JSON
     const jsonContent = rawHtml.value
       ? JSON.stringify({ mode: 'iframe', rawHtml: rawHtml.value })
       : JSON.stringify(document.value, null, 2);
 
->>>>>>> 1baeef6ed7d57359aef01b24f108c1cd64851c47
     sendToParent({
       type: 'htmlAndJsonResponse',
       html,
