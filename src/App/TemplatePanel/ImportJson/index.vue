@@ -200,8 +200,9 @@ async function handleZipUpload(event: Event) {
         name.startsWith('__MACOSX/') || name.startsWith('._') ||
         name.startsWith('./._') || name.includes('/._') || name.includes('\x00');
 
-      // Find first HTML file whose content actually starts with HTML (not binary metadata)
-      const isValidHtml = (content: string) => content.trimStart().startsWith('<');
+      // Strip macOS metadata prepended to HTML (metadata ends before first '<')
+      const stripJunk = (content: string) => { const i = content.indexOf('<'); return i > 0 ? content.slice(i) : content; };
+      const isValidHtml = (content: string) => stripJunk(content).trimStart().startsWith('<');
 
       const htmlCandidates = [
         zip.file('index.html'),
@@ -211,8 +212,8 @@ async function handleZipUpload(event: Event) {
       let htmlContent = '';
       let htmlFile: JSZip.JSZipObject | null = null;
       for (const candidate of htmlCandidates) {
-        const content = await candidate.async('string');
-        if (isValidHtml(content)) { htmlFile = candidate; htmlContent = content; break; }
+        const raw = await candidate.async('string');
+        if (isValidHtml(raw)) { htmlFile = candidate; htmlContent = stripJunk(raw); break; }
       }
       if (!htmlFile) {
         zipError.value = 'No se encontró un archivo HTML válido en el ZIP';

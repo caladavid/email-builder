@@ -405,6 +405,10 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
           return;
         }
 
+        // Strip macOS metadata prepended to HTML content
+        const firstTag = htmlContent.indexOf('<');
+        if (firstTag > 0) htmlContent = htmlContent.slice(firstTag);
+
         // 1. FIX: Corregir etiquetas <img src="..."> (Tu solución)
         htmlContent = htmlContent.replace(/src="images\/(https?:\/\/)/g, 'src="$1');
 
