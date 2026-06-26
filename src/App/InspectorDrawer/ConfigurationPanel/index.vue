@@ -57,6 +57,9 @@
     <EmailLayoutSidebarPanel v-else-if="block.type === 'EmailLayout'" :data="block.data" @update:data="handleUpdateData({ type: block.type, data: $event })" />
     <SpacerSidebarPanel v-else-if="block.type === 'Spacer'" :data="block.data" @update:data="handleUpdateData({ type: block.type, data: $event })" />
     <TextSidebarPanel v-else-if="block.type === 'Text'" :data="block.data" @update:data="handleUpdateData({ type: block.type, data: $event })" />
+    <VideoSidebarPanel v-else-if="block.type === 'Video'" :data="block.data" @update:data="handleUpdateData({ type: block.type, data: $event })" />
+    <ListSidebarPanel v-else-if="block.type === 'List'" :data="block.data" @update:data="handleUpdateData({ type: block.type, data: $event })" />
+    <ListItemSidebarPanel v-else-if="block.type === 'ListItem'" :data="block.data" @update:data="handleUpdateData({ type: block.type, data: $event })" />
 
     <pre v-else>{{ JSON.stringify(block, null, '  ') }}</pre>
   </template>
@@ -78,6 +81,9 @@ import ImageSidebarPanel from './input-panels/ImageSidebarPanel.vue';
 import EmailLayoutSidebarPanel from './input-panels/EmailLayoutSidebarPanel.vue';
 import SpacerSidebarPanel from './input-panels/SpacerSidebarPanel.vue';
 import TextSidebarPanel from './input-panels/TextSidebarPanel.vue';
+import VideoSidebarPanel from './input-panels/VideoSidebarPanel.vue';
+import ListSidebarPanel from './input-panels/ListSidebarPanel.vue';
+import ListItemSidebarPanel from './input-panels/ListItemSidebarPanel.vue';
 
 const inspectorDrawer = useInspectorDrawer()
 

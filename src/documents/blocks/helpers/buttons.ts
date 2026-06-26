@@ -218,6 +218,47 @@ export const BUTTONS: TButtonProps[] = [
       },
     }),
   },
+  {
+    label: 'Video',
+    icon: 'material-symbols:videocam-outline',
+    htmlTemplate: '<div data-block-type="Video" style="padding:16px 24px;max-width:600px;margin:0 auto;background:#ffffff;text-align:center;"><video controls style="max-width:100%;"><source src="" type="video/mp4" /></video></div>',
+    block: () => ({
+      type: 'Video',
+      data: {
+        style: { padding: { top: 16, bottom: 16, left: 24, right: 24 } },
+        props: {
+          url: '',
+          poster: '',
+          controls: true,
+          autoplay: false,
+        },
+      },
+    }),
+  },
+  {
+    label: 'Lista',
+    icon: 'material-symbols:format-list-bulleted',
+    htmlTemplate: '<ul data-block-type="Lista" style="padding:16px 24px;max-width:600px;margin:0 auto;background:#ffffff;"><li>Elemento 1</li><li>Elemento 2</li><li>Elemento 3</li></ul>',
+    block: () => ({
+      type: 'List',
+      data: {
+        style: { padding: { top: 16, bottom: 16, left: 24, right: 24 } },
+        props: { childrenIds: [], ordered: false },
+      },
+    }),
+  },
+  {
+    label: 'Lista Ordenada',
+    icon: 'material-symbols:format-list-numbered',
+    htmlTemplate: '<ol data-block-type="Lista Ordenada" style="padding:16px 24px;max-width:600px;margin:0 auto;background:#ffffff;"><li>Elemento 1</li><li>Elemento 2</li><li>Elemento 3</li></ol>',
+    block: () => ({
+      type: 'List',
+      data: {
+        style: { padding: { top: 16, bottom: 16, left: 24, right: 24 } },
+        props: { childrenIds: [], ordered: true },
+      },
+    }),
+  },
   /* {
     label: 'Enlace',
     icon: 'material-symbols:link',

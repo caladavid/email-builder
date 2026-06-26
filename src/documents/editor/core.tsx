@@ -36,6 +36,9 @@ import { TableCellPropsSchema } from '../blocks/TableCell/TableCellPropsSchema';
 import TableCellEditor from '../blocks/TableCell/TableCellEditor.vue';
 import { TableSectionPropsSchema } from '../blocks/TableSection/TableSectionPropsSchema';
 import TableSectionEditor from '../blocks/TableSection/TableSectionEditor.vue';
+import VideoReader, { VideoPropsSchema } from '../../lib/email-builder/blocks/Video/VideoReader.vue';
+import ListReader, { ListPropsSchema } from '../../lib/email-builder/blocks/List/ListReader.vue';
+import ListItemReader, { ListItemPropsSchema } from '../../lib/email-builder/blocks/List/ListItemReader.vue';
 
 
 
@@ -236,6 +239,33 @@ export const EDITOR_DICTIONARY = buildBlockConfigurationDictionary({
     Component: (props) => (
       <EditorBlockWrapper>
         <TableSectionEditor {...props} />
+      </EditorBlockWrapper>
+    ),
+  },
+  Video: {
+    schema: VideoPropsSchema,
+    Component: (props) => (
+      <EditorBlockWrapper>
+        <VideoReader {...props} />
+      </EditorBlockWrapper>
+    ),
+  },
+  List: {
+    schema: ListPropsSchema,
+    Component: (props) => (
+      <EditorBlockWrapper>
+        <ContainerEditor {...props} />
+      </EditorBlockWrapper>
+    ),
+  },
+  ListItem: {
+    schema: ListItemPropsSchema,
+    Component: (data) => (
+      <EditorBlockWrapper>
+        <InlineTextEditor
+          text={data.props?.text || ''}
+          style={data.style ?? undefined}
+        />
       </EditorBlockWrapper>
     ),
   },
