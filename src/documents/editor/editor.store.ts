@@ -236,7 +236,14 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
 
   async function getHtmlFromDocument(): Promise<string> {
     // En modo iframe, el rawHtml ya es el HTML final 1:1
-    if (rawHtml.value) return rawHtml.value;
+    if (rawHtml.value) {
+      // Strip CSS comments + @media blocks from <style> — parent CSS inliner crashes on both
+      return rawHtml.value.replace(/<style([^>]*)>([\s\S]*?)<\/style>/gi, (_m, attrs, css) => {
+        let clean = css.replace(/\/\*[\s\S]*?\*\//g, '');
+        clean = clean.replace(/@media[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, '');
+        return `<style${attrs}>${clean}</style>`;
+      });
+    }
 
     const { default: renderToStaticMarkup } = await import("../../lib/email-builder/renderers/renderToStaticMarkup");
     const { createProcessedDocument } = await import("../../utils/documentProcessor");
