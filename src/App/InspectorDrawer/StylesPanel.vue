@@ -542,9 +542,13 @@ async function onBgFileChange(event: Event) {
   onBgImageChange(url);
 }
 
+// Only textDecoration is applied to the text selection; all other props go to the element directly
+const DECORATION_PROPS = new Set(['textDecoration']);
+
 function setStyle(property: string, value: string) {
   if (!store.selectedElementPath) return;
-  sendToCanvas({ type: 'set-style', path: store.selectedElementPath, property, value });
+  const type = DECORATION_PROPS.has(property) ? 'apply-style-to-selection' : 'set-style';
+  sendToCanvas({ type, path: store.selectedElementPath, property, value });
   store.selectedElementStyles = { ...store.selectedElementStyles, [property]: value };
 }
 
