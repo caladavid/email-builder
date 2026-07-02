@@ -159,7 +159,8 @@ export const CANVAS_BRIDGE_CODE = `
     _styleDebTimer = setTimeout(function() {
       _styleDebTimer = null;
       notifyDomChanged();
-      if (_styleDebTarget && _styleDebTarget === selectedEl) selectElement(_styleDebTarget);
+      // Skip selectElement while in text-edit mode — it clears _savedRange
+      if (!editingEl && _styleDebTarget && _styleDebTarget === selectedEl) selectElement(_styleDebTarget);
       _styleDebTarget = null;
     }, 120);
   }
@@ -172,6 +173,7 @@ export const CANVAS_BRIDGE_CODE = `
 
   function selectElement(el) {
     if (!el) return;
+    if (el !== selectedEl) _savedRange = null; // clear stale selection only when element changes
     // clear previous selection — always restore to empty, never back to a saved blue outline
     if (selectedEl && selectedEl !== el) {
       clearOutline(selectedEl, '', '');
@@ -463,6 +465,83 @@ export const CANVAS_BRIDGE_CODE = `
         notifyStyleDebounced(target);
         break;
 
+      case 'apply-style-to-selection':
+        var _appliedToSel = false;
+        if (_savedRange && !_savedRange.collapsed) {
+          try {
+            // --- textDecoration removal: unwrap existing span instead of creating nested one ---
+            if (cmd.property === 'textDecoration' && (!cmd.value || cmd.value === 'none')) {
+              var _rContainer = _savedRange.commonAncestorContainer;
+              if (_rContainer.nodeType === 3) _rContainer = _rContainer.parentElement;
+              var _tdAncestor = _rContainer;
+              while (_tdAncestor && _tdAncestor !== document.body) {
+                if (_tdAncestor.tagName === 'SPAN' && _tdAncestor.style && _tdAncestor.style.textDecoration) {
+                  _tdAncestor.style.textDecoration = '';
+                  var _styleLeft = (_tdAncestor.getAttribute('style') || '').replace(/text-decoration[^;]*;?/gi, '').trim().replace(/;$/, '').trim();
+                  if (!_styleLeft && !_tdAncestor.className) {
+                    var _ph = document.createDocumentFragment();
+                    while (_tdAncestor.firstChild) _ph.appendChild(_tdAncestor.firstChild);
+                    if (_tdAncestor.parentNode) _tdAncestor.parentNode.replaceChild(_ph, _tdAncestor);
+                  }
+                  _appliedToSel = true;
+                  notifyDomChanged();
+                  break;
+                }
+                _tdAncestor = _tdAncestor.parentElement;
+              }
+            }
+            // --- Normal path: wrap selection in a span ---
+            if (!_appliedToSel) {
+              var asel = window.getSelection();
+              asel.removeAllRanges();
+              asel.addRange(_savedRange);
+              var aspan = document.createElement('span');
+              aspan.style[cmd.property] = cmd.value;
+              var _surroundOk = false;
+              try {
+                _savedRange.surroundContents(aspan);
+                _surroundOk = true;
+              } catch(e) {}
+              if (!_surroundOk) {
+                // Cross-node range: wrap each text node individually instead of extractContents
+                var _rCommon = _savedRange.commonAncestorContainer;
+                if (_rCommon.nodeType === 3) _rCommon = _rCommon.parentNode;
+                var _rnodes = [];
+                var _rWalker = document.createTreeWalker(_rCommon, 4, null);
+                var _rn;
+                while ((_rn = _rWalker.nextNode())) {
+                  if (_savedRange.intersectsNode(_rn)) _rnodes.push(_rn);
+                }
+                _rnodes.forEach(function(_rTextNode) {
+                  var _nr = document.createRange();
+                  var _ns = _rTextNode === _savedRange.startContainer ? _savedRange.startOffset : 0;
+                  var _ne = _rTextNode === _savedRange.endContainer ? _savedRange.endOffset : (_rTextNode.textContent || '').length;
+                  if (_ns >= _ne) return;
+                  _nr.setStart(_rTextNode, _ns);
+                  _nr.setEnd(_rTextNode, _ne);
+                  var _ns2 = document.createElement('span');
+                  _ns2.style[cmd.property] = cmd.value;
+                  try { _nr.surroundContents(_ns2); } catch(_e2) {}
+                });
+              }
+              _appliedToSel = true;
+              if (_surroundOk) {
+                var _newRange = document.createRange();
+                _newRange.selectNodeContents(aspan);
+                _savedRange = _newRange;
+              }
+              notifyDomChanged();
+            }
+          } catch(e) {
+            _savedRange = null; // clear only on failure
+          }
+        }
+        if (!_appliedToSel && target) {
+          target.style[cmd.property] = cmd.value;
+          notifyStyleDebounced(target);
+        }
+        break;
+
       case 'remove-style':
         if (target) { target.style[cmd.property] = ''; }
         notifyDomChanged();
@@ -583,29 +662,45 @@ export const CANVAS_BRIDGE_CODE = `
         }
         break;
 
-      case 'move-up':
+      case 'move-up': {
         if (target) {
-          var moveUp = (target.tagName === 'TD' || target.tagName === 'TH') && target.parentElement
+          // TD/TH → start from parent TR directly
+          var muEl = (target.tagName === 'TD' || target.tagName === 'TH') && target.parentElement
             ? target.parentElement : target;
-          var prev = moveUp.previousElementSibling;
-          if (!prev) break;
-          moveUp.parentElement.insertBefore(moveUp, prev);
+          // If element itself has no prev sibling, try its nearest TR ancestor (one table level up max)
+          if (!muEl.previousElementSibling) {
+            var muWalk = muEl.parentElement;
+            while (muWalk && muWalk !== document.body && muWalk.tagName !== 'TR') {
+              muWalk = muWalk.parentElement;
+            }
+            if (muWalk && muWalk !== document.body && muWalk.tagName === 'TR') muEl = muWalk;
+          }
+          if (!muEl || !muEl.previousElementSibling) break;
+          muEl.parentElement.insertBefore(muEl, muEl.previousElementSibling);
           notifyDomChanged();
           selectElement(target);
         }
         break;
+      }
 
-      case 'move-down':
+      case 'move-down': {
         if (target) {
-          var moveDown = (target.tagName === 'TD' || target.tagName === 'TH') && target.parentElement
+          var mdEl = (target.tagName === 'TD' || target.tagName === 'TH') && target.parentElement
             ? target.parentElement : target;
-          var next = moveDown.nextElementSibling;
-          if (!next) break;
-          next.after(moveDown);
+          if (!mdEl.nextElementSibling) {
+            var mdWalk = mdEl.parentElement;
+            while (mdWalk && mdWalk !== document.body && mdWalk.tagName !== 'TR') {
+              mdWalk = mdWalk.parentElement;
+            }
+            if (mdWalk && mdWalk !== document.body && mdWalk.tagName === 'TR') mdEl = mdWalk;
+          }
+          if (!mdEl || !mdEl.nextElementSibling) break;
+          mdEl.nextElementSibling.after(mdEl);
           notifyDomChanged();
           selectElement(target);
         }
         break;
+      }
 
       case 'select-parent':
         if (editingEl) exitEditing();
@@ -714,7 +809,101 @@ export const CANVAS_BRIDGE_CODE = `
           var er = target.getBoundingClientRect();
           parent.postMessage({ type: 'editing-start', path: getElementPath(target), rect: { top: er.top + window.scrollY, left: er.left + window.scrollX, width: er.width, height: er.height } }, _parentOrigin);
         }
-        try { document.execCommand(cmd.command, false, cmd.value || null); } catch(err) {}
+        // Restore saved text selection — clicking mini-bar button causes iframe blur
+        // which collapses the selection; _savedRange preserves the last non-collapsed range
+        if (_savedRange) {
+          try {
+            var _ecSel = window.getSelection();
+            _ecSel.removeAllRanges();
+            _ecSel.addRange(_savedRange);
+          } catch(e) {}
+        }
+        // Detect CSS-inherited formatting on ancestor elements.
+        // execCommand only toggles <u>/<b>/<i> tags — it cannot unset text-decoration/font-weight
+        // applied via inline style on a parent element. When found, we handle it ourselves:
+        // wrap the before/after text in spans with the original style, then remove it from the ancestor.
+        var _cssInheritEl = null;
+        var _cssInheritProp = null;
+        var _cssInheritVal = null;
+        var _cmdHandled = false;
+        var _cssToggleMap = { underline: 'textDecoration', bold: 'fontWeight', italic: 'fontStyle' };
+        if (_cssToggleMap[cmd.command] && _savedRange && !_savedRange.collapsed) {
+          try {
+            if (document.queryCommandState(cmd.command)) {
+              var _ctiProp = _cssToggleMap[cmd.command];
+              var _ctiWalk = _savedRange.commonAncestorContainer;
+              if (_ctiWalk.nodeType === 3) _ctiWalk = _ctiWalk.parentElement;
+              while (_ctiWalk && _ctiWalk !== document.body) {
+                if (_ctiWalk.style && _ctiWalk.style[_ctiProp]) {
+                  _cssInheritEl = _ctiWalk;
+                  _cssInheritProp = _ctiProp;
+                  _cssInheritVal = _ctiWalk.style[_ctiProp];
+                  break;
+                }
+                _ctiWalk = _ctiWalk.parentElement;
+              }
+            }
+          } catch(_ctie) {}
+        }
+        // Handle CSS-inherited case: split ancestor at selection boundaries
+        // so only the unselected parts keep the style (via spans), not the selected text.
+        if (_cssInheritEl && _cssInheritProp && _cssInheritVal) {
+          try {
+            var _ciStartNode = _savedRange.startContainer;
+            var _ciStartOff = _savedRange.startOffset;
+            var _ciEndNode = _savedRange.endContainer;
+            var _ciEndOff = _savedRange.endOffset;
+            // Wrap AFTER part first (no impact on start boundary)
+            try {
+              var _ciAfter = document.createRange();
+              _ciAfter.setStart(_ciEndNode, _ciEndOff);
+              _ciAfter.setEnd(_cssInheritEl, _cssInheritEl.childNodes.length);
+              if (!_ciAfter.collapsed) {
+                var _ciAfterSpan = document.createElement('span');
+                _ciAfterSpan.style[_cssInheritProp] = _cssInheritVal;
+                _ciAfter.surroundContents(_ciAfterSpan);
+              }
+            } catch(_e1) {}
+            // Wrap BEFORE part
+            try {
+              var _ciBefore = document.createRange();
+              _ciBefore.setStart(_cssInheritEl, 0);
+              _ciBefore.setEnd(_ciStartNode, _ciStartOff);
+              if (!_ciBefore.collapsed) {
+                var _ciBeforeSpan = document.createElement('span');
+                _ciBeforeSpan.style[_cssInheritProp] = _cssInheritVal;
+                _ciBefore.surroundContents(_ciBeforeSpan);
+              }
+            } catch(_e2) {}
+            // Remove style from ancestor — spans now carry it for unselected parts
+            _cssInheritEl.style[_cssInheritProp] = '';
+            if (!(_cssInheritEl.getAttribute('style') || '').replace(/[\s;]/g, '')) {
+              _cssInheritEl.removeAttribute('style');
+            }
+            _cmdHandled = true;
+          } catch(_ciErr) {}
+        }
+        if (!_cmdHandled) {
+          try { document.execCommand(cmd.command, false, cmd.value || null); } catch(err) {}
+        }
+        // removeFormat: also unwrap CSS-styled spans that execCommand doesn't touch
+        if (cmd.command === 'removeFormat' && target) {
+          try {
+            var _rfRoot = editingEl || target;
+            var _rfSpans = _rfRoot.querySelectorAll('span[style]');
+            var _rfRange = _savedRange || (function() {
+              var _s = window.getSelection();
+              return _s && _s.rangeCount ? _s.getRangeAt(0) : null;
+            })();
+            Array.from(_rfSpans).forEach(function(_rfSpan) {
+              if (!_rfRange || _rfRange.intersectsNode(_rfSpan)) {
+                var _rfFrag = document.createDocumentFragment();
+                while (_rfSpan.firstChild) _rfFrag.appendChild(_rfSpan.firstChild);
+                if (_rfSpan.parentNode) _rfSpan.parentNode.replaceChild(_rfFrag, _rfSpan);
+              }
+            });
+          } catch(_rfe) {}
+        }
         notifyDomChanged();
         break;
 
@@ -1056,6 +1245,18 @@ export const CANVAS_BRIDGE_CODE = `
     }, 150);
   };
   window.addEventListener('scroll', _scrollHandler);
+
+  // Save text selection so StylesPanel can apply styles to selected words
+  var _savedRange = null;
+  document.addEventListener('selectionchange', function() {
+    var sel = window.getSelection();
+    if (sel && !sel.isCollapsed && sel.rangeCount > 0) {
+      _savedRange = sel.getRangeAt(0).cloneRange();
+      parent.postMessage({ type: 'canvas-text-selection', selectedText: sel.toString() }, _parentOrigin);
+    }
+    // Do NOT clear _savedRange on collapse — clicking parent frame collapses iframe
+    // selection, but _savedRange must survive until apply-style-to-selection runs.
+  });
 
   var _heightPushCount = 0;
   var _heightPushTimer = setInterval(function() {
