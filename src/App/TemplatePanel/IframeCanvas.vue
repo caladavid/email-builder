@@ -24,13 +24,13 @@
         <div style="position:absolute;inset:0;border:2px solid rgba(0,121,204,1);pointer-events:none;" />
         <!-- Formatting mini-bar (top-right, solo en bloques de texto) -->
         <div v-if="isTextBlock" style="position:absolute;top:-30px;right:0;display:flex;align-items:center;gap:1px;background:#0033A0;padding:3px 5px;border-radius:6px 6px 0 0;pointer-events:all;" @click.stop>
-          <button @click.stop="handleFormat('bold')"          title="Negrita (Ctrl+B)"   style="width:24px;height:24px;border:none;background:transparent;color:white;font-family:serif;font-size:14px;font-weight:800;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;"><b>B</b></button>
-          <button @click.stop="handleFormat('italic')"        title="Cursiva (Ctrl+I)"   style="width:24px;height:24px;border:none;background:transparent;color:white;font-family:serif;font-size:14px;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;"><i>I</i></button>
-          <button @click.stop="handleFormat('underline')"     title="Subrayado"          style="width:24px;height:24px;border:none;background:transparent;color:white;font-family:serif;font-size:14px;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;"><u>U</u></button>
-          <button @click.stop="handleFormat('strikeThrough')" title="Tachado"            style="width:24px;height:24px;border:none;background:transparent;color:white;font-family:serif;font-size:13px;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;"><s>S</s></button>
+          <button @mousedown.prevent @click.stop="handleFormat('bold')"          title="Negrita (Ctrl+B)"   style="width:24px;height:24px;border:none;background:transparent;color:white;font-family:serif;font-size:14px;font-weight:800;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;"><b>B</b></button>
+          <button @mousedown.prevent @click.stop="handleFormat('italic')"        title="Cursiva (Ctrl+I)"   style="width:24px;height:24px;border:none;background:transparent;color:white;font-family:serif;font-size:14px;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;"><i>I</i></button>
+          <button @mousedown.prevent @click.stop="handleFormat('underline')"     title="Subrayado"          style="width:24px;height:24px;border:none;background:transparent;color:white;font-family:serif;font-size:14px;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;"><u>U</u></button>
+          <button @mousedown.prevent @click.stop="handleFormat('strikeThrough')" title="Tachado"            style="width:24px;height:24px;border:none;background:transparent;color:white;font-family:serif;font-size:13px;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;"><s>S</s></button>
           <div style="width:1px;height:16px;background:rgba(255,255,255,0.3);margin:0 2px;flex-shrink:0;" />
           <button @click.stop="showLinkInput = !showLinkInput" title="Enlace" style="width:24px;height:24px;border:none;background:transparent;color:white;font-size:13px;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;">🔗</button>
-          <button @click.stop="handleFormat('removeFormat')"  title="Limpiar formato"    style="width:24px;height:24px;border:none;background:transparent;color:white;font-size:11px;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;">T✕</button>
+          <button @mousedown.prevent @click.stop="handleFormat('removeFormat')"  title="Limpiar formato"    style="width:24px;height:24px;border:none;background:transparent;color:white;font-size:11px;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;">T✕</button>
           <!-- Variables button -->
           <div style="width:1px;height:16px;background:rgba(255,255,255,0.3);margin:0 2px;flex-shrink:0;" />
           <div style="position:relative;">
@@ -454,6 +454,13 @@ function handleMessage(event: MessageEvent) {
       if (data.height && data.height > iframeHeight.value) {
         iframeHeight.value = data.height;
       }
+      break;
+
+    case 'canvas-text-selection':
+      store.canvasSelectedText = data.selectedText || '';
+      break;
+
+    case 'debug-style-applied':
       break;
 
     case 'html-response':
