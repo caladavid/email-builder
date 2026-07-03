@@ -549,7 +549,11 @@ function setStyle(property: string, value: string) {
   if (!store.selectedElementPath) return;
   const type = DECORATION_PROPS.has(property) ? 'apply-style-to-selection' : 'set-style';
   sendToCanvas({ type, path: store.selectedElementPath, property, value });
-  store.selectedElementStyles = { ...store.selectedElementStyles, [property]: value };
+  // DECORATION_PROPS apply to selection (not whole element) — don't optimistic-write element styles;
+  // the panel will refresh via selectElement round-trip from notifyStyleDebounced
+  if (!DECORATION_PROPS.has(property)) {
+    store.selectedElementStyles = { ...store.selectedElementStyles, [property]: value };
+  }
 }
 
 function setChildrenStyle(selector: string, property: string, value: string) {
