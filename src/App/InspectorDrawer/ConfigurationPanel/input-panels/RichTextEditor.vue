@@ -193,6 +193,17 @@ function updateFormatState() {
     isBoldActive.value = document.queryCommandState('bold');
     isItalicActive.value = document.queryCommandState('italic');
     isUnderlineActive.value = document.queryCommandState('underline');
+    // queryCommandState only detects <u> tags — also check for span-based underline
+    if (!isUnderlineActive.value) {
+      let node: Node | null = sel.anchorNode;
+      while (node && node !== editableDiv.value) {
+        if (node.nodeType === 1 && (node as HTMLElement).style?.textDecoration === 'underline') {
+          isUnderlineActive.value = true;
+          break;
+        }
+        node = node.parentNode;
+      }
+    }
   } catch(e) {}
 }
 
