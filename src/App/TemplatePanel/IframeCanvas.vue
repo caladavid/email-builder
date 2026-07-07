@@ -153,10 +153,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useInspectorDrawer } from '../../documents/editor/editor.store';
 import { CANVAS_BRIDGE_CODE } from '../../utils/canvas-bridge';
-import { registerCanvasIframe, sendToCanvas } from '../../composables/useCanvasBridge';
+import { registerCanvasIframe, sendToCanvas, consumeRawHtmlWriteSuppressed, registerClearPendingSnapshot } from '../../composables/useCanvasBridge';
 import { BUTTONS } from '../../documents/blocks/helpers/buttons';
 import TuneMenuOverlay from './TuneMenuOverlay.vue';
 
@@ -198,6 +198,8 @@ let _bridgeInjected = false;
 let _suppressWrite = false;
 // Debounce timer for dom-changed snapshot saves
 let _saveTimer: ReturnType<typeof setTimeout> | null = null;
+// Latest pending snapshot — flushed synchronously on unmount to survive tab switches
+let _pendingSnapshot: string | null = null;
 // Prevent re-entrant overlay refresh (highlight → select → highlight loop)
 let _overlayRefreshPending = false;
 // ResizeObserver to catch iframe size changes (window resize, drawer open/close, etc.)
@@ -420,14 +422,17 @@ function handleMessage(event: MessageEvent) {
 
     case 'dom-changed':
       if (data.html) {
-        const snapshotHtml = data.html;
+        _pendingSnapshot = data.html;
         if (_saveTimer) clearTimeout(_saveTimer);
         _saveTimer = setTimeout(() => {
-          _suppressWrite = true;
-          store.saveHtmlSnapshot(snapshotHtml);
-          nextTick(() => { _suppressWrite = false; });
-          sendToCanvas({ type: 'get-tree' });
+          if (_pendingSnapshot) {
+            _suppressWrite = true;
+            store.saveHtmlSnapshot(_pendingSnapshot);
+            nextTick(() => { _suppressWrite = false; });
+            sendToCanvas({ type: 'get-tree' });
+          }
           _saveTimer = null;
+          _pendingSnapshot = null;
         }, 150);
         nextTick(updateIframeHeight);
       }
@@ -575,7 +580,7 @@ defineExpose({ sendToCanvas });
 watch(
   () => store.rawHtml,
   (html) => {
-    if (_suppressWrite) { return; }
+    if (_suppressWrite || consumeRawHtmlWriteSuppressed()) { return; }
     if (html) {
       overlayRect.value = null;
       writeHtmlToIframe(html);
@@ -634,6 +639,11 @@ onMounted(() => {
   containerRef.value?.addEventListener('scroll', refreshOverlayOnScroll);
   containerRef.value?.addEventListener('scroll', _hideAddPickerOnScroll);
   registerCanvasIframe(iframeRef.value);
+  registerClearPendingSnapshot(() => {
+    if (_saveTimer) clearTimeout(_saveTimer);
+    _saveTimer = null;
+    _pendingSnapshot = null;
+  });
 
   // ResizeObserver catches iframe height changes (content grows, images load, etc.)
   _resizeObserver = new ResizeObserver(() => resyncOverlayPosition());
@@ -649,9 +659,25 @@ onUnmounted(() => {
   containerRef.value?.removeEventListener('scroll', _hideAddPickerOnScroll);
   _resizeObserver?.disconnect();
   _resizeObserver = null;
-  if (_saveTimer) clearTimeout(_saveTimer);
+  if (_saveTimer) {
+    clearTimeout(_saveTimer);
+    // Flush pending snapshot so tab-switch doesn't discard unsaved DOM changes
+    if (_pendingSnapshot) store.saveHtmlSnapshot(_pendingSnapshot);
+    _saveTimer = null;
+    _pendingSnapshot = null;
+  }
   if (_scrollEndTimer) clearTimeout(_scrollEndTimer);
   if (_resyncTimer) clearTimeout(_resyncTimer);
   registerCanvasIframe(null);
+});
+
+// KeepAlive: flush pending save when tab is hidden (component stays mounted but inactive)
+onDeactivated(() => {
+  if (_saveTimer && _pendingSnapshot) {
+    clearTimeout(_saveTimer);
+    store.saveHtmlSnapshot(_pendingSnapshot);
+    _saveTimer = null;
+    _pendingSnapshot = null;
+  }
 });
 </script>

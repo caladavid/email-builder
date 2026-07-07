@@ -674,9 +674,25 @@ export const CANVAS_BRIDGE_CODE = `
       case 'set-child-attr':
         if (target) {
           var chAttr = target.querySelector(cmd.selector);
+          // No <a> exists and user is setting href on image → create wrapper <a>
+          if (!chAttr && cmd.selector === 'a' && cmd.property === 'href' && cmd.value) {
+            var _wrapImg = target.querySelector('img');
+            if (_wrapImg) {
+              chAttr = document.createElement('a');
+              chAttr.setAttribute('target', '_blank');
+              _wrapImg.parentNode.insertBefore(chAttr, _wrapImg);
+              chAttr.appendChild(_wrapImg);
+            }
+          }
           if (chAttr) {
             if (cmd.value === '') {
               chAttr.removeAttribute(cmd.property);
+              // Unwrap <a> with no href so it doesn't leave an inert anchor tag
+              if (cmd.selector === 'a' && cmd.property === 'href' && !chAttr.getAttribute('href')) {
+                var _unwrapFrag = document.createDocumentFragment();
+                while (chAttr.firstChild) _unwrapFrag.appendChild(chAttr.firstChild);
+                if (chAttr.parentNode) chAttr.parentNode.replaceChild(_unwrapFrag, chAttr);
+              }
             } else {
               chAttr.setAttribute(cmd.property, cmd.value);
             }

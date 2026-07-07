@@ -81,7 +81,28 @@
       <StyleRow label="Alt" type="text" :value="childData.alt" placeholder="Descripción" @change="setChildAttr('img', 'alt', $event)" />
       <StyleRow label="Alineación" type="select" :value="styles.textAlign||'center'"
         :options="alignOptions" @change="setStyle('textAlign', $event)" />
-      <StyleRow label="Link URL" type="text" :value="childData.linkHref||''" placeholder="https://..." @change="setChildAttr('a', 'href', $event)" />
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        <label style="font-size:11px;font-weight:600;color:var(--color-primary);">Link URL</label>
+        <div style="display:flex;gap:4px;">
+          <input
+            v-model="localLinkHref"
+            placeholder="https://..."
+            @keydown.enter.prevent="applyLinkHref"
+            style="flex:1;font-size:11px;padding:6px 8px;border:1px solid #c7d8f5;border-radius:7px;color:#111;background:white;outline:none;box-sizing:border-box;"
+          />
+          <button
+            @click.prevent="applyLinkHref"
+            title="Aplicar URL"
+            style="padding:6px 10px;border-radius:7px;border:none;background:var(--color-primary);color:white;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;"
+          >✓</button>
+        </div>
+        <div v-if="linkHrefApplied" style="font-size:11px;color:#16a34a;display:flex;align-items:center;gap:4px;">
+          <span>✓</span> URL aplicada
+        </div>
+        <div v-else-if="localLinkHref && localLinkHref !== (childData.linkHref||'')" style="font-size:11px;color:#92400e;">
+          Presiona ✓ para aplicar
+        </div>
+      </div>
     </StyleSection>
 
     <!-- IMAGE (direct img tag) -->
@@ -329,9 +350,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useInspectorDrawer } from '../../documents/editor/editor.store';
-import { sendToCanvas } from '../../composables/useCanvasBridge';
+import { sendToCanvas, getCanvasIframe, snapshotCanvasHtml, suppressNextRawHtmlWrite, clearPendingCanvasSnapshot } from '../../composables/useCanvasBridge';
 import EmailLayoutSidebarPanel from './ConfigurationPanel/input-panels/EmailLayoutSidebarPanel.vue';
 import type { EmailLayoutProps } from '@flyhub/email-builder/blocks/EmailLayout';
 import StyleSection from './StylesPanel/StyleSection.vue';
@@ -348,6 +369,19 @@ const videoChildData = computed(() => {
 });
 
 const uploadWarning = ref(false);
+
+// Local state for Link URL input — avoids blur-triggered @change race condition on tab switch.
+// Synced from store when element selection changes; committed only on button click or Enter.
+const localLinkHref = ref('');
+const linkHrefApplied = ref(false);
+let _linkHrefAppliedTimer: ReturnType<typeof setTimeout> | null = null;
+watch(() => childData.value.linkHref, (v) => { localLinkHref.value = v || ''; }, { immediate: true });
+function applyLinkHref() {
+  setChildAttr('a', 'href', localLinkHref.value);
+  linkHrefApplied.value = true;
+  if (_linkHrefAppliedTimer) clearTimeout(_linkHrefAppliedTimer);
+  _linkHrefAppliedTimer = setTimeout(() => { linkHrefApplied.value = false; _linkHrefAppliedTimer = null; }, 2000);
+}
 
 const variableItems = computed(() =>
   Object.entries(store.globalVariables || {}).map(([key, value]) => ({ key, value }))
@@ -495,8 +529,49 @@ function setAttr(property: string, value: string) {
 
 function setChildAttr(selector: string, property: string, value: string) {
   if (!store.selectedElementPath) return;
+
+  // Image link href: bypass postMessage round-trip.
+  // @change fires on blur, triggered by clicking the Preview tab — BEFORE the
+  // tab switch unmounts IframeCanvas. sendToCanvas is async (postMessage); by the
+  // time the canvas sends dom-changed back, the listener is already removed.
+  // Fix: directly modify the live iframe DOM (same-origin, synchronous) and
+  // snapshot immediately — no race condition.
+  if (selector === 'a' && property === 'href') {
+    const doc = getCanvasIframe()?.contentDocument;
+    if (doc) {
+      const target = doc.querySelector(store.selectedElementPath) as HTMLElement | null;
+      if (target) {
+        let a = target.querySelector('a') as HTMLAnchorElement | null;
+        const img = target.querySelector('img') as HTMLImageElement | null;
+        if (value) {
+          if (!a && img) {
+            a = doc.createElement('a');
+            a.setAttribute('target', '_blank');
+            img.parentNode!.insertBefore(a, img);
+            a.appendChild(img);
+          }
+          if (a) a.setAttribute('href', value);
+        } else if (a) {
+          const frag = doc.createDocumentFragment();
+          while (a.firstChild) frag.appendChild(a.firstChild);
+          a.parentNode?.replaceChild(frag, a);
+        }
+        const html = snapshotCanvasHtml();
+        if (html) {
+          suppressNextRawHtmlWrite();
+          clearPendingCanvasSnapshot();
+          store.saveHtmlSnapshot(html);
+        }
+      }
+    }
+    store.selectedElementChildData = { ...store.selectedElementChildData, linkHref: value };
+    return;
+  }
+
   sendToCanvas({ type: 'set-child-attr', path: store.selectedElementPath, selector, property, value });
-  store.selectedElementChildData = { ...store.selectedElementChildData, [property === 'href' ? 'href' : property]: value };
+  // 'href' is exposed as 'linkHref' in childData (from selectElement in canvas-bridge)
+  const cdKey = (selector === 'a' && property === 'href') ? 'linkHref' : property;
+  store.selectedElementChildData = { ...store.selectedElementChildData, [cdKey]: value };
 }
 
 function setChildStyle(selector: string, property: string, value: string) {

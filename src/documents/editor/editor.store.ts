@@ -93,6 +93,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   const selectedElementChildData = ref<Record<string, string> | null>(null);
   const htmlClipboard = ref<string>('');
   const draggedHtml = ref<string>('');
+  const canvasSelectedText = ref<string>('');
   // ────────────────────────────────────────────────────────────────────────
 
   const globalVariables = ref<TValue['globalVariables']>(loadVariablesFromStorage());
@@ -416,16 +417,39 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
         const firstTag = htmlContent.indexOf('<');
         if (firstTag > 0) htmlContent = htmlContent.slice(firstTag);
 
+        // 0. FIX: El backend a veces re-hostea la imagen pero pega la URL nueva
+        //    al final de la original en vez de reemplazarla, ej:
+        //    src="https://huu.cl/envios/.../https://services.celcom.cl/imagenes/.../invierno.jpg"
+        //    Solo colapsamos si el segundo "http(s)://" viene justo después de un "/" de path
+        //    (el patrón exacto del bug de backend), no en cualquier parte del string —
+        //    así no rompemos query params legítimos tipo "?redirect=https://otro.com".
+        const collapseDoubleUrl = (value: string): string => {
+          const m = value.match(/^https?:\/\/.*\/(https?:\/\/.+)$/i);
+          return m ? m[1] : value;
+        };
+        htmlContent = htmlContent.replace(
+          /(<img[^>]+\bsrc=)(["'])([^"']+)\2/gi,
+          (match, pre, q, src) => `${pre}${q}${collapseDoubleUrl(src)}${q}`
+        );
+        htmlContent = htmlContent.replace(
+          /(\bbackground=)(["'])([^"']+)\2/gi,
+          (match, pre, q, src) => `${pre}${q}${collapseDoubleUrl(src)}${q}`
+        );
+        htmlContent = htmlContent.replace(
+          /url\((['"]?)([^'")]+)\1\)/gi,
+          (match, q, src) => `url(${q}${collapseDoubleUrl(src)}${q})`
+        );
+
         // 1. FIX: Corregir etiquetas <img src="..."> (Tu solución)
         htmlContent = htmlContent.replace(/src="images\/(https?:\/\/)/g, 'src="$1');
 
         // 2. FIX: Corregir estilos background-image: url('...')
         // El HTML que enviaste usa comillas simples dentro de url()
         htmlContent = htmlContent.replace(/url\('images\/(https?:\/\/)/g, "url('$1");
-        
+
         // Opcional: Si a veces viene con comillas dobles en el CSS
         htmlContent = htmlContent.replace(/url\("images\/(https?:\/\/)/g, 'url("$1');
-        
+
         // Modo iframe: cargar HTML directo sin parsear a bloques
         importRawHtml(htmlContent);
         console.log('✅ ZIP importado como HTML directo (modo iframe)');
@@ -675,6 +699,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     selectedElementChildData,
     htmlClipboard,
     draggedHtml,
+    canvasSelectedText,
     importRawHtml,
     saveHtmlSnapshot,
     undoHtml,
