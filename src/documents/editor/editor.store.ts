@@ -1,5 +1,6 @@
 import getConfiguration from "../../getConfiguration";
 import { isOriginAllowed } from "../../utils/allowedOrigins";
+import { isGrapesJsProject, grapesJsProjectToHtml } from "../../utils/grapesJsToHtml";
 import type { TEditorConfiguration } from "./core";
 import { defineStore } from "pinia";
 import { computed, nextTick, onScopeDispose, ref, render } from "vue";
@@ -125,7 +126,15 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
       if (data.html) {
         importRawHtml(data.html);
       } else if (data.document) {
-        resetDocument(data.document);
+        // Algunos orígenes (ej. plantillas creadas en un wrapper basado en GrapesJS)
+        // mandan el proyecto crudo de GrapesJS en vez del Record<blockId,...> propio
+        // de este editor. Sin esto, resetDocument() lo acepta igual sin validar,
+        // no encuentra 'root' y el canvas termina viéndose como plantilla nueva/vacía.
+        if (isGrapesJsProject(data.document)) {
+          importRawHtml(grapesJsProjectToHtml(data.document));
+        } else {
+          resetDocument(data.document);
+        }
       }
       if (data.variables) {
         receivedVariables.value = data.variables;
@@ -303,6 +312,14 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     // Detect iframe-mode envelope saved by exportHtmlAndJsonToParent
     if (t.mode === 'iframe' && typeof t.rawHtml === 'string') {
       importRawHtml(t.rawHtml);
+      inspectorDrawerOpen.value = true;
+      return;
+    }
+
+    // Formato ajeno (ej. wrapper basado en GrapesJS) en vez del Record<blockId,...>
+    // propio de este editor — convertir a HTML plano en vez de mostrar canvas vacío.
+    if (isGrapesJsProject(t)) {
+      importRawHtml(grapesJsProjectToHtml(t));
       inspectorDrawerOpen.value = true;
       return;
     }
