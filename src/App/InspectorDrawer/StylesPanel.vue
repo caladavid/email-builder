@@ -79,6 +79,8 @@
         <StyleRow label="URL de origen" type="text" :value="currentImgSrc" placeholder="https://..." @change="setChildAttr('img', 'src', $event)" />
       </div>
       <StyleRow label="Alt" type="text" :value="childData.alt" placeholder="Descripción" @change="setChildAttr('img', 'alt', $event)" />
+      <StyleRow label="Ancho de imagen" type="slider-text" :max="800" :value="childData.imgWidth" placeholder="ej. 100% o 300px" @change="setImageWidth" />
+      <StyleRow label="Alto de imagen" type="slider-text" :max="600" :value="childData.imgHeight" placeholder="auto" @change="setImageHeight" />
       <StyleRow label="Alineación" type="select" :value="styles.textAlign||'center'"
         :options="alignOptions" @change="setStyle('textAlign', $event)" />
       <div style="display:flex;flex-direction:column;gap:5px;">
@@ -357,6 +359,7 @@ import EmailLayoutSidebarPanel from './ConfigurationPanel/input-panels/EmailLayo
 import type { EmailLayoutProps } from '@flyhub/email-builder/blocks/EmailLayout';
 import StyleSection from './StylesPanel/StyleSection.vue';
 import StyleRow from './StylesPanel/StyleRow.vue';
+import { normalizeLength, toPxInt } from '../../utils/css-length';
 
 const store = useInspectorDrawer();
 const block = computed(() => store.document.root);
@@ -620,14 +623,29 @@ async function onBgFileChange(event: Event) {
 // Only textDecoration is applied to the text selection; all other props go to the element directly
 const DECORATION_PROPS = new Set(['textDecoration']);
 
+// Properties that take a CSS length — raw user input ("300") is invalid CSS and gets
+// silently dropped by the DOM, so it must be normalized ("300px") before sending.
+const LENGTH_PROPS = new Set([
+  'width', 'height', 'maxWidth', 'minWidth',
+  'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+  'marginTop', 'marginRight', 'marginBottom', 'marginLeft',
+  'fontSize', 'lineHeight', 'letterSpacing', 'borderWidth', 'borderRadius',
+]);
+
 function setStyle(property: string, value: string) {
   if (!store.selectedElementPath) return;
+  let v = value;
+  if (LENGTH_PROPS.has(property)) {
+    const normalized = normalizeLength(value);
+    if (normalized === null) return; // invalid length — don't send, don't optimistic-write
+    v = normalized;
+  }
   const type = DECORATION_PROPS.has(property) ? 'apply-style-to-selection' : 'set-style';
-  sendToCanvas({ type, path: store.selectedElementPath, property, value });
+  sendToCanvas({ type, path: store.selectedElementPath, property, value: v });
   // DECORATION_PROPS apply to selection (not whole element) — don't optimistic-write element styles;
   // the panel will refresh via selectElement round-trip from notifyStyleDebounced
   if (!DECORATION_PROPS.has(property)) {
-    store.selectedElementStyles = { ...store.selectedElementStyles, [property]: value };
+    store.selectedElementStyles = { ...store.selectedElementStyles, [property]: v };
   }
 }
 
@@ -641,6 +659,29 @@ function setChildrenStyle(selector: string, property: string, value: string) {
 function setAvatarSize(v: string) {
   setChildStyle('img', 'width', v);
   setChildStyle('img', 'height', v);
+}
+
+function setImageWidth(raw: string) {
+  const v = normalizeLength(raw);
+  if (v === null) return;
+  setChildStyle('img', 'width', v);
+  const px = toPxInt(v);
+  setChildStyle('img', 'maxWidth', px === null ? '100%' : v);
+  setChildStyle('img', 'height', 'auto'); // preserve aspect ratio
+  setChildAttr('img', 'width', px === null ? '' : String(px));
+  setChildAttr('img', 'height', '');
+  if (px !== null) {
+    const wrapPx = toPxInt(childData.value.wrapMaxWidth || '');
+    if (wrapPx !== null && px > wrapPx) setStyle('maxWidth', v);
+  }
+}
+
+function setImageHeight(raw: string) {
+  const v = normalizeLength(raw);
+  if (v === null) return;
+  setChildStyle('img', 'height', v);
+  const px = toPxInt(v);
+  setChildAttr('img', 'height', px === null ? '' : String(px));
 }
 
 function setAvatarShape(v: string) {

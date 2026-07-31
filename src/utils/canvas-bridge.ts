@@ -204,8 +204,8 @@ export const CANVAS_BRIDGE_CODE = `
         childData.href = btnA.getAttribute('href') || '';
         childData.bg = btnA.style.backgroundColor || btnA.style.background || '';
         childData.color = btnA.style.color || '';
-        childData.btnPaddingH = btnA.style.paddingLeft || '20';
-        childData.btnPaddingV = btnA.style.paddingTop || '12';
+        childData.btnPaddingH = btnA.style.paddingLeft || '20px';
+        childData.btnPaddingV = btnA.style.paddingTop || '12px';
         childData.target = btnA.getAttribute('target') || '_self';
         childData.borderRadius = btnA.style.borderRadius || '4px';
       }
@@ -216,6 +216,11 @@ export const CANVAS_BRIDGE_CODE = `
         childData.alt = btnImg.getAttribute('alt') || '';
         var linkA = el.querySelector('a');
         childData.linkHref = linkA ? (linkA.getAttribute('href') || '') : '';
+        // Inline-only (not computed) — mirrors Avatar's childData.size so the field
+        // never snaps back to a computed px value the user didn't type.
+        childData.imgWidth = btnImg.style.width || (btnImg.getAttribute('width') ? btnImg.getAttribute('width') + 'px' : '');
+        childData.imgHeight = btnImg.style.height || (btnImg.getAttribute('height') ? btnImg.getAttribute('height') + 'px' : '');
+        childData.wrapMaxWidth = el.style.maxWidth || '';
       }
     } else if (blockType === 'Separador') {
       var btnHr = el.querySelector('hr');
