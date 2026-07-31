@@ -570,7 +570,22 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
 
   // ── IFRAME CANVAS FUNCTIONS ──────────────────────────────────────────────
 
+  // Clean up Google Docs / Figma copy-paste artifacts that break email rendering.
+  // Only runs on import — NOT on canvas DOM snapshots (saveHtmlSnapshot bypasses this).
+  function sanitizeImportedHtml(html: string): string {
+    // white-space:pre-wrap preserves Google Docs line-breaks from doc's original width
+    // → text wraps at wrong positions in the email canvas/preview
+    html = html.replace(/\bwhite-space\s*:\s*pre-wrap\s*;?/gi, '');
+    // Empty Google Docs anchor spans (zero-width, just carry an ID)
+    html = html.replace(/<span[^>]+id="docs-internal-guid-[^"]*"[^>]*>\s*<\/span>/gi, '');
+    // contenteditable / draggable from Google Docs HTML
+    html = html.replace(/\s*contenteditable="[^"]*"/gi, '');
+    html = html.replace(/\s*draggable="[^"]*"/gi, '');
+    return html;
+  }
+
   function importRawHtml(html: string) {
+    html = sanitizeImportedHtml(html);
     rawHtml.value = html;
     selectedElementPath.value = null;
     selectedElementStyles.value = {};
