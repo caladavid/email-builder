@@ -64,12 +64,18 @@
         :min="0"
         :max="max ?? 100"
         step="1"
-        :value="numericVal"
+        :value="sliderDisplayVal"
         style="flex:1;accent-color:var(--color-primary);height:4px;cursor:pointer;"
         @input="onSliderInput"
+        @pointerdown="isDragging = true"
+        @pointerup="onSliderRelease"
+        @pointercancel="onSliderRelease"
       />
-      <span style="min-width:38px;font-size:11px;font-weight:600;text-align:right;color:var(--color-primary);">
-        {{ value || '0px' }}
+      <span
+        :style="{ color: value ? 'var(--color-primary)' : '#94a3b8' }"
+        style="min-width:38px;font-size:11px;font-weight:600;text-align:right;"
+      >
+        {{ value || computedValue || '0px' }}
       </span>
     </div>
 
@@ -108,14 +114,17 @@
         :min="0"
         :max="max ?? 800"
         step="1"
-        :value="numericVal"
+        :value="sliderDisplayVal"
         style="flex:1;accent-color:var(--color-primary);height:4px;cursor:pointer;"
         @input="onSliderInput"
+        @pointerdown="isDragging = true"
+        @pointerup="onSliderRelease"
+        @pointercancel="onSliderRelease"
       />
       <input
         type="text"
         :value="value"
-        :placeholder="placeholder || 'ej. 100%'"
+        :placeholder="computedValue || placeholder || 'ej. 100%'"
         style="width:64px;font-size:11px;padding:4px 6px;border:1px solid #c7d8f5;border-radius:6px;color:#111;background:white;outline:none;text-align:center;"
         @change="emit('change', ($event.target as HTMLInputElement).value)"
         @keydown.enter.prevent="emit('change', ($event.target as HTMLInputElement).value)"
@@ -127,7 +136,7 @@
       v-else
       type="text"
       :value="value"
-      :placeholder="placeholder || 'ej. 16px'"
+      :placeholder="computedValue || placeholder || 'ej. 16px'"
       style="width:100%;font-size:11px;padding:6px 8px;border:1px solid #c7d8f5;border-radius:7px;color:#111;background:white;outline:none;box-sizing:border-box;"
       @change="emit('change', ($event.target as HTMLInputElement).value)"
     />
@@ -141,6 +150,9 @@ const props = defineProps<{
   label: string;
   type: 'color' | 'text' | 'select' | 'slider' | 'slider-text' | 'select-text';
   value?: string;
+  // Read-only computed value shown as a placeholder/hint when `value` is empty —
+  // distinguishes "the browser resolved this to 600px" from "the user set 600px".
+  computedValue?: string;
   placeholder?: string;
   options?: { label: string; value: string }[];
   max?: number;
@@ -208,14 +220,43 @@ function onHexChange() {
 
 // ── Slider helpers ─────────────────────────────────────────────────────────
 
+// Round-tripping the emitted value straight back into the same range input's
+// :value on every 'input' tick fights the browser's own native drag tracking —
+// each reactive update forces the thumb to the last known *external* value,
+// which visibly lags behind the mouse and snaps back mid-drag (note: binding
+// :value to `undefined` to "skip" the update does NOT work — Vue's DOM prop
+// patcher coerces null/undefined to '' for form elements, which is itself a
+// forced value, not a no-op). Fix: `sliderDisplayVal` is a local ref that only
+// listens to prop changes while NOT dragging; during the drag it is driven
+// solely by the input's own 'input' events, so external reactivity never
+// touches the DOM value until the user actually releases.
+const isDragging = ref(false);
+
 const numericVal = computed(() => {
-  const n = parseFloat(props.value ?? '0');
+  const raw = props.value || props.computedValue || '0';
+  const n = parseFloat(raw);
   return isNaN(n) ? 0 : Math.round(n);
 });
 
+const sliderDisplayVal = ref(numericVal.value);
+watch(numericVal, (v) => {
+  if (!isDragging.value) sliderDisplayVal.value = v;
+});
+
+function onSliderRelease() {
+  isDragging.value = false;
+  sliderDisplayVal.value = numericVal.value; // snap to the authoritative value once settled
+}
+
 function onSliderInput(e: Event) {
+  // The slider's numeric range (the :max prop) is always calibrated in pixels
+  // across every usage in this panel — inferring '%' from the pre-edit value
+  // (e.g. an image at "100%") produced nonsense like dragging to 200 -> "200%".
   const n = (e.target as HTMLInputElement).value;
-  const hasPercent = (props.value ?? '').includes('%');
-  emit('change', n + (hasPercent ? '%' : 'px'));
+  // Track the drag position locally so a mid-drag reactive re-render (from the
+  // optimistic store write elsewhere) can't force the DOM value back to a
+  // stale point — see the comment above sliderDisplayVal.
+  sliderDisplayVal.value = Number(n);
+  emit('change', n + 'px');
 }
 </script>
