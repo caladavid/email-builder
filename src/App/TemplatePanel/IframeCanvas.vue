@@ -376,9 +376,11 @@ function handleMessage(event: MessageEvent) {
 
       store.selectedElementPath = data.path;
       store.selectedElementStyles = data.styles ?? {};
+      store.selectedElementInlineStyles = data.inlineStyles ?? {};
       store.selectedElementAttrs = data.attrs ?? {};
       store.selectedElementTagName = data.blockType ?? data.tagName ?? '';
       store.selectedElementInnerText = data.innerText ?? '';
+      store.selectedElementHasRichText = data.hasRichText ?? false;
       store.selectedElementChildData = data.childData ?? null;
       overlayRect.value = data.rect ?? null;
       store.selectedSidebarTab = 'styles';
@@ -403,6 +405,7 @@ function handleMessage(event: MessageEvent) {
       addButtonInfo.value = null;
       store.selectedElementPath = null;
       store.selectedElementStyles = {};
+      store.selectedElementInlineStyles = {};
       store.selectedElementAttrs = {};
       store.selectedElementTagName = '';
       overlayRect.value = null;
@@ -424,7 +427,7 @@ function handleMessage(event: MessageEvent) {
       if (data.html) {
         _pendingSnapshot = data.html;
         if (_saveTimer) clearTimeout(_saveTimer);
-        _saveTimer = setTimeout(() => {
+        const flushSnapshot = () => {
           if (_pendingSnapshot) {
             _suppressWrite = true;
             store.saveHtmlSnapshot(_pendingSnapshot);
@@ -433,7 +436,15 @@ function handleMessage(event: MessageEvent) {
           }
           _saveTimer = null;
           _pendingSnapshot = null;
-        }, 150);
+        };
+        // 'immediate' (e.g. finishing a text edit) skips the debounce — otherwise
+        // switching tabs within the wait window destroys this timer before the
+        // edit is ever saved to rawHtml, and the change is silently lost.
+        if (data.immediate) {
+          flushSnapshot();
+        } else {
+          _saveTimer = setTimeout(flushSnapshot, 150);
+        }
         nextTick(updateIframeHeight);
       }
       break;
