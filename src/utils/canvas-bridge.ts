@@ -1,4 +1,8 @@
-export const CANVAS_BRIDGE_CODE = `
+// UMD build — executed as plain inline script text inside the iframe, so it
+// assigns `window.DOMPurify` there (no module system present in that context).
+import purifySrc from 'dompurify/dist/purify.min.js?raw';
+
+export const CANVAS_BRIDGE_CODE = purifySrc + `
 (function () {
   'use strict';
   if (window.__canvasBridgeCleanup) { try { window.__canvasBridgeCleanup(); } catch(e) {} }
@@ -9,16 +13,17 @@ export const CANVAS_BRIDGE_CODE = `
   var _parentOrigin = '*';
   var _parentOriginCaptured = false;
 
-  // Basic XSS sanitizer — strips <script> tags, javascript: protocol, and inline event handlers.
-  // DOMPurify is not available in this iframe context; origin validation is the primary guard.
-  // IMPORTANT: inside this template literal, regex meta-escapes need \\ so that \s/\w/\b
-  // survive template-literal evaluation as \s/\w/\b in the injected script.
-  // \/ also needs \\ so the slash does not prematurely close the regex.
+  // Real sanitizer (DOMPurify, loaded above as a plain global) — the previous
+  // regex-only version missed unquoted event handlers (onerror=alert(1) with no
+  // quotes), <svg onload=...>, and other well-known bypasses. Keeps VML tags
+  // (Outlook "bulletproof" buttons) and inline styles, which DOMPurify would
+  // otherwise strip since they're not in its default allowlist.
   function sanitizeHtml(html) {
-    return (html || '')
-      .replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, '')
-      .replace(/\\bon\\w+\\s*=\\s*["'][^"']*["']/gi, '')
-      .replace(/javascript:/gi, 'javascript_disabled:');
+    if (!window.DOMPurify) return ''; // fail closed if the bundled purify script didn't load
+    return window.DOMPurify.sanitize(html || '', {
+      ADD_TAGS: ['v:shape', 'v:rect', 'v:oval', 'v:roundrect', 'v:textbox', 'v:fill', 'v:stroke', 'o:lock'],
+      ADD_ATTR: ['xmlns:v', 'xmlns:o', 'xmlns:w', 'fillcolor', 'strokecolor', 'arcsize'],
+    });
   }
 
   const IGNORE_TAGS = new Set(['HTML', 'HEAD', 'BODY', 'STYLE', 'SCRIPT', 'META', 'LINK', 'TITLE', 'NOSCRIPT']);
@@ -35,6 +40,73 @@ export const CANVAS_BRIDGE_CODE = `
   var _internalDragEl = null;
   var _selectGen = 0; // cancels stale selectAfterImagesLoad callbacks
 
+  // Box-model overlay (DevTools/GrapesJS style) — 4 orange strips for margin,
+  // 4 green strips for padding, drawn around whatever is currently hovered.
+  // position:fixed + viewport rects so no scroll-offset math is needed.
+  var _boxModelEls = null;
+  function ensureBoxModelEls() {
+    if (_boxModelEls) return _boxModelEls;
+    var host = document.createElement('div');
+    host.id = '__box-model-overlay__';
+    host.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;pointer-events:none;z-index:2147483646;';
+    var els = { margin: [], padding: [] };
+    function makeStrip(color) {
+      var d = document.createElement('div');
+      d.style.cssText = 'position:fixed;pointer-events:none;display:none;background:' + color + ';';
+      host.appendChild(d);
+      return d;
+    }
+    for (var mi = 0; mi < 4; mi++) els.margin.push(makeStrip('rgba(246,178,107,0.45)'));
+    for (var pi = 0; pi < 4; pi++) els.padding.push(makeStrip('rgba(147,196,125,0.45)'));
+    (document.body || document.documentElement).appendChild(host);
+    _boxModelEls = els;
+    return els;
+  }
+
+  function hideBoxModel() {
+    if (!_boxModelEls) return;
+    var all = _boxModelEls.margin.concat(_boxModelEls.padding);
+    for (var i = 0; i < all.length; i++) all[i].style.display = 'none';
+  }
+
+  function showBoxModelFor(el) {
+    if (!el || !el.getBoundingClientRect) { hideBoxModel(); return; }
+    var els = ensureBoxModelEls();
+    var cs = window.getComputedStyle(el);
+    var r = el.getBoundingClientRect();
+    var mt = parseFloat(cs.marginTop) || 0, mr = parseFloat(cs.marginRight) || 0, mb = parseFloat(cs.marginBottom) || 0, ml = parseFloat(cs.marginLeft) || 0;
+    var bt = parseFloat(cs.borderTopWidth) || 0, br = parseFloat(cs.borderRightWidth) || 0, bb = parseFloat(cs.borderBottomWidth) || 0, bl = parseFloat(cs.borderLeftWidth) || 0;
+    var pt = parseFloat(cs.paddingTop) || 0, pr = parseFloat(cs.paddingRight) || 0, pb = parseFloat(cs.paddingBottom) || 0, pl = parseFloat(cs.paddingLeft) || 0;
+
+    // Nothing to show at all — hide instead of drawing empty 0-size strips.
+    if (!mt && !mr && !mb && !ml && !pt && !pr && !pb && !pl) { hideBoxModel(); return; }
+
+    function place(d, top, left, width, height) {
+      if (width <= 0 || height <= 0) { d.style.display = 'none'; return; }
+      d.style.display = 'block';
+      d.style.top = top + 'px';
+      d.style.left = left + 'px';
+      d.style.width = width + 'px';
+      d.style.height = height + 'px';
+    }
+
+    // Margin ring — outside the border box.
+    place(els.margin[0], r.top - mt, r.left - ml, r.width + ml + mr, mt);              // top
+    place(els.margin[1], r.bottom, r.left - ml, r.width + ml + mr, mb);                // bottom
+    place(els.margin[2], r.top, r.left - ml, ml, r.height);                             // left
+    place(els.margin[3], r.top, r.right, mr, r.height);                                 // right
+
+    // Padding ring — inside the border box, between border and content.
+    var innerTop = r.top + bt, innerLeft = r.left + bl;
+    var innerWidth = r.width - bl - br, innerHeight = r.height - bt - bb;
+    var contentTop = innerTop + pt, contentLeft = innerLeft + pl;
+    var contentWidth = innerWidth - pl - pr, contentHeight = innerHeight - pt - pb;
+    place(els.padding[0], innerTop, innerLeft, innerWidth, pt);                          // top
+    place(els.padding[1], contentTop + contentHeight, innerLeft, innerWidth, pb);        // bottom
+    place(els.padding[2], contentTop, innerLeft, pl, contentHeight);                     // left
+    place(els.padding[3], contentTop, contentLeft + contentWidth, pr, contentHeight);    // right
+  }
+
   function makePlaceholder() {
     var _ph = document.createElement('div');
     _ph.setAttribute('data-block-type', 'placeholder');
@@ -42,6 +114,13 @@ export const CANVAS_BRIDGE_CODE = `
     _ph.innerHTML = '<svg width="24" height="24" viewBox="0 0 40 40" fill="none" style="pointer-events:none;"><path d="M20 11v18M11 20h18" stroke="#0045B0" stroke-width="2.5" stroke-linecap="round"/></svg>';
     return _ph;
   }
+
+  // Pure inline-formatting tags — clicking one of these (no data-block-type
+  // ancestor) should select the paragraph/container they live in, not the tag
+  // itself, so a bold word inside running text doesn't become its own tiny
+  // selectable "block". <A> is deliberately excluded — plain text links keep
+  // their own selection (Link panel: href/text) when not wrapped in a Botón block.
+  const INLINE_FORMAT_TAGS = new Set(['STRONG', 'B', 'EM', 'I', 'U', 'S', 'STRIKE', 'SPAN', 'SMALL', 'MARK', 'SUB', 'SUP', 'Q', 'ABBR', 'CITE', 'TIME', 'KBD', 'VAR', 'CODE']);
 
   // Walk up to data-block-type; if not found, use the clicked element directly
   // (imported templates have no data-block-type so we allow individual element selection)
@@ -53,9 +132,10 @@ export const CANVAS_BRIDGE_CODE = `
     if (cur && cur !== document.body && cur !== document.documentElement) {
       return cur;
     }
-    // No data-block-type — select the clicked element itself (skip ignored tags)
+    // No data-block-type — select the clicked element itself, but skip past
+    // ignored tags and pure inline-formatting tags (see INLINE_FORMAT_TAGS above)
     var target = el;
-    while (target && (IGNORE_TAGS.has(target.tagName) || target === document.body || target === document.documentElement)) {
+    while (target && (IGNORE_TAGS.has(target.tagName) || INLINE_FORMAT_TAGS.has(target.tagName) || target === document.body || target === document.documentElement)) {
       target = target.parentElement;
     }
     return target || null;
@@ -80,45 +160,52 @@ export const CANVAS_BRIDGE_CODE = `
     return 'body > ' + parts.join(' > ');
   }
 
+  // Single source of truth for the style properties the panel reads. Plain 1:1
+  // properties only — textAlign/textDecoration need extra logic and are handled
+  // separately below. Kept as a flat list (not a map) so getInlineStyles (added
+  // later) can reuse it without duplicating the property names.
+  var STYLE_KEYS = [
+    'color', 'backgroundColor', 'backgroundImage', 'backgroundSize', 'backgroundPosition', 'backgroundRepeat',
+    'fontSize', 'fontFamily', 'fontWeight', 'fontStyle', 'lineHeight', 'letterSpacing',
+    'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+    'marginTop', 'marginRight', 'marginBottom', 'marginLeft',
+    'width', 'height', 'maxWidth',
+    'borderWidth', 'borderColor', 'borderStyle', 'borderRadius',
+    'display',
+  ];
+
   function getElementStyles(el) {
     var cs = window.getComputedStyle(el);
     var s = el.style;
     function pick(inline, computed) { return inline || computed || ''; }
-    return {
-      color: pick(s.color, cs.color),
-      backgroundColor: pick(s.backgroundColor, cs.backgroundColor),
-      fontSize: pick(s.fontSize, cs.fontSize),
-      fontFamily: pick(s.fontFamily, cs.fontFamily),
-      fontWeight: pick(s.fontWeight, cs.fontWeight),
-      fontStyle: pick(s.fontStyle, cs.fontStyle),
-      textAlign: (function(v){ return v==='start'?'left':v==='end'?'right':v; })(pick(s.textAlign, cs.textAlign)),
-      lineHeight: pick(s.lineHeight, cs.lineHeight),
-      letterSpacing: pick(s.letterSpacing, cs.letterSpacing),
-      paddingTop: pick(s.paddingTop, cs.paddingTop),
-      paddingRight: pick(s.paddingRight, cs.paddingRight),
-      paddingBottom: pick(s.paddingBottom, cs.paddingBottom),
-      paddingLeft: pick(s.paddingLeft, cs.paddingLeft),
-      marginTop: pick(s.marginTop, cs.marginTop),
-      marginRight: pick(s.marginRight, cs.marginRight),
-      marginBottom: pick(s.marginBottom, cs.marginBottom),
-      marginLeft: pick(s.marginLeft, cs.marginLeft),
-      width: pick(s.width, cs.width),
-      height: pick(s.height, cs.height),
-      maxWidth: pick(s.maxWidth, cs.maxWidth),
-      borderWidth: pick(s.borderWidth, cs.borderWidth),
-      borderColor: pick(s.borderColor, cs.borderColor),
-      borderStyle: pick(s.borderStyle, cs.borderStyle),
-      borderRadius: pick(s.borderRadius, cs.borderRadius),
-      textDecoration: (function() {
-        if (s.textDecoration) return s.textDecoration;
-        if (el.querySelector('u')) return 'underline';
-        if (el.querySelector('s, strike')) return 'line-through';
-        if (el.querySelector('span[style*="text-decoration: underline"],span[style*="text-decoration:underline"]')) return 'underline';
-        if (el.querySelector('span[style*="text-decoration: line-through"],span[style*="text-decoration:line-through"]')) return 'line-through';
-        return '';
-      })(),
-      display: pick(s.display, cs.display),
-    };
+    var out = {};
+    for (var i = 0; i < STYLE_KEYS.length; i++) {
+      var k = STYLE_KEYS[i];
+      out[k] = pick(s[k], cs[k]);
+    }
+    out.textAlign = (function(v){ return v==='start'?'left':v==='end'?'right':v; })(pick(s.textAlign, cs.textAlign));
+    out.textDecoration = (function() {
+      if (s.textDecoration) return s.textDecoration;
+      if (el.querySelector('u')) return 'underline';
+      if (el.querySelector('s, strike')) return 'line-through';
+      if (el.querySelector('span[style*="text-decoration: underline"],span[style*="text-decoration:underline"]')) return 'underline';
+      if (el.querySelector('span[style*="text-decoration: line-through"],span[style*="text-decoration:line-through"]')) return 'line-through';
+      return '';
+    })();
+    return out;
+  }
+
+  // Inline-only values (no computed fallback) for fields where showing a computed
+  // value as if the user had set it is misleading (e.g. an untouched width field
+  // rendering "600px" in black as though it were an explicit choice).
+  function getInlineStyles(el) {
+    var s = el.style;
+    var out = {};
+    for (var i = 0; i < STYLE_KEYS.length; i++) {
+      var k = STYLE_KEYS[i];
+      out[k] = s[k] || '';
+    }
+    return out;
   }
 
   function getElementAttrs(el) {
@@ -130,7 +217,7 @@ export const CANVAS_BRIDGE_CODE = `
     return attrs;
   }
 
-  function notifyDomChanged() {
+  function notifyDomChanged(immediate) {
     // Strip editor hover/selection outlines before snapshot — they must not leak into exported HTML
     var outlineEls = document.querySelectorAll('[style*="dashed"]');
     var savedOutlines = [];
@@ -141,7 +228,13 @@ export const CANVAS_BRIDGE_CODE = `
         _oel.style.outline = '';
       }
     }
+    // Box-model hover overlay lives permanently in the DOM (just hidden/shown) —
+    // detach it before serializing so it never leaks into the saved/exported HTML.
+    var _boxModelHost = document.getElementById('__box-model-overlay__');
+    var _boxModelParent = _boxModelHost ? _boxModelHost.parentNode : null;
+    if (_boxModelHost && _boxModelParent) _boxModelParent.removeChild(_boxModelHost);
     var html = document.documentElement.outerHTML;
+    if (_boxModelHost && _boxModelParent) _boxModelParent.appendChild(_boxModelHost);
     for (var ri = 0; ri < savedOutlines.length; ri++) {
       savedOutlines[ri][0].style.outline = savedOutlines[ri][1];
     }
@@ -153,7 +246,23 @@ export const CANVAS_BRIDGE_CODE = `
         html = html.slice(0, bridgeStart) + html.slice(bridgeEnd + closeTag.length);
       }
     }
-    parent.postMessage({ type: 'dom-changed', html: html }, _parentOrigin);
+    // Strip the editor-only scroll-padding style injected by IframeCanvas — it must
+    // never reach the saved/exported HTML (was leaking as body{padding-bottom:160px!important}).
+    var padStart = html.indexOf('<style id="__canvas-padding__"');
+    if (padStart >= 0) {
+      var padCloseTag = '<' + '/style>';
+      var padEnd = html.indexOf(padCloseTag, padStart);
+      if (padEnd >= 0) {
+        html = html.slice(0, padStart) + html.slice(padEnd + padCloseTag.length);
+      }
+    }
+    // Strip editor-only attributes (selection drag handle, in-progress text editing)
+    html = html.replace(/\\s*draggable="[^"]*"/gi, '');
+    html = html.replace(/\\s*contenteditable="[^"]*"/gi, '');
+    // 'immediate' skips IframeCanvas's 150ms save debounce — needed for one-shot events
+    // (like finishing a text edit) where switching tabs right after would otherwise
+    // destroy the pending timer before the change is ever saved to rawHtml.
+    parent.postMessage({ type: 'dom-changed', html: html, immediate: !!immediate }, _parentOrigin);
   }
 
   // Debounced version for rapid-fire style changes (slider drag).
@@ -176,6 +285,32 @@ export const CANVAS_BRIDGE_CODE = `
     if (!el) return;
     el.style.outline = outline || '';
     el.style.outlineOffset = outlineOffset || '';
+  }
+
+  // Writes an inline style, escalating to !important only when a stylesheet rule
+  // (e.g. a template's own "img{max-width:100%!important}") would otherwise win.
+  // Compares computed value before/after rather than against the requested value,
+  // since computed values are normalized ('50%' -> '300px', '#fff' -> 'rgb(...)').
+  function writeStyle(el, prop, value) {
+    if (!el) return;
+    var css = prop.replace(/[A-Z]/g, function(m) { return '-' + m.toLowerCase(); });
+    if (!value) { el.style.removeProperty(css); return; }
+    // Once a property is already escalated (e.g. from a previous slider tick),
+    // keep writing !important directly. Clearing priority first to "test" would
+    // let the competing stylesheet rule win for one tick — since that fallback
+    // value differs from our *previous* value, the before/after check below
+    // reads it as "the write worked" and skips re-escalating, snapping the
+    // field back to the stylesheet's value on every write after the first.
+    if (el.style.getPropertyPriority(css) === 'important') {
+      el.style.setProperty(css, value, 'important');
+      return;
+    }
+    var before = window.getComputedStyle(el).getPropertyValue(css);
+    el.style.setProperty(css, value, '');
+    var after = window.getComputedStyle(el).getPropertyValue(css);
+    if (after === before && el.style.getPropertyValue(css)) {
+      el.style.setProperty(css, value, 'important');
+    }
   }
 
   function selectElement(el) {
@@ -257,14 +392,23 @@ export const CANVAS_BRIDGE_CODE = `
         childData.autoplay = vidEl.hasAttribute('autoplay') ? 'autoplay' : null;
       }
     }
+    // Does this element contain formatting (bold/link/line-break/etc.)? The "Texto"
+    // panel field is plain-text — writing through it replaces textContent wholesale,
+    // silently destroying any such formatting. Surfaced so the panel can warn.
+    var hasRichText = false;
+    for (var _rtI = 0; _rtI < el.childNodes.length; _rtI++) {
+      if (el.childNodes[_rtI].nodeType === 1) { hasRichText = true; break; }
+    }
     parent.postMessage({
       type: 'select',
       path: getElementPath(el),
       styles: getElementStyles(el),
+      inlineStyles: getInlineStyles(el),
       attrs: getElementAttrs(el),
       tagName: el.tagName,
       blockType: blockType || null,
       innerText: (el.innerText || '').trim().slice(0, 200),
+      hasRichText: hasRichText,
       childData: childData,
       rect: {
         top: rect.top + window.scrollY,
@@ -278,6 +422,10 @@ export const CANVAS_BRIDGE_CODE = `
   // HOVER
   document.addEventListener('mouseover', function (e) {
     var el = e.target;
+    if (!el || IGNORE_TAGS.has(el.tagName)) return;
+    // Bubble past pure inline-formatting tags so hovering a bold/span word
+    // highlights its paragraph instead of just that word — matches click-select.
+    while (el && INLINE_FORMAT_TAGS.has(el.tagName)) { el = el.parentElement; }
     if (!el || IGNORE_TAGS.has(el.tagName)) return;
     if (el === selectedEl || el === editingEl) return;
     if (selectedEl && selectedEl.contains(el)) {
@@ -300,6 +448,7 @@ export const CANVAS_BRIDGE_CODE = `
     if (!el.style.outline.includes('rgba(0,121,204,1)') && !el.style.outline.includes('rgba(0,200,100')) {
       el.style.outline = '1px dashed rgba(0,121,204,0.5)';
     }
+    showBoxModelFor(el);
   }, true);
 
   document.addEventListener('mouseout', function (e) {
@@ -308,6 +457,7 @@ export const CANVAS_BRIDGE_CODE = `
     if (el.style && el.style.outline.includes('dashed')) {
       el.style.outline = prevHoverOutline || '';
     }
+    if (el === hoveredEl) { hoveredEl = null; hideBoxModel(); }
   }, true);
 
   // INPUT while editing → debounce re-measure overlay rect as block grows
@@ -341,11 +491,17 @@ export const CANVAS_BRIDGE_CODE = `
   // CLICK → SELECT (walk up to block root, fallback to direct body child for imported templates)
   document.addEventListener('click', function (e) {
     var el = e.target;
-    if (!el || IGNORE_TAGS.has(el.tagName)) return;
+    if (!el) return;
+    var isIgnoredTag = IGNORE_TAGS.has(el.tagName);
     if (editingEl) {
       if (!editingEl.contains(el)) {
+        // Clicking empty canvas background (<body>/<html>, both IGNORE_TAGS) must still
+        // exit editing and save — previously the IGNORE_TAGS early-return below ran first,
+        // so exitEditing() (and the save it triggers) never fired and the edit was lost.
         exitEditing();
+        if (isIgnoredTag) return;
       } else {
+        if (isIgnoredTag) return;
         // Click inside editing element — if it's a distinct named sub-block, escape and select it
         var innerBlock = findBlockEl(el);
         if (innerBlock && innerBlock !== editingEl && innerBlock.getAttribute('data-block-type')) {
@@ -355,6 +511,8 @@ export const CANVAS_BRIDGE_CODE = `
           return; // just move cursor
         }
       }
+    } else if (isIgnoredTag) {
+      return;
     }
     e.stopPropagation();
     var block = findBlockEl(el);
@@ -395,7 +553,7 @@ export const CANVAS_BRIDGE_CODE = `
         }
       }
     }
-    notifyDomChanged();
+    notifyDomChanged(true);
     parent.postMessage({ type: 'editing-end' }, _parentOrigin);
     // Do NOT re-select exiting: it sends a stale 'select' for the old element right before
     // the new click's 'select' arrives, causing the overlay to flash to the wrong position.
@@ -473,7 +631,7 @@ export const CANVAS_BRIDGE_CODE = `
 
     switch (cmd.type) {
       case 'set-style':
-        if (target) { target.style[cmd.property] = cmd.value; }
+        writeStyle(target, cmd.property, cmd.value);
         notifyStyleDebounced(target);
         break;
 
@@ -651,7 +809,7 @@ export const CANVAS_BRIDGE_CODE = `
         break;
 
       case 'remove-style':
-        if (target) { target.style[cmd.property] = ''; }
+        writeStyle(target, cmd.property, '');
         notifyDomChanged();
         break;
 
@@ -709,7 +867,7 @@ export const CANVAS_BRIDGE_CODE = `
       case 'set-child-style':
         if (target) {
           var chSt = target.querySelector(cmd.selector);
-          if (chSt) chSt.style[cmd.property] = cmd.value;
+          if (chSt) writeStyle(chSt, cmd.property, cmd.value);
         }
         notifyStyleDebounced(target);
         break;
@@ -725,8 +883,14 @@ export const CANVAS_BRIDGE_CODE = `
       case 'set-children-style':
         if (target) {
           var chAllSt = target.querySelectorAll(cmd.selector);
+          // Scope to the block's own table only — a cell/box built with a nested
+          // <table> (e.g. a bordered inner box) must not have its borders/padding
+          // changed by an edit meant for the outer Table/Columnas block.
+          var _outerTable = target.tagName === 'TABLE' ? target : target.querySelector('table');
           for (var csi = 0; csi < chAllSt.length; csi++) {
-            chAllSt[csi].style[cmd.property] = cmd.value;
+            var _cell = chAllSt[csi];
+            if (_outerTable && _cell.closest('table') !== _outerTable) continue;
+            writeStyle(_cell, cmd.property, cmd.value);
           }
         }
         notifyStyleDebounced(target);
@@ -1062,6 +1226,14 @@ export const CANVAS_BRIDGE_CODE = `
       case 'highlight':
         if (target) selectElement(target);
         break;
+
+      case 'exit-editing':
+        // Sent proactively by the parent when leaving the Editor tab, so an
+        // in-progress edit (no click-away inside the canvas yet) still gets
+        // saved and reflected in Preview/HTML instead of staying stuck live
+        // in the DOM until the user happens to click something in the canvas.
+        if (editingEl) exitEditing();
+        break;
     }
   };
   window.addEventListener('message', _msgHandler);
@@ -1338,14 +1510,16 @@ export const CANVAS_BRIDGE_CODE = `
       if (block && block.getAttribute('data-block-type') === 'placeholder') block = null;
       if (block) _dbgStep = 'data-block-type';
       // Fallback for imported templates: walk up from e.target and find the first
-      // non-IGNORE, non-TABLE_INT element the cursor is hovering in/near.
-      // TABLE_INT (TD/TR/TH etc.) are excluded because inserting after them breaks table structure.
-      // Everything else (SPAN, STRONG, DIV, P, H1-H6, IMG, A…) is a valid insert target.
+      // non-IGNORE, non-TABLE_INT, non-inline-formatting element the cursor is
+      // hovering in/near. TABLE_INT (TD/TR/TH etc.) are excluded because inserting
+      // after them breaks table structure; INLINE_FORMAT_TAGS (SPAN, STRONG…) are
+      // excluded so the "+" anchors to the paragraph, not a formatted word inside it.
+      // DIV, P, H1-H6, IMG, A… remain valid insert targets.
       if (!block) {
         var wb = el;
         while (wb && wb !== document.body && wb !== document.documentElement) {
           var wbType = wb.getAttribute && wb.getAttribute('data-block-type');
-          if (!IGNORE_TAGS.has(wb.tagName) && !TABLE_INT.has(wb.tagName) && wbType !== 'placeholder') {
+          if (!IGNORE_TAGS.has(wb.tagName) && !TABLE_INT.has(wb.tagName) && !INLINE_FORMAT_TAGS.has(wb.tagName) && wbType !== 'placeholder') {
             var wbBr = wb.getBoundingClientRect();
             // max(50%, 30px): short elements (single-line span/p) always get a 30px zone
             var wbZone = Math.max(wbBr.height * 0.5, 30);
