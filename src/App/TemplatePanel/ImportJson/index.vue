@@ -275,9 +275,13 @@ async function handleZipUpload(event: Event) {
 
     } else {
       // Production: backend processes + uploads images to CDN
-      await inspectorDrawer.sendZip(file);
-      zipSuccess.value = 'Plantilla importada exitosamente';
-      setTimeout(handleCancel, 1500);
+      const ok = await inspectorDrawer.sendZip(file);
+      if (ok) {
+        zipSuccess.value = 'Plantilla importada exitosamente';
+        setTimeout(handleCancel, 1500);
+      } else {
+        zipError.value = 'No se pudo importar el ZIP — revisá tu sesión (token) o la conexión.';
+      }
     }
 
   } catch (err) {
