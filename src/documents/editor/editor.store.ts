@@ -88,9 +88,11 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   const htmlHistoryIndex = ref<number>(-1);
   const selectedElementPath = ref<string | null>(null);
   const selectedElementStyles = ref<Record<string, string>>({});
+  const selectedElementInlineStyles = ref<Record<string, string>>({});
   const selectedElementAttrs = ref<Record<string, string>>({});
   const selectedElementTagName = ref<string>('');
   const selectedElementInnerText = ref<string>('');
+  const selectedElementHasRichText = ref<boolean>(false);
   const selectedElementChildData = ref<Record<string, string> | null>(null);
   const htmlClipboard = ref<string>('');
   const draggedHtml = ref<string>('');
@@ -195,9 +197,11 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     htmlHistoryIndex.value = -1;
     selectedElementPath.value = null;
     selectedElementStyles.value = {};
+    selectedElementInlineStyles.value = {};
     selectedElementAttrs.value = {};
     selectedElementTagName.value = '';
     selectedElementInnerText.value = '';
+    selectedElementHasRichText.value = false;
     selectedElementChildData.value = null;
 
     document.value = newDocument;
@@ -394,13 +398,13 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
       return historyIndex.value < history.value.length - 1;
   }
 
-  async function sendZip(file: File) {
+  async function sendZip(file: File): Promise<boolean> {
     try {
       const token = authToken.value
-      
+
       if (!token){
-        console.error('❌ No hay token disponible');  
-        return;  
+        console.error('❌ No hay token disponible');
+        return false;
       }
 
       const formData = new FormData()
@@ -427,7 +431,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
         let htmlContent = result.data;
         if (!htmlContent || typeof htmlContent !== 'string') {
           console.error('❌ Respuesta inválida del servidor ZIP: data vacío');
-          return;
+          return false;
         }
 
         // Strip macOS metadata prepended to HTML content
@@ -470,12 +474,15 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
         // Modo iframe: cargar HTML directo sin parsear a bloques
         importRawHtml(htmlContent);
         console.log('✅ ZIP importado como HTML directo (modo iframe)');
-      } else {  
-        console.error('❌ Error procesando ZIP:', result);  
-      }  
+        return true;
+      } else {
+        console.error('❌ Error procesando ZIP:', result);
+        return false;
+      }
 
     } catch (error) {
-      console.error('❌ Error en sendZip:', error);  
+      console.error('❌ Error en sendZip:', error);
+      return false;
     }
   }
 
@@ -570,6 +577,72 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
 
   // ── IFRAME CANVAS FUNCTIONS ──────────────────────────────────────────────
 
+  // Google Docs paste sometimes carries a run of text with NO explicit color
+  // anywhere in its own style or its ancestors' inline styles (seen in production:
+  // a paragraph rendered black in our editor — the browser's default — but grey
+  // in the wrapper's own preview, whose rendering environment defaults differently).
+  // Bakes in an explicit '#000000' on any element that directly holds text and has
+  // no color declared on itself or any ancestor, so it renders the same everywhere
+  // regardless of what each host's own default text color happens to be. Elements
+  // that already inherit an EXPLICIT color from a styled ancestor (e.g. white text
+  // on a dark section) are left alone — inheritance still works, and that ancestor
+  // is unambiguous already.
+  function hasDirectText(el: Element): boolean {
+    for (const node of Array.from(el.childNodes)) {
+      if (node.nodeType === 3 && (node.textContent || '').trim()) return true;
+    }
+    return false;
+  }
+
+  // 'inherit'/'unset'/'initial' don't resolve to a concrete color on their own —
+  // they just defer to the parent, so they must NOT count as "already has an
+  // explicit color" (seen in production: a `color: inherit` on a <p> whose
+  // ancestors also have no concrete color let the whole run fall through to
+  // each renderer's own default, which is exactly the bug this function exists
+  // to prevent).
+  function hasConcreteColor(el: HTMLElement): boolean {
+    const c = el.style.color.trim().toLowerCase();
+    return !!c && c !== 'inherit' && c !== 'unset' && c !== 'initial';
+  }
+
+  // Some host pages that embed this builder's export via v-html (not an iframe —
+  // confirmed in production: e-commerce-frontend's own preview modal) carry a
+  // global `* { box-sizing: border-box }` reset. Pasted content frequently bakes
+  // in both an explicit width AND padding per block (Google Docs does this per
+  // paragraph) — under border-box those combine into a SMALLER rendered box than
+  // under this app's own neutral iframe (content-box, the CSS default), so the
+  // same block renders visibly narrower/"indented" in that host than in our
+  // editor. Stamping content-box explicitly is a no-op for elements without that
+  // width+padding combo, and guarantees the ones that DO have it render identically
+  // regardless of any global reset the host page happens to carry.
+  function bakeContentBoxSizing(body: HTMLElement) {
+    body.querySelectorAll<HTMLElement>('*').forEach((el) => {
+      if (!el.style.boxSizing) el.style.boxSizing = 'content-box';
+    });
+  }
+
+  function bakeHostIndependentDefaults(html: string): string {
+    let doc: Document;
+    try {
+      doc = new DOMParser().parseFromString(html, 'text/html');
+    } catch {
+      return html;
+    }
+    const body = doc.body;
+    if (!body) return html;
+    body.querySelectorAll<HTMLElement>('*').forEach((el) => {
+      if (hasConcreteColor(el) || !hasDirectText(el)) return;
+      let cur: HTMLElement | null = el.parentElement;
+      while (cur && cur !== body) {
+        if (hasConcreteColor(cur)) return; // inherits a concrete color already — leave it
+        cur = cur.parentElement;
+      }
+      el.style.color = '#000000';
+    });
+    bakeContentBoxSizing(body);
+    return '<!DOCTYPE html>' + doc.documentElement.outerHTML;
+  }
+
   // Clean up Google Docs / Figma copy-paste artifacts that break email rendering.
   // Only runs on import — NOT on canvas DOM snapshots (saveHtmlSnapshot bypasses this).
   function sanitizeImportedHtml(html: string): string {
@@ -581,6 +654,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     // contenteditable / draggable from Google Docs HTML
     html = html.replace(/\s*contenteditable="[^"]*"/gi, '');
     html = html.replace(/\s*draggable="[^"]*"/gi, '');
+    html = bakeHostIndependentDefaults(html);
     return html;
   }
 
@@ -589,9 +663,11 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     rawHtml.value = html;
     selectedElementPath.value = null;
     selectedElementStyles.value = {};
+    selectedElementInlineStyles.value = {};
     selectedElementAttrs.value = {};
     selectedElementTagName.value = '';
     selectedElementInnerText.value = '';
+    selectedElementHasRichText.value = false;
     selectedElementChildData.value = null;
     htmlHistory.value = [html];
     htmlHistoryIndex.value = 0;
@@ -638,9 +714,11 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     htmlHistoryIndex.value = -1;
     selectedElementPath.value = null;
     selectedElementStyles.value = {};
+    selectedElementInlineStyles.value = {};
     selectedElementAttrs.value = {};
     selectedElementTagName.value = '';
     selectedElementInnerText.value = '';
+    selectedElementHasRichText.value = false;
     selectedElementChildData.value = null;
   }
 
@@ -725,9 +803,11 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     htmlHistoryIndex,
     selectedElementPath,
     selectedElementStyles,
+    selectedElementInlineStyles,
     selectedElementAttrs,
     selectedElementTagName,
     selectedElementInnerText,
+    selectedElementHasRichText,
     selectedElementChildData,
     htmlClipboard,
     draggedHtml,
