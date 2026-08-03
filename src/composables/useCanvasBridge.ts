@@ -51,7 +51,15 @@ export function snapshotCanvasHtml(): string | null {
     }
   });
 
+  // Box-model hover overlay lives permanently in the DOM (just hidden/shown) —
+  // detach it before serializing so it never leaks into the snapshot.
+  const boxModelHost = doc.getElementById('__box-model-overlay__');
+  const boxModelParent = boxModelHost?.parentNode ?? null;
+  if (boxModelHost && boxModelParent) boxModelParent.removeChild(boxModelHost);
+
   let html = doc.documentElement.outerHTML;
+
+  if (boxModelHost && boxModelParent) boxModelParent.appendChild(boxModelHost);
 
   // Restore outlines
   savedOutlines.forEach(([el, outline, offset]) => {
@@ -66,6 +74,18 @@ export function snapshotCanvasHtml(): string | null {
     const bridgeEnd = html.indexOf(closeTag, bridgeStart);
     if (bridgeEnd >= 0) html = html.slice(0, bridgeStart) + html.slice(bridgeEnd + closeTag.length);
   }
+
+  // Strip the editor-only scroll-padding style injected by IframeCanvas
+  const padStart = html.indexOf('<style id="__canvas-padding__"');
+  if (padStart >= 0) {
+    const padCloseTag = '</style>';
+    const padEnd = html.indexOf(padCloseTag, padStart);
+    if (padEnd >= 0) html = html.slice(0, padStart) + html.slice(padEnd + padCloseTag.length);
+  }
+
+  // Strip editor-only attributes (selection drag handle, in-progress text editing)
+  html = html.replace(/\s*draggable="[^"]*"/gi, '');
+  html = html.replace(/\s*contenteditable="[^"]*"/gi, '');
 
   return html;
 }
