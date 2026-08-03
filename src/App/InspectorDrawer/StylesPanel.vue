@@ -20,6 +20,9 @@
 
     <!-- HEADING -->
     <StyleSection v-else-if="blockType === 'heading'" title="Contenido">
+      <div v-if="store.selectedElementHasRichText" style="font-size:11px;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;padding:6px 8px;">
+        ⚠️ Este texto tiene formato (negrita, enlace, etc.) — escribir acá lo va a borrar. Para conservarlo, editalo con doble click directo en el bloque.
+      </div>
       <StyleRow label="Texto" type="text" :value="store.selectedElementInnerText" placeholder="Texto del encabezado" @change="setInnerText" />
       <div style="display:flex;flex-direction:column;gap:5px;">
         <label style="font-size:11px;font-weight:600;color:var(--color-primary);">Nivel</label>
@@ -39,6 +42,9 @@
 
     <!-- TEXT / PARAGRAPH -->
     <StyleSection v-else-if="blockType === 'text'" title="Contenido">
+      <div v-if="store.selectedElementHasRichText" style="font-size:11px;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;padding:6px 8px;">
+        ⚠️ Este texto tiene formato (negrita, enlace, etc.) — escribir acá lo va a borrar. Para conservarlo, editalo con doble click directo en el bloque.
+      </div>
       <StyleRow label="Texto" type="text" :value="store.selectedElementInnerText" placeholder="Texto del párrafo" @change="setInnerText" />
     </StyleSection>
 
@@ -306,25 +312,25 @@
 
     <!-- Padding -->
     <StyleSection title="Espaciado interno (Padding)">
-      <StyleRow label="Arriba"    type="slider" :max="80" :value="styles.paddingTop"    @change="setStyle('paddingTop', $event)" />
-      <StyleRow label="Derecha"   type="slider" :max="80" :value="styles.paddingRight"  @change="setStyle('paddingRight', $event)" />
-      <StyleRow label="Abajo"     type="slider" :max="80" :value="styles.paddingBottom" @change="setStyle('paddingBottom', $event)" />
-      <StyleRow label="Izquierda" type="slider" :max="80" :value="styles.paddingLeft"   @change="setStyle('paddingLeft', $event)" />
+      <StyleRow label="Arriba"    type="slider" :max="80" :value="inline.paddingTop"    :computed-value="styles.paddingTop"    @change="setStyle('paddingTop', $event)" />
+      <StyleRow label="Derecha"   type="slider" :max="80" :value="inline.paddingRight"  :computed-value="styles.paddingRight"  @change="setStyle('paddingRight', $event)" />
+      <StyleRow label="Abajo"     type="slider" :max="80" :value="inline.paddingBottom" :computed-value="styles.paddingBottom" @change="setStyle('paddingBottom', $event)" />
+      <StyleRow label="Izquierda" type="slider" :max="80" :value="inline.paddingLeft"   :computed-value="styles.paddingLeft"   @change="setStyle('paddingLeft', $event)" />
     </StyleSection>
 
     <!-- Margin -->
     <StyleSection title="Espaciado externo (Margin)" :defaultOpen="false">
-      <StyleRow label="Arriba"    type="slider" :max="80" :value="styles.marginTop"    @change="setStyle('marginTop', $event)" />
-      <StyleRow label="Derecha"   type="slider" :max="80" :value="styles.marginRight"  @change="setStyle('marginRight', $event)" />
-      <StyleRow label="Abajo"     type="slider" :max="80" :value="styles.marginBottom" @change="setStyle('marginBottom', $event)" />
-      <StyleRow label="Izquierda" type="slider" :max="80" :value="styles.marginLeft"   @change="setStyle('marginLeft', $event)" />
+      <StyleRow label="Arriba"    type="slider" :max="80" :value="inline.marginTop"    :computed-value="styles.marginTop"    @change="setStyle('marginTop', $event)" />
+      <StyleRow label="Derecha"   type="slider" :max="80" :value="inline.marginRight"  :computed-value="styles.marginRight"  @change="setStyle('marginRight', $event)" />
+      <StyleRow label="Abajo"     type="slider" :max="80" :value="inline.marginBottom" :computed-value="styles.marginBottom" @change="setStyle('marginBottom', $event)" />
+      <StyleRow label="Izquierda" type="slider" :max="80" :value="inline.marginLeft"   :computed-value="styles.marginLeft"   @change="setStyle('marginLeft', $event)" />
     </StyleSection>
 
     <!-- Dimensiones -->
     <StyleSection title="Dimensiones">
-      <StyleRow label="Ancho"      type="slider-text" :max="800" :value="styles.width"    placeholder="ej. 100%" @change="setStyle('width', $event)" />
-      <StyleRow label="Alto"       type="slider-text" :max="600" :value="styles.height"   placeholder="ej. auto" @change="setStyle('height', $event)" />
-      <StyleRow label="Ancho máx." type="slider-text" :max="800" :value="styles.maxWidth" placeholder="ej. 600px" @change="setStyle('maxWidth', $event)" />
+      <StyleRow label="Ancho"      type="slider-text" :max="800" :value="inline.width"    :computed-value="styles.width"    placeholder="ej. 100%" @change="setStyle('width', $event)" />
+      <StyleRow label="Alto"       type="slider-text" :max="600" :value="inline.height"   :computed-value="styles.height"   placeholder="ej. auto" @change="setStyle('height', $event)" />
+      <StyleRow label="Ancho máx." type="slider-text" :max="800" :value="inline.maxWidth" :computed-value="styles.maxWidth" placeholder="ej. 600px" @change="setStyle('maxWidth', $event)" />
     </StyleSection>
 
     <!-- Borde -->
@@ -364,6 +370,7 @@ import { normalizeLength, toPxInt } from '../../utils/css-length';
 const store = useInspectorDrawer();
 const block = computed(() => store.document.root);
 const styles = computed(() => store.selectedElementStyles ?? {});
+const inline = computed(() => store.selectedElementInlineStyles ?? {});
 const childData = computed(() => (store.selectedElementChildData ?? {}) as Record<string, string>);
 // For video: when wrapper div selected, attrs come from child <video>; when video element itself, from selectedElementAttrs
 const videoChildData = computed(() => {
@@ -646,6 +653,7 @@ function setStyle(property: string, value: string) {
   // the panel will refresh via selectElement round-trip from notifyStyleDebounced
   if (!DECORATION_PROPS.has(property)) {
     store.selectedElementStyles = { ...store.selectedElementStyles, [property]: v };
+    store.selectedElementInlineStyles = { ...store.selectedElementInlineStyles, [property]: v };
   }
 }
 
