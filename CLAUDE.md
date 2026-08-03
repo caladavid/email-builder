@@ -8,7 +8,9 @@ npm run build    # production build → dist/
 npm run preview  # preview production build
 ```
 
-No test suite configured.
+`npm test` runs the vitest unit suite (`test/parser/*.spec.ts`, happy-dom — no real browser, can't drive the live iframe canvas).
+
+`node test/e2e/text-sync-check.mjs` — manual Playwright smoke test for the Editor↔Preview↔HTML text-sync mechanism (see "Zona frágil" below). Requires `npm run dev` running and a system Chrome install; not part of `npm test` since it needs a real browser + the dev server.
 
 ## Tech Stack
 
@@ -62,6 +64,17 @@ Record<blockId, { type: string, data: { props: {...}, style: {...} } }>
 **Dev vs production:** On `localhost`, ZIP parsing runs client-side via `parseZipToBlocks()` (JSZip). On production, the ZIP is sent to the backend and the returned HTML is parsed.
 
 Dev proxy in `vite.config.ts`: `/api-zip` → `https://services.celcom.cl/...`
+
+## Zona frágil: sync Editor ↔ Preview/HTML (texto editado en el canvas)
+
+El texto que se edita con doble click en el canvas (`contentEditable`, dentro del iframe) solo llega a `store.rawHtml` — y por lo tanto a las pestañas Preview/HTML — a través de esta cadena. Si algo de esto se rompe, el síntoma es "escribo texto, cambio de pestaña, se pierde o no se refleja":
+
+1. **`exitEditing()`** (`src/utils/canvas-bridge.ts`) — corre dentro del iframe, al clickear afuera del elemento en edición (incluido el fondo vacío, ambos casos manejados explícitamente en el handler de `click`) o Escape. Llama `notifyDomChanged(true)`.
+2. **`notifyDomChanged(immediate)`** (mismo archivo) — el flag `immediate` salta el debounce de 150ms del lado del padre. Sin esto, cambiar de pestaña muy rápido after de salir de edición podía perder el cambio.
+3. **`case 'exit-editing'`** (mismo archivo) — comando que el padre manda proactivamente ANTES de dejar la pestaña Editor, para forzar el guardado aunque el usuario no haya clickeado nada dentro del canvas (el caso más común: escribís y vas directo a Preview).
+4. **`<UTabs v-model="activeTab" ... :unmount-on-hide="false">`** (`src/App/TemplatePanel/index.vue`) — reka-ui destruye el panel inactivo por defecto (`unmountOnHide: true`). Sin `:unmount-on-hide="false"`, el iframe del Editor se destruye de verdad al cambiar de pestaña, matando cualquier texto que solo vivía en su DOM. El `watch(activeTab, ...)` en el mismo archivo es lo que manda el comando `exit-editing` del punto 3, y depende de que los `tabs` items tengan `value` explícito (`'editor'|'preview'|'html'`) — sin eso, reka-ui usa el índice como valor y el watcher nunca matchea.
+
+**Antes de tocar cualquiera de estos 4 puntos**, correr `node test/e2e/text-sync-check.mjs` (con `npm run dev` corriendo) para confirmar que el flujo completo sigue funcionando.
 
 ## Known Issues / Gotchas
 
