@@ -1,5 +1,5 @@
 <template>
-  <UTabs :items="tabs" variant="pill"  class="h-full bg-[var(--color-primary)]" :ui="tabsUi"
+  <UTabs v-model="activeTab" :items="tabs" variant="pill"  class="h-full bg-[var(--color-primary)]" :ui="tabsUi" :unmount-on-hide="false"
 >
     <template #list-leading >  
       <UButton  
@@ -102,8 +102,20 @@ import VariablesModal from '../VariablesModal/index.vue'
 import { createProcessedDocument } from '../../utils/documentProcessor'
 import { Reader, renderToStaticMarkup } from '../../lib/email-builder/index'
 import IframeCanvas from './IframeCanvas.vue'
+import { ref } from 'vue'
+import { sendToCanvas } from '../../composables/useCanvasBridge'
 
 const inspectorDrawer = useInspectorDrawer()
+
+// Leaving the Editor tab must flush any in-progress text edit (contentEditable
+// with no click-away yet) so Preview/HTML reflect it — otherwise the edit only
+// lives in the canvas iframe's DOM and never reaches store.rawHtml.
+const activeTab = ref<'editor' | 'preview' | 'html'>('editor')
+watch(activeTab, (next, prev) => {
+  if (prev === 'editor' && next !== 'editor') {
+    sendToCanvas({ type: 'exit-editing' })
+  }
+})
 
 const isIframeMode = computed(() => !!inspectorDrawer.rawHtml)
 
@@ -154,15 +166,18 @@ useKeyboardShortcuts()
 const tabs = [
   {
     icon: 'material-symbols:edit-outline',
-    slot: 'editor' as const
+    slot: 'editor' as const,
+    value: 'editor'
   },
   {
     icon: 'material-symbols:preview-outline',
-    slot: 'preview' as const
+    slot: 'preview' as const,
+    value: 'preview'
   },
   {
     icon: 'material-symbols:code',
-    slot: 'html' as const
+    slot: 'html' as const,
+    value: 'html'
   }
 ]
 
