@@ -71,6 +71,9 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
 
   function showBoxModelFor(el) {
     if (!el || !el.getBoundingClientRect) { hideBoxModel(); return; }
+    // Skip empty-canvas / add-block placeholders — they're an editor affordance,
+    // not real email content, so their own padding/margin isn't meaningful to show.
+    if (el.getAttribute && el.getAttribute('data-block-type') === 'placeholder') { hideBoxModel(); return; }
     var els = ensureBoxModelEls();
     var cs = window.getComputedStyle(el);
     var r = el.getBoundingClientRect();
