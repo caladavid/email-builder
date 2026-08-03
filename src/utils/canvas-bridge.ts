@@ -40,6 +40,16 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
   var _internalDragEl = null;
   var _selectGen = 0; // cancels stale selectAfterImagesLoad callbacks
 
+  // Editor-injected overlay elements that live as permanent children of <body>
+  // (hidden/shown, never removed) — any "find the last REAL block" walk must skip
+  // these, or it silently resolves to an invisible 0x0 div instead of actual
+  // template content (this is exactly what broke drag-and-drop positioning after
+  // the box-model hover overlay was added — it was the last child of <body> in
+  // any session where the user had already hovered something, which is "always").
+  function isInternalOverlayId(id) {
+    return id === '__drop-indicator__' || id === '__box-model-overlay__';
+  }
+
   // Box-model overlay (DevTools/GrapesJS style) — 4 orange strips for margin,
   // 4 green strips for padding, drawn around whatever is currently hovered.
   // position:fixed + viewport rects so no scroll-offset math is needed.
@@ -1025,8 +1035,12 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
         if (!newEl) { break; }
         var ref = target || document.body;
         if (ref === document.body) {
-          var lastChild = document.body.lastElementChild;
-          if (lastChild) { lastChild.after(newEl); }
+          var bodyChildren = document.body.children;
+          var lastRealChild = null;
+          for (var lci = bodyChildren.length - 1; lci >= 0; lci--) {
+            if (!isInternalOverlayId(bodyChildren[lci].id)) { lastRealChild = bodyChildren[lci]; break; }
+          }
+          if (lastRealChild) { lastRealChild.after(newEl); }
           else { document.body.appendChild(newEl); }
         } else if (cmd.position === 'inside' || cmd.position === 'center') {
           var insidePh = ref.querySelector('[data-block-type="placeholder"]');
@@ -1329,59 +1343,108 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
     }
   });
 
-  document.addEventListener('dragover', function(e) {
-    e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = _internalDragEl ? 'move' : 'copy';
+  // Pure computation, no side effects — resolves where a drop AT THESE COORDINATES
+  // would land: { target, position: 'inside'|'before'|'after' }, or null. Called by
+  // dragover (rAF-throttled, just for the visual indicator) AND synchronously by
+  // 'drop' itself right before committing, so a fast move+release within the same
+  // animation frame can't commit a stale target from an earlier point in the drag
+  // path (e.g. a container's "inside" zone the cursor already left) — that race is
+  // what caused a new block to land as a child/column instead of after the block.
+  function computeDropTarget(e) {
     var el = e.target;
     while (el && el !== document.body && IGNORE_TAGS.has(el.tagName)) el = el.parentElement;
-    if (!el || el === document.documentElement || el === dropIndicator) return;
+    if (!el || el === document.documentElement || el === dropIndicator) return null;
     if (el === document.body) {
       var bodyKids = document.body.children;
       var lastContent = null;
       for (var bki = bodyKids.length - 1; bki >= 0; bki--) {
-        if (bodyKids[bki].id !== '__drop-indicator__') { lastContent = bodyKids[bki]; break; }
+        if (!isInternalOverlayId(bodyKids[bki].id)) { lastContent = bodyKids[bki]; break; }
       }
       el = lastContent || document.body;
     }
-    if (_internalDragEl && (_internalDragEl === el || _internalDragEl.contains(el))) return;
+    if (_internalDragEl && (_internalDragEl === el || _internalDragEl.contains(el))) return null;
     var candidate = findBlockEl(el);
-    if (!candidate) return;
+    if (!candidate) return null;
+
+    // Imported templates have no data-block-type, so findBlockEl's fallback can
+    // hand back a bare TD/TR from inside a horizontal table row (an icon row, a
+    // 2-column layout built with <table>). before/after on a TD inserts a
+    // sibling inside the same <tr> — renders BESIDE it, not below, and can
+    // break the row's cell count. Walk up to the nearest ancestor outside the
+    // table's internal structure (typically that row's own <table>) so
+    // before/after acts on the whole row, not one cell of it.
+    while (candidate && TABLE_INT.has(candidate.tagName) && candidate.parentElement) {
+      candidate = candidate.parentElement;
+    }
+    if (!candidate || candidate === document.documentElement) return null;
 
     var candidateBlockType = candidate.getAttribute && candidate.getAttribute('data-block-type');
 
-    // Columnas block: check if cursor is inside any TD rect (both X+Y).
-    // Inside TD → drop inside that cell. Outside all TDs → before/after whole block.
+    // Columnas block: check if cursor is inside any TD rect (both X+Y) — but only
+    // away from the block's own top/bottom edge (same 24px margin used below for
+    // "candidate is a descendant of a Columnas block"). Without this, dropping
+    // right at the seam between a narrow-column block (e.g. a row of social
+    // icons) and whatever comes next resolved to "inside" that narrow cell —
+    // the new block landed squeezed into it instead of after the whole row.
     if (candidateBlockType === 'Columnas') {
-      var colTds = candidate.querySelectorAll('td');
-      var targetTd = null;
+      var colOuterRect = candidate.getBoundingClientRect();
+      var COL_EDGE_PX = 24;
+      var nearColumnsEdge = e.clientY < colOuterRect.top + COL_EDGE_PX || e.clientY > colOuterRect.bottom - COL_EDGE_PX;
+      var colTds = nearColumnsEdge ? [] : candidate.querySelectorAll('td');
       for (var ci = 0; ci < colTds.length; ci++) {
         var tdR = colTds[ci].getBoundingClientRect();
         if (e.clientX >= tdR.left && e.clientX <= tdR.right &&
             e.clientY >= tdR.top  && e.clientY <= tdR.bottom) {
-          targetTd = colTds[ci]; break;
+          return { target: colTds[ci], position: 'inside' };
         }
-      }
-      if (targetTd) {
-        removeDropIndicator();
-        if (_rafId) { cancelAnimationFrame(_rafId); _rafId = null; }
-        highlightPlaceholderForDrop(targetTd);
-        dropTarget = targetTd;
-        _dropPosition = 'inside';
-        return;
       }
     }
 
     // Contenedor block: 8px border zone → before/after; inside → drop as child
     if (candidateBlockType === 'Contenedor') {
-      var contRect = candidate.getBoundingClientRect();
-      if (e.clientX > contRect.left + 8 && e.clientX < contRect.right - 8 &&
-          e.clientY > contRect.top  + 8 && e.clientY < contRect.bottom - 8) {
-        removeDropIndicator();
-        if (_rafId) { cancelAnimationFrame(_rafId); _rafId = null; }
-        highlightPlaceholderForDrop(candidate);
-        dropTarget = candidate;
-        _dropPosition = 'inside';
-        return;
+      // If the container lays its children out in a row (flex/inline-*), an
+      // 'inside' drop does appendChild (see 'insert-html' below) — the new
+      // block would just become another item in that same row, squeezed next
+      // to whatever's already there (an icon row, a flex footer section…),
+      // instead of a full-width block. No pixel margin can fix that — the
+      // container itself is the wrong kind of drop target, at any size.
+      // flex-direction defaults to 'row' — but plenty of vertical stacks use
+      // display:flex + flex-direction:column purely for the gap. Only 'flex'/
+      // 'inline-flex' with an actual row direction count as row layout; the
+      // inline-* values are inherently row-flow regardless of flex-direction.
+      var contCs = window.getComputedStyle(candidate);
+      var isRowLayout = (contCs.display === 'flex' || contCs.display === 'inline-flex')
+        ? (contCs.flexDirection === 'row' || contCs.flexDirection === 'row-reverse')
+        : (contCs.display === 'inline-block' || contCs.display === 'inline' || contCs.display === 'inline-table');
+      if (!isRowLayout) {
+        // Fixed 24px margin — a container shorter/narrower than 2x this simply
+        // never offers 'inside' at all (an icon row isn't a sensible place to
+        // append a new block either), only before/after the whole thing.
+        var contRect = candidate.getBoundingClientRect();
+        var CONT_EDGE_PX = 24;
+        if (e.clientX > contRect.left + CONT_EDGE_PX && e.clientX < contRect.right - CONT_EDGE_PX &&
+            e.clientY > contRect.top  + CONT_EDGE_PX && e.clientY < contRect.bottom - CONT_EDGE_PX) {
+          return { target: candidate, position: 'inside' };
+        }
+      }
+    }
+
+    // If candidate's own parent is a Contenedor laid out as a row (flex/inline-*),
+    // before/after on the candidate itself inserts as a DOM sibling — which, in a
+    // flex row, renders BESIDE the candidate, not below it, even though the
+    // indicator (sized from the candidate's own narrow rect) reads as a below/above
+    // bar. Same problem the direct-hover check above solves, but for children
+    // inside the row instead of the row container itself. Reroute to the row so
+    // before/after targets the whole row, matching what the drop actually does.
+    var rowParent = candidate.parentElement;
+    if (rowParent && rowParent !== document.body && rowParent.getAttribute &&
+        rowParent.getAttribute('data-block-type') === 'Contenedor') {
+      var rowParentCs = window.getComputedStyle(rowParent);
+      var rowParentIsRow = (rowParentCs.display === 'flex' || rowParentCs.display === 'inline-flex')
+        ? (rowParentCs.flexDirection === 'row' || rowParentCs.flexDirection === 'row-reverse')
+        : (rowParentCs.display === 'inline-block' || rowParentCs.display === 'inline' || rowParentCs.display === 'inline-table');
+      if (rowParentIsRow) {
+        candidate = rowParent;
       }
     }
 
@@ -1411,27 +1474,38 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
       if (phEl.getAttribute && phEl.getAttribute('data-block-type') === 'placeholder') break;
       phEl = phEl.parentElement;
     }
-    var isOverPlaceholder = phEl && phEl !== document.body;
+    if (phEl && phEl !== document.body) {
+      return { target: phEl, position: 'inside' };
+    }
 
-    if (isOverPlaceholder) {
+    // Determine before/after based on cursor Y vs element midpoint
+    var candidateRect = candidate.getBoundingClientRect();
+    var newPosition = e.clientY < (candidateRect.top + candidateRect.height / 2) ? 'before' : 'after';
+    return { target: candidate, position: newPosition };
+  }
+
+  document.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = _internalDragEl ? 'move' : 'copy';
+    var result = computeDropTarget(e);
+    if (!result) return;
+
+    if (result.position === 'inside') {
       removeDropIndicator();
       if (_rafId) { cancelAnimationFrame(_rafId); _rafId = null; }
-      highlightPlaceholderForDrop(phEl);
-      dropTarget = phEl;
+      highlightPlaceholderForDrop(result.target);
+      dropTarget = result.target;
       _dropPosition = 'inside';
       return;
     }
 
     clearPlaceholderHighlight();
-    // Determine before/after based on cursor Y vs element midpoint
-    var candidateRect = candidate.getBoundingClientRect();
-    var newPosition = e.clientY < (candidateRect.top + candidateRect.height / 2) ? 'before' : 'after';
-    if (_rafId && candidate === dropTarget && newPosition === _dropPosition) return;
+    if (_rafId && result.target === dropTarget && result.position === _dropPosition) return;
     if (_rafId) { cancelAnimationFrame(_rafId); }
     _rafId = requestAnimationFrame(function() {
       _rafId = null;
-      dropTarget = candidate;
-      _dropPosition = newPosition;
+      dropTarget = result.target;
+      _dropPosition = result.position;
       if (!dropIndicator) dropIndicator = createDropIndicator();
       positionDropIndicator(dropTarget, _dropPosition);
     });
@@ -1443,6 +1517,10 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
     clearPlaceholderHighlight();
     if (_rafId) { cancelAnimationFrame(_rafId); _rafId = null; }
     if (_dragleaveTimer) { clearTimeout(_dragleaveTimer); _dragleaveTimer = null; }
+    // Recompute from the drop event's own coordinates instead of trusting the
+    // cached dropTarget/_dropPosition — see computeDropTarget's comment.
+    var finalDrop = computeDropTarget(e);
+    if (finalDrop) { dropTarget = finalDrop.target; _dropPosition = finalDrop.position; }
     if (_internalDragEl) {
       if (dropTarget && dropTarget !== _internalDragEl && !_internalDragEl.contains(dropTarget)) {
         var dragSourceParent = _internalDragEl.parentElement;
