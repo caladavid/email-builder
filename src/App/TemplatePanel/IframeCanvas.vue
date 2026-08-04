@@ -370,9 +370,16 @@ function handleMessage(event: MessageEvent) {
       }
       break;
 
-    case 'select':
+    case 'select': {
       if (showAddPicker.value) break;
       showBlockPicker.value = data.blockType === 'placeholder';
+
+      // A 'highlight' resync (same path, just repositioning the overlay — e.g. after
+      // the drawer open/close watch below, or a resize) re-emits this exact 'select'
+      // message. Only auto-open the drawer for an actual NEW selection (path changed) —
+      // otherwise closing the drawer while a block stays selected reopens itself via
+      // that resync roundtrip.
+      const isNewSelection = data.path !== store.selectedElementPath;
 
       store.selectedElementPath = data.path;
       store.selectedElementStyles = data.styles ?? {};
@@ -384,7 +391,7 @@ function handleMessage(event: MessageEvent) {
       store.selectedElementChildData = data.childData ?? null;
       overlayRect.value = data.rect ?? null;
       store.selectedSidebarTab = 'styles';
-      if (!store.inspectorDrawerOpen) {
+      if (isNewSelection && !store.inspectorDrawerOpen) {
         store.inspectorDrawerOpen = true;
         if (!_overlayRefreshPending) {
           _overlayRefreshPending = true;
@@ -397,6 +404,7 @@ function handleMessage(event: MessageEvent) {
         }
       }
       break;
+    }
 
     case 'deselect':
       showBlockPicker.value = false;
