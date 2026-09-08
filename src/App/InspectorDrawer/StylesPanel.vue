@@ -78,7 +78,7 @@
           <input type="file" accept="image/*" style="display:none;" @change="onImageFileChange" />
         </label>
         <div v-if="uploadWarning" style="font-size:11px;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;padding:6px 8px;">
-          ⚠️ Sin token — imagen guardada como base64.
+          {{ isDev ? '⚠️ Sin token — imagen guardada como base64.' : '❌ No se pudo subir la imagen. Intentá de nuevo.' }}
         </div>
       </div>
       <div style="border:1.5px solid #c7d8f5;border-radius:8px;padding:4px 6px;background:#f8faff;">
@@ -122,7 +122,7 @@
           <input type="file" accept="image/*" style="display:none;" @change="onImageFileChange" />
         </label>
         <div v-if="uploadWarning" style="font-size:11px;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;padding:6px 8px;">
-          ⚠️ Sin token — imagen guardada como base64.
+          {{ isDev ? '⚠️ Sin token — imagen guardada como base64.' : '❌ No se pudo subir la imagen. Intentá de nuevo.' }}
         </div>
       </div>
       <div style="border:1.5px solid #c7d8f5;border-radius:8px;padding:4px 6px;background:#f8faff;">
@@ -139,7 +139,7 @@
           <input type="file" accept="video/*" style="display:none;" @change="onVideoFileChange" />
         </label>
         <div v-if="uploadWarning" style="font-size:11px;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;padding:6px 8px;">
-          ⚠️ Sin token — video guardado como base64.
+          {{ isDev ? '⚠️ Sin token — video guardado como base64.' : '❌ Subida de video no disponible en producción.' }}
         </div>
       </div>
       <div style="border:1.5px solid #c7d8f5;border-radius:8px;padding:4px 6px;background:#f8faff;">
@@ -171,7 +171,7 @@
           <input type="file" accept="image/*" style="display:none;" @change="onAvatarFileChange" />
         </label>
         <div v-if="uploadWarning" style="font-size:11px;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;padding:6px 8px;">
-          ⚠️ Sin token — imagen guardada como base64.
+          {{ isDev ? '⚠️ Sin token — imagen guardada como base64.' : '❌ No se pudo subir la imagen. Intentá de nuevo.' }}
         </div>
       </div>
       <div style="border:1.5px solid #c7d8f5;border-radius:8px;padding:4px 6px;background:#f8faff;">
@@ -289,7 +289,7 @@
           <input type="file" accept="image/*" style="display:none;" @change="onBgFileChange" />
         </label>
         <div v-if="uploadWarning" style="font-size:11px;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;padding:6px 8px;">
-          ⚠️ Sin token — imagen guardada como base64.
+          {{ isDev ? '⚠️ Sin token — imagen guardada como base64.' : '❌ No se pudo subir la imagen. Intentá de nuevo.' }}
         </div>
         <input
           type="text"
@@ -379,6 +379,7 @@ const videoChildData = computed(() => {
 });
 
 const uploadWarning = ref(false);
+const isDev = import.meta.env.DEV;
 
 // Local state for Link URL input — avoids blur-triggered @change race condition on tab switch.
 // Synced from store when element selection changes; committed only on button click or Enter.
@@ -458,11 +459,13 @@ async function uploadImageFile(file: File): Promise<string> {
   let url = await store.uploadImage(file);
   if (!url) {
     uploadWarning.value = true;
-    url = await new Promise<string>(resolve => {
-      const reader = new FileReader();
-      reader.onload = e => resolve(e.target!.result as string);
-      reader.readAsDataURL(file);
-    });
+    if (import.meta.env.DEV) {
+      url = await new Promise<string>(resolve => {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target!.result as string);
+        reader.readAsDataURL(file);
+      });
+    }
   }
   return url;
 }
@@ -471,7 +474,7 @@ async function onImageFileChange(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0];
   if (!file) return;
   const url = await uploadImageFile(file);
-  if (!store.selectedElementPath) return;
+  if (!url || !store.selectedElementPath) return;
   if (blockType.value === 'image-block') {
     sendToCanvas({ type: 'set-child-attr', path: store.selectedElementPath, selector: 'img', property: 'src', value: url });
   } else {
@@ -484,7 +487,7 @@ async function onAvatarFileChange(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0];
   if (!file) return;
   const url = await uploadImageFile(file);
-  if (!store.selectedElementPath) return;
+  if (!url || !store.selectedElementPath) return;
   sendToCanvas({ type: 'set-child-attr', path: store.selectedElementPath, selector: 'img', property: 'src', value: url });
 }
 
@@ -492,6 +495,10 @@ async function onVideoFileChange(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0];
   if (!file) return;
   uploadWarning.value = false;
+  if (!import.meta.env.DEV) {
+    uploadWarning.value = true;
+    return;
+  }
   const url = await new Promise<string>(resolve => {
     const reader = new FileReader();
     reader.onload = e => resolve(e.target!.result as string);
@@ -618,12 +625,15 @@ async function onBgFileChange(event: Event) {
   let url = await store.uploadImage(file);
   if (!url) {
     uploadWarning.value = true;
-    url = await new Promise<string>(resolve => {
-      const reader = new FileReader();
-      reader.onload = e => resolve(e.target!.result as string);
-      reader.readAsDataURL(file);
-    });
+    if (import.meta.env.DEV) {
+      url = await new Promise<string>(resolve => {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target!.result as string);
+        reader.readAsDataURL(file);
+      });
+    }
   }
+  if (!url) return;
   onBgImageChange(url);
 }
 

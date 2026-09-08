@@ -1,6 +1,7 @@
 import getConfiguration from "../../getConfiguration";
 import { isOriginAllowed } from "../../utils/allowedOrigins";
 import { isGrapesJsProject, grapesJsProjectToHtml } from "../../utils/grapesJsToHtml";
+import { bakeHostIndependentDefaults } from "../../utils/htmlImportNormalizer";
 import type { TEditorConfiguration } from "./core";
 import { defineStore } from "pinia";
 import { computed, nextTick, onScopeDispose, ref, render } from "vue";
@@ -577,72 +578,6 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
 
   // ── IFRAME CANVAS FUNCTIONS ──────────────────────────────────────────────
 
-  // Google Docs paste sometimes carries a run of text with NO explicit color
-  // anywhere in its own style or its ancestors' inline styles (seen in production:
-  // a paragraph rendered black in our editor — the browser's default — but grey
-  // in the wrapper's own preview, whose rendering environment defaults differently).
-  // Bakes in an explicit '#000000' on any element that directly holds text and has
-  // no color declared on itself or any ancestor, so it renders the same everywhere
-  // regardless of what each host's own default text color happens to be. Elements
-  // that already inherit an EXPLICIT color from a styled ancestor (e.g. white text
-  // on a dark section) are left alone — inheritance still works, and that ancestor
-  // is unambiguous already.
-  function hasDirectText(el: Element): boolean {
-    for (const node of Array.from(el.childNodes)) {
-      if (node.nodeType === 3 && (node.textContent || '').trim()) return true;
-    }
-    return false;
-  }
-
-  // 'inherit'/'unset'/'initial' don't resolve to a concrete color on their own —
-  // they just defer to the parent, so they must NOT count as "already has an
-  // explicit color" (seen in production: a `color: inherit` on a <p> whose
-  // ancestors also have no concrete color let the whole run fall through to
-  // each renderer's own default, which is exactly the bug this function exists
-  // to prevent).
-  function hasConcreteColor(el: HTMLElement): boolean {
-    const c = el.style.color.trim().toLowerCase();
-    return !!c && c !== 'inherit' && c !== 'unset' && c !== 'initial';
-  }
-
-  // Some host pages that embed this builder's export via v-html (not an iframe —
-  // confirmed in production: e-commerce-frontend's own preview modal) carry a
-  // global `* { box-sizing: border-box }` reset. Pasted content frequently bakes
-  // in both an explicit width AND padding per block (Google Docs does this per
-  // paragraph) — under border-box those combine into a SMALLER rendered box than
-  // under this app's own neutral iframe (content-box, the CSS default), so the
-  // same block renders visibly narrower/"indented" in that host than in our
-  // editor. Stamping content-box explicitly is a no-op for elements without that
-  // width+padding combo, and guarantees the ones that DO have it render identically
-  // regardless of any global reset the host page happens to carry.
-  function bakeContentBoxSizing(body: HTMLElement) {
-    body.querySelectorAll<HTMLElement>('*').forEach((el) => {
-      if (!el.style.boxSizing) el.style.boxSizing = 'content-box';
-    });
-  }
-
-  function bakeHostIndependentDefaults(html: string): string {
-    let doc: Document;
-    try {
-      doc = new DOMParser().parseFromString(html, 'text/html');
-    } catch {
-      return html;
-    }
-    const body = doc.body;
-    if (!body) return html;
-    body.querySelectorAll<HTMLElement>('*').forEach((el) => {
-      if (hasConcreteColor(el) || !hasDirectText(el)) return;
-      let cur: HTMLElement | null = el.parentElement;
-      while (cur && cur !== body) {
-        if (hasConcreteColor(cur)) return; // inherits a concrete color already — leave it
-        cur = cur.parentElement;
-      }
-      el.style.color = '#000000';
-    });
-    bakeContentBoxSizing(body);
-    return '<!DOCTYPE html>' + doc.documentElement.outerHTML;
-  }
-
   // Clean up Google Docs / Figma copy-paste artifacts that break email rendering.
   // Only runs on import — NOT on canvas DOM snapshots (saveHtmlSnapshot bypasses this).
   function sanitizeImportedHtml(html: string): string {
@@ -731,6 +666,11 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
       const block = config[blockId];
 
       if (block.type === 'Image' && block.data.props?.url?.startsWith('data:image/')) {
+        // Yield before each conversion — convertBase64ToService's atob()+byte-copy
+        // runs synchronously before its first await, so kicking off N conversions
+        // back-to-back in one tick blocks the main thread for their combined
+        // decode time. A tick between each lets the browser breathe/repaint.
+        await new Promise(resolve => setTimeout(resolve, 0));
         const originalUrl = block.data.props.url;
         conversions.push(
           convertBase64ToService(originalUrl).then(convertedUrl => {
@@ -743,6 +683,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
       }
 
       if (block.type === 'Avatar' && block.data.props?.imageUrl?.startsWith('data:image/')) {
+        await new Promise(resolve => setTimeout(resolve, 0));
         conversions.push(
           convertBase64ToService(block.data.props.imageUrl).then(convertedUrl => {
             if (convertedUrl !== block.data.props.imageUrl) {

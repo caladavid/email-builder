@@ -102,12 +102,17 @@ async function onImageFileChange(event: Event) {
 
   let url = await inspectorDrawer.uploadImage(file);
   if (!url) {
-    showUploadWarning.value = true;
-    url = await new Promise<string>(resolve => {
-      const reader = new FileReader();
-      reader.onload = e => resolve(e.target!.result as string);
-      reader.readAsDataURL(file);
-    });
+    if (import.meta.env.DEV) {
+      showUploadWarning.value = true;
+      url = await new Promise<string>(resolve => {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target!.result as string);
+        reader.readAsDataURL(file);
+      });
+    } else {
+      uploadError.value = 'No se pudo subir la imagen. Intentá de nuevo.';
+      return;
+    }
   }
   if (!inspectorDrawer.selectedElementPath) return;
   sendToCanvas({ type: 'set-attr', path: inspectorDrawer.selectedElementPath, property: 'src', value: url });

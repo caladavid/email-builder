@@ -136,7 +136,7 @@ async function onFileChange(event: Event) {
       ...props.data,
       props: { ...props.data.props, imageUrl: imageUrl }
     });
-  } else {
+  } else if (import.meta.env.DEV) {
     console.warn('⚠️ uploadImage falló, usando base64 como fallback. La imagen puede no verse en el email enviado.');
     showUploadWarning.value = true;
     const reader = new FileReader();
@@ -148,6 +148,8 @@ async function onFileChange(event: Event) {
       });
     };
     reader.readAsDataURL(selectedFile);
+  } else {
+    uploadError.value = 'No se pudo subir la imagen. Intentá de nuevo.';
   }
 }
 

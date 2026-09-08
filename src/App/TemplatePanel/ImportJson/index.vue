@@ -189,9 +189,7 @@ async function handleZipUpload(event: Event) {
   zipSuccess.value = null;
 
   try {
-    const currentOrigin = window.location.origin;
-
-    if (currentOrigin.includes('localhost:3000') || currentOrigin.includes('localhost:5173')) {
+    if (import.meta.env.DEV) {
       // Local: extract HTML + embed images as base64 (no backend call)
       const JSZip = (await import('jszip')).default;
       const zip = await JSZip.loadAsync(file);
@@ -239,10 +237,17 @@ async function handleZipUpload(event: Event) {
         // Upload each unique base64 to CDN; fall back to base64 if no token/error
         const uniqueDataUris = Array.from(new Set(imageMap.values()));
         const dataUriToCdn = new Map<string, string>();
-        await Promise.all(uniqueDataUris.map(async (dataUri) => {
-          const cdn = await inspectorDrawer.convertBase64ToService(dataUri);
-          dataUriToCdn.set(dataUri, cdn);
-        }));
+        // Stagger conversion start (not the whole upload) by a tick each — convertBase64ToService's
+        // atob()+byte-copy runs synchronously before its first await, so starting all of them in the
+        // same tick blocks the main thread for their combined decode time. Uploads still run concurrently.
+        const conversions: Promise<void>[] = [];
+        for (const dataUri of uniqueDataUris) {
+          await new Promise(resolve => setTimeout(resolve, 0));
+          conversions.push(
+            inspectorDrawer.convertBase64ToService(dataUri).then(cdn => { dataUriToCdn.set(dataUri, cdn); })
+          );
+        }
+        await Promise.all(conversions);
         for (const [key, dataUri] of imageMap.entries()) {
           imageMap.set(key, dataUriToCdn.get(dataUri) ?? dataUri);
         }

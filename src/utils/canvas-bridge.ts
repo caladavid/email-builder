@@ -1,6 +1,7 @@
 // UMD build — executed as plain inline script text inside the iframe, so it
 // assigns `window.DOMPurify` there (no module system present in that context).
 import purifySrc from 'dompurify/dist/purify.min.js?raw';
+import { sanitizePastedHtml } from './pasteSanitizer';
 
 export const CANVAS_BRIDGE_CODE = purifySrc + `
 (function () {
@@ -25,6 +26,11 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
       ADD_ATTR: ['xmlns:v', 'xmlns:o', 'xmlns:w', 'fillcolor', 'strokecolor', 'arcsize'],
     });
   }
+
+  // Real function lives in src/utils/pasteSanitizer.ts (unit tested there via
+  // vitest/happy-dom) — embedded here verbatim via toString() so the iframe
+  // runtime and the tested source can never drift apart.
+  var sanitizePastedHtml = ${sanitizePastedHtml.toString()};
 
   const IGNORE_TAGS = new Set(['HTML', 'HEAD', 'BODY', 'STYLE', 'SCRIPT', 'META', 'LINK', 'TITLE', 'NOSCRIPT']);
   // Denylist: any element NOT in this set can be inline-edited on dblclick
@@ -499,6 +505,26 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
     block.focus();
     var er = block.getBoundingClientRect();
     parent.postMessage({ type: 'editing-start', path: getElementPath(block), rect: { top: er.top + window.scrollY, left: er.left + window.scrollX, width: er.width, height: er.height } }, _parentOrigin);
+  }, true);
+
+  // PASTE while editing → force inline-only content (see sanitizePastedHtml above).
+  // Without this, clipboard HTML can invalidly nest inside the editable block root
+  // and silently corrupt the document (orphaned, unselectable content).
+  document.addEventListener('paste', function (e) {
+    if (!editingEl || !editingEl.contains(e.target)) return;
+    e.preventDefault();
+    var cd = e.clipboardData || window.clipboardData;
+    var html = cd && cd.getData && cd.getData('text/html');
+    var sanitized;
+    if (html) {
+      sanitized = sanitizePastedHtml(html);
+    } else {
+      var text = (cd && cd.getData && cd.getData('text/plain')) || '';
+      sanitized = text
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .split(/\r\n|\r|\n/).join('<br>');
+    }
+    document.execCommand('insertHTML', false, sanitized);
   }, true);
 
   // CLICK → SELECT (walk up to block root, fallback to direct body child for imported templates)
@@ -1295,11 +1321,39 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
     return el;
   }
 
+  function isSkippableSibling(el) {
+    return !el || isInternalOverlayId(el.id) || el.tagName === 'SCRIPT' || el.tagName === 'STYLE';
+  }
+
+  // Nearest real sibling in the given direction — skipping overlay elements
+  // (drop indicator, box-model overlay) and non-visual tags.
+  function getAdjacentBlockRect(el, direction) {
+    var sib = direction === 'before' ? el.previousElementSibling : el.nextElementSibling;
+    while (sib && isSkippableSibling(sib)) {
+      sib = direction === 'before' ? sib.previousElementSibling : sib.nextElementSibling;
+    }
+    return sib ? sib.getBoundingClientRect() : null;
+  }
+
   function positionDropIndicator(refEl, pos) {
     if (!dropIndicator) return;
     var rect = refEl.getBoundingClientRect();
-    var h = Math.min(Math.max(rect.height, 40), 60);
-    var y = pos === 'before' ? rect.top - h - 4 : rect.bottom + 4;
+    var neighborRect = getAdjacentBlockRect(refEl, pos);
+    var h, y;
+    if (neighborRect) {
+      // Center the indicator in the actual gap between refEl and its neighbor,
+      // instead of a fixed-size bar hanging off refEl's own edge — otherwise a
+      // small gap makes the indicator overlap deep into the neighbor (or stay
+      // visually "inside" refEl), never reading as "between the two blocks".
+      var gapTop = pos === 'before' ? neighborRect.bottom : rect.bottom;
+      var gapBottom = pos === 'before' ? rect.top : neighborRect.top;
+      var gap = gapBottom - gapTop;
+      h = Math.min(Math.max(gap, 12), 60);
+      y = gapTop + gap / 2 - h / 2;
+    } else {
+      h = Math.min(Math.max(rect.height, 40), 60);
+      y = pos === 'before' ? rect.top - h - 4 : rect.bottom + 4;
+    }
     dropIndicator.style.left = rect.left + 'px';
     dropIndicator.style.width = rect.width + 'px';
     dropIndicator.style.top = y + 'px';
