@@ -85,46 +85,75 @@ export function mergeOrphanedBlockMarkers(doc: Document, body: HTMLElement) {
   }
 }
 
-// Plain <p>/<div> text content with no data-block-type at all (hand-written
+// Plain text-bearing content with no data-block-type at all (hand-written
 // HTML, content pasted straight into the HTML tab, a ZIP built outside this
 // app...) is only ever selectable by its raw tag — click-to-select shows
-// "<p>" or "<div>" instead of "Texto", and none of the Texto-specific Style
-// panel affordances apply. Every text-bearing element should end up as the
-// SAME block type regardless of how it got into the document — one canonical
-// "Texto", not a mix of raw tags — so the editing experience doesn't depend
-// on which tool originally produced the markup.
+// "<p>" or "<h1>" instead of "Texto"/"Encabezado", and none of the
+// type-specific Style panel affordances apply. Every text-bearing element
+// should end up as the SAME block type regardless of how it got into the
+// document — one canonical type per role, not a mix of raw tags — so the
+// editing experience doesn't depend on which tool originally produced the
+// markup.
 //
 // Deliberately conservative — only tags an element when doing so can't
 // possibly swallow something that should stay its own block:
 //   - already marked, or already living inside a marked ancestor → skip
 //     (never touch/renest an existing block)
 //   - wraps a marked descendant (e.g. an unmarked <div> around an Imagen
-//     block) → skip (would nest a real block inside a fake "Texto" one)
+//     block) → skip (would nest a real block inside a fake wrapper)
 //   - contains a replaced/structural element (img, video, table, form,
-//     button, hr...) → skip (that's a distinct block, not text — an inline
-//     <a> link is fine and stays, since "click here to read more" is
-//     legitimate rich text)
+//     button, hr...) → skip (that's a distinct block, not text)
+//   - is itself just a single <a> with nothing else — a real bug hit in
+//     production: an unmarked <div> whose ONLY content is one button-styled
+//     link ("Apply Now!", "Contact Us") would get called "Texto", hiding the
+//     link's own URL/target fields behind the wrong panel. A link with
+//     surrounding prose ("Click <a>here</a> to read more") is NOT a lone
+//     link — it stays eligible, since that IS legitimate rich text — the
+//     check is "nothing else besides the one <a>", not "contains an <a>".
+//     Left unmarked, a lone <a> is still fully selectable/editable on its
+//     own via the existing raw-tag fallback (blockType 'link').
 //   - no real text anywhere in it → skip (nothing to classify)
 // Processes top-down (document order): once a wrapper is tagged, its
 // descendants are skipped on their own turn via the "inside a marked
-// ancestor" check, so nested <div><p>text</p></div> becomes ONE Texto block
-// (the outer element) rather than two nested ones. Siblings at the same
-// depth (e.g. several <p> directly in a <td>) each become their own block,
-// same as building them one-by-one from the block picker would.
+// ancestor" check, so nested <div><p>text</p></div> becomes ONE block (the
+// outer element) rather than two nested ones. Siblings at the same depth
+// (e.g. several <p> directly in a <td>) each become their own block, same as
+// building them one-by-one from the block picker would.
 const NON_TEXT_TAGS: Record<string, true> = {
   IMG: true, VIDEO: true, AUDIO: true, IFRAME: true, TABLE: true, FORM: true,
   INPUT: true, BUTTON: true, SELECT: true, TEXTAREA: true, HR: true,
   CANVAS: true, SVG: true, OBJECT: true, EMBED: true, SCRIPT: true, STYLE: true,
 };
-export function autoTagPlainTextBlocks(body: HTMLElement) {
-  const candidates = Array.from(body.querySelectorAll<HTMLElement>('p, div'));
+function isLoneLinkWrapper(el: HTMLElement): boolean {
+  const meaningful = Array.from(el.childNodes).filter((n) => {
+    if (n.nodeType === 3) return !!(n.textContent || '').trim(); // real text node
+    return n.nodeType === 1; // element node
+  });
+  return meaningful.length === 1 && meaningful[0].nodeType === 1 && (meaningful[0] as Element).tagName === 'A';
+}
+function tagPlainLeaves(body: HTMLElement, selector: string, blockType: string) {
+  const candidates = Array.from(body.querySelectorAll<HTMLElement>(selector));
   for (const el of candidates) {
     if (el.closest('[data-block-type]')) continue; // already marked, or inside a marked block
     if (el.querySelector('[data-block-type]')) continue; // wraps a real block — don't renest it
     if (Array.from(el.querySelectorAll<HTMLElement>('*')).some((d) => NON_TEXT_TAGS[d.tagName])) continue;
+    if (isLoneLinkWrapper(el)) continue; // a bare link, not text — leave it to the 'link' raw-tag fallback
     if (!(el.textContent || '').trim()) continue; // nothing to classify
-    el.setAttribute('data-block-type', 'Texto');
+    el.setAttribute('data-block-type', blockType);
   }
+}
+export function autoTagPlainTextBlocks(body: HTMLElement) {
+  tagPlainLeaves(body, 'p, div', 'Texto');
+}
+// H1-H6 already get heading-specific Style panel controls without any marker
+// at all — StylesPanel's blockType detection falls back to a raw /^H[1-6]$/
+// tag match — so this is lower-stakes than the Texto case above (nothing was
+// actually broken). It's still worth doing for the same consistency reason:
+// the click-to-select badge shows the raw tag ("<h1>") instead of the
+// canonical block name, and the element has no real data-block-type to be
+// found/selected by path the way every other block can be.
+export function autoTagPlainHeadings(body: HTMLElement) {
+  tagPlainLeaves(body, 'h1, h2, h3, h4, h5, h6', 'Encabezado');
 }
 
 // Text styling (color, size, weight...) that lives on a lone child <span>/<font>
@@ -174,6 +203,7 @@ export function bakeHostIndependentDefaults(html: string): string {
   if (!body) return html;
   mergeOrphanedBlockMarkers(doc, body);
   autoTagPlainTextBlocks(body);
+  autoTagPlainHeadings(body);
   hoistSingleRunChildStyle(body);
   body.querySelectorAll<HTMLElement>('*').forEach((el) => {
     if (hasConcreteColor(el) || !hasDirectText(el)) return;

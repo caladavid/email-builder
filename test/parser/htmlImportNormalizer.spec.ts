@@ -166,4 +166,53 @@ describe('bakeHostIndependentDefaults — autoTagPlainTextBlocks', () => {
     expect(out).toMatch(/data-block-type="Texto"[^>]*color: rgb\(255, 0, 0\)/);
     expect(out).toContain('red text');
   });
+
+  it('does NOT tag a div whose only content is one button-styled link (the real "Apply Now!" bug)', () => {
+    // Real shape from a client template: a button-styled <a> is the ENTIRE
+    // content of the wrapper. Tagging the wrapper "Texto" would hide the
+    // link's URL/target controls behind the wrong panel — left unmarked, the
+    // <a> is still fully selectable/editable on its own (raw-tag 'link' fallback).
+    const html =
+      '<div class="v-text-align"><a href="https://unlayer.com" class="v-button" style="background: rgb(13,48,43); border-radius: 4px;">' +
+      '<span><span><strong>Apply Now!</strong></span></span></a></div>';
+    const out = bodyOf(html);
+    expect(out).not.toContain('data-block-type="Texto"');
+    expect(out).toContain('Apply Now!');
+  });
+
+  it('DOES tag a paragraph that has a link plus real surrounding text (not a lone link)', () => {
+    const html = '<p>Read the full story <a href="https://x.com">here</a>.</p>';
+    const out = bodyOf(html);
+    expect(out).toMatch(/<p[^>]*data-block-type="Texto"/);
+  });
+});
+
+describe('bakeHostIndependentDefaults — autoTagPlainHeadings', () => {
+  it('tags a plain unmarked <h1> as Encabezado', () => {
+    const out = bodyOf('<h1>Big Title</h1>');
+    expect(out).toMatch(/<h1[^>]*data-block-type="Encabezado"[^>]*>Big Title<\/h1>/);
+  });
+
+  it('tags h2 through h6 too', () => {
+    const out = bodyOf('<h2>A</h2><h3>B</h3><h4>C</h4><h5>D</h5><h6>E</h6>');
+    const matches = out.match(/data-block-type="Encabezado"/g) || [];
+    expect(matches.length).toBe(5);
+  });
+
+  it('does not tag an already-marked heading (idempotent)', () => {
+    const html = '<h1 data-block-type="Encabezado" style="color: red;">already a block</h1>';
+    const out = bodyOf(html);
+    const matches = out.match(/data-block-type="Encabezado"/g) || [];
+    expect(matches.length).toBe(1);
+  });
+
+  it('does not tag an empty heading', () => {
+    const out = bodyOf('<h1></h1>');
+    expect(out).not.toContain('data-block-type');
+  });
+
+  it('does not tag a heading whose only content is a lone link', () => {
+    const out = bodyOf('<h2><a href="https://x.com">Click here</a></h2>');
+    expect(out).not.toContain('data-block-type="Encabezado"');
+  });
 });
