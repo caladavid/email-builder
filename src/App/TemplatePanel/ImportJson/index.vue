@@ -118,6 +118,9 @@
 import { computed, ref } from 'vue';
 import { useInspectorDrawer } from '../../../documents/editor/editor.store';
 import validateJsonStringValue from './validateJsonStringValue';
+// Type-only — the runtime module is loaded dynamically below (bundle-splitting);
+// this just brings in the `JSZip.JSZipObject` type namespace, fully erased at build time.
+import type JSZip from 'jszip';
 /* import { HTMLToBlockParser } from './htmlParser';  */
 
 const inspectorDrawer = useInspectorDrawer()

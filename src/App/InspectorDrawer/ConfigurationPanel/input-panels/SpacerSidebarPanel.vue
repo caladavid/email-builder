@@ -19,6 +19,7 @@ import SliderInput from './helpers/inputs/SliderInput.vue';
 import type { SpacerProps } from '@flyhub/email-block-spacer';
 import { SpacerPropsSchema, SpacerPropsDefaults } from '@flyhub/email-block-spacer';
 import { ref } from 'vue';
+import { z } from 'zod';
 
 type SpacerSidebarPanelProps = {
   data: SpacerProps
@@ -32,7 +33,7 @@ const emit = defineEmits<{
 
 /** Refs */
 
-const errors = ref<Zod.ZodError | null>(null)
+const errors = ref<z.ZodError | null>(null)
 
 /** Functions */
 

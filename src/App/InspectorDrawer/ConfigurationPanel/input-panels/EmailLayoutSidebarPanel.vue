@@ -49,6 +49,7 @@ import ColorInput from './helpers/inputs/ColorInput/ColorInput.vue';
 import NullableColorInput from './helpers/inputs/ColorInput/NullableColorInput.vue';
 import SliderInput from './helpers/inputs/SliderInput.vue';
 import { ref } from 'vue';
+import { z } from 'zod';
 
 type EmailLayoutSidebarFieldsProps = {
   data: Omit<EmailLayoutProps, 'document'>;
@@ -61,7 +62,7 @@ const emit = defineEmits<{
 
 /** Refs */
 
-const errors = ref<Zod.ZodError | null>(null)
+const errors = ref<z.ZodError | null>(null)
 
 /** Functions */
 

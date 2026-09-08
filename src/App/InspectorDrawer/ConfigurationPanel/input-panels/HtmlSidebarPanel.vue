@@ -22,6 +22,7 @@ import MultiStylePropertyPanel from './helpers/style-inputs/MultiStylePropertyPa
 import type { HtmlProps} from '@flyhub/email-block-html';
 import { HtmlPropsSchema } from '@flyhub/email-block-html';
 import { ref } from 'vue';
+import { z } from 'zod';
 
 type HtmlSidebarPanelProps = {
   data: HtmlProps
@@ -35,7 +36,7 @@ const emit = defineEmits<{
 
 /** Refs */
 
-const errors = ref<Zod.ZodError | null>(null)
+const errors = ref<z.ZodError | null>(null)
 
 /** Functions */
 

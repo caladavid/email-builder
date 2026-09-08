@@ -58,6 +58,7 @@ import type { ButtonProps } from '../../../../documents/blocks/Button/ButtonProp
 import { ButtonPropsSchema, ButtonPropsDefaults } from '../../../../documents/blocks/Button/ButtonPropsSchema';
 import { computed, ref } from 'vue';
 import RichTextEditor from './RichTextEditor.vue';
+import { z } from 'zod';
 
 type ButtonSidebarPanelProps = {
   data: ButtonProps;
@@ -71,7 +72,7 @@ const emit = defineEmits<{
 
 /** Refs */
 
-const errors = ref<Zod.ZodError | null>(null)
+const errors = ref<z.ZodError | null>(null)
 
 /** Computed */
 

@@ -31,6 +31,7 @@ import SliderInput from './helpers/inputs/SliderInput.vue';
 import BaseSidebarPanel from './helpers/BaseSidebarPanel.vue';
 import MultiStylePropertyPanel from './helpers/style-inputs/MultiStylePropertyPanel.vue';
 import { computed, ref } from 'vue';
+import { z } from 'zod';
 
 type DividerSidebarPanelProps = {
   data: DividerProps
@@ -44,7 +45,7 @@ const emit = defineEmits<{
 
 /** Refs */
 
-const errors = ref<Zod.ZodError | null>(null)
+const errors = ref<z.ZodError | null>(null)
 
 /** Computed */
 

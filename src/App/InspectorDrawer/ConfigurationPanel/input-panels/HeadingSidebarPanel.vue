@@ -45,6 +45,7 @@ import type { HeadingProps} from '../../../../documents/blocks/Heading/HeadingPr
 import { HeadingPropsSchema, HeadingPropsDefaults } from '../../../../documents/blocks/Heading/HeadingPropsSchema';
 import { ref } from 'vue';
 import RichTextEditor from './RichTextEditor.vue';
+import { z } from 'zod';
 
 type HeadingSidebarPanelProps = {
   data: HeadingProps
@@ -58,7 +59,7 @@ const emit = defineEmits<{
 
 /** Refs */
 
-const errors = ref<Zod.ZodError | null>(null)
+const errors = ref<z.ZodError | null>(null)
 
 /** Functions */
 

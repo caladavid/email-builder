@@ -2511,7 +2511,7 @@ export class HTMLToBlockParser {
         return id;
     }
     
-        private createFormBlock(element: Element, styles: any): string | null {
+        /* private createFormBlock(element: Element, styles: any): string | null {
             const formItems: string[] = [];
     
             Array.from(element.querySelectorAll('input, select, textarea, button')).forEach(field => {

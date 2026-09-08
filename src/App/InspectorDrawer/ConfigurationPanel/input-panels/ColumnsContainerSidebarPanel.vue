@@ -66,6 +66,7 @@ import ColumnsContainerPropsSchema from '../../../../documents/blocks/ColumnsCon
 import SliderInput from './helpers/inputs/SliderInput.vue';  
 import MultiStylePropertyPanel from './helpers/style-inputs/MultiStylePropertyPanel.vue';  
 import { ref } from 'vue';  
+import { z } from 'zod';
   
 type ColumnsContainerSidebarPanelProps = {  
   data: ColumnsContainerProps;  
@@ -79,7 +80,7 @@ const emit = defineEmits<{
   
 /** Refs */  
   
-const errors = ref<Zod.ZodError | null>(null)  
+const errors = ref<z.ZodError | null>(null)  
   
 /** Functions */  
   

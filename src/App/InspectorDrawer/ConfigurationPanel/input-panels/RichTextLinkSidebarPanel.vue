@@ -19,6 +19,7 @@ import type { RichTextLinkProps } from '../../../../documents/blocks/RichTextLin
 import RichTextLinkPropsSchema from '../../../../documents/blocks/RichTextLink/RichTextLinkPropsSchema';
 import { ref, computed } from 'vue';
 import DOMPurify from 'dompurify';  
+import { z } from 'zod';
   
 type RichTextLinkSidebarPanelProps = {  
   data: RichTextLinkProps;  
@@ -30,7 +31,7 @@ const emit = defineEmits<{
   (e: 'update:data', args: RichTextLinkProps): void
 }>();
 
-const errors = ref<Zod.ZodError | null>(null);
+const errors = ref<z.ZodError | null>(null);
 
 const safeContent = computed(() => DOMPurify.sanitize(props.data.props?.content ?? 'No content'));  
   

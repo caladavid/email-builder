@@ -522,7 +522,7 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
       var text = (cd && cd.getData && cd.getData('text/plain')) || '';
       sanitized = text
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        .split(/\r\n|\r|\n/).join('<br>');
+        .split(/\\r\\n|\\r|\\n/).join('<br>');
     }
     document.execCommand('insertHTML', false, sanitized);
   }, true);

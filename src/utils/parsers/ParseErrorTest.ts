@@ -4,7 +4,7 @@ import type { TEditorConfiguration } from "../../documents/editor/core";
 export class ParseError extends Error {
     constructor(
         message: string,
-        public type:  'ZIP_ERROR' | 'HTML_ERROR' | 'CSS_ERROR' | 'IMAGE_ERROR' | 'VALIDATION_ERROR', 
+        public type:  'ZIP_ERROR' | 'HTML_ERROR' | 'CSS_ERROR' | 'IMAGE_ERROR' | 'VALIDATION_ERROR' | 'COMPARISON_WARNING',
         public details?: any,
         public recoverable: boolean = true  
     ){

@@ -93,6 +93,7 @@ import { useInspectorDrawer } from '../../../../documents/editor/editor.store';
 import RichTextEditor from '../input-panels/RichTextEditor.vue';
 import BooleanInput from './helpers/inputs/BooleanInput.vue';
 import TextPropsSchema from '../../../../documents/blocks/Text/TextPropsSchema';
+import { z } from 'zod';
 
 type TextSidebarPanelProps = {
   data: TextProps
@@ -106,7 +107,7 @@ const emit = defineEmits<{
 
 /** Refs */
 
-const errors = ref<Zod.ZodError | null>(null)
+const errors = ref<z.ZodError | null>(null)
 const variables = ref<Record<string, string>>({});
 const fileInput = ref<HTMLInputElement | null>(null);
 const showLinkPanel = ref(false);

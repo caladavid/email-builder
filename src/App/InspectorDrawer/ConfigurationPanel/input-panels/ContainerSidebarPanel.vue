@@ -14,6 +14,7 @@ import type { ContainerProps } from '../../../../lib/email-builder/blocks/Contai
 import MultiStylePropertyPanel from './helpers/style-inputs/MultiStylePropertyPanel.vue';
 import BaseSidebarPanel from './helpers/BaseSidebarPanel.vue';
 import { ref } from 'vue';
+import { z } from 'zod';
 
 type ContainerSidebarPanelProps = {
   data: ContainerProps;
@@ -28,7 +29,7 @@ const emit = defineEmits<{
 
 /** Refs */
 
-const errors = ref<Zod.ZodError | null>(null)
+const errors = ref<z.ZodError | null>(null)
 
 /** Functions */
 

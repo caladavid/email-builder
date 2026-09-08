@@ -4,6 +4,14 @@
 // injected script text — do not fork/copy this logic into canvas-bridge.ts,
 // or the two will silently drift apart.
 //
+// IMPORTANT: everything this function needs (helpers, tag tables) MUST be
+// declared INSIDE it, not at module scope. Function.prototype.toString()
+// only returns THIS function's own source — any module-scope helper it
+// called would be undefined once embedded in the iframe (caught in
+// production: paste threw "walk is not defined" because an earlier version
+// had `walk`/`escapeText`/the tag tables as separate module-level
+// declarations that never made it into the injected script).
+//
 // Why this exists: pasting rich HTML (Google Docs/Word) straight into a
 // contentEditable block root (e.g. a Texto block is a <p>) breaks the canvas —
 // clipboard HTML brings block-level tags (<div>/<p>/<li>...) which are invalid
@@ -19,74 +27,67 @@
 // but under happy-dom/vitest DOMPurify was found to corrupt already-safe
 // output — e.g. silently dropping sibling text nodes next to <br> — so it's
 // deliberately NOT used here. The construction below is the actual guarantee.
-
-// Tags whose own text content forms one "line" — a trailing <br> is emitted
-// after each so pasted paragraphs/list items/headings don't run together.
-var LINE_TAGS: Record<string, true> = {
-  P: true, DIV: true, LI: true, TR: true, BLOCKQUOTE: true,
-  H1: true, H2: true, H3: true, H4: true, H5: true, H6: true,
-};
-// Pure containers — recurse into them but don't add an extra break of their
-// own (their line-level children already do that).
-var WRAPPER_TAGS: Record<string, true> = {
-  UL: true, OL: true, TABLE: true, TBODY: true, THEAD: true, TFOOT: true,
-  SECTION: true, ARTICLE: true, HEADER: true, FOOTER: true,
-};
-// Dropped entirely, content included (never just unwrapped).
-var DROP_TAGS: Record<string, true> = {
-  SCRIPT: true, STYLE: true, NOSCRIPT: true, IFRAME: true, OBJECT: true, EMBED: true, TEMPLATE: true,
-};
-var INLINE_TAG_MAP: Record<string, string> = {
-  B: 'b', STRONG: 'strong', I: 'i', EM: 'em', U: 'u', S: 's', STRIKE: 'strike', SPAN: 'span',
-};
-
-function escapeText(s: string): string {
-  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-function isSafeHref(href: string): boolean {
-  var h = String(href || '').trim().toLowerCase();
-  return /^(https?:|mailto:|tel:|#|\/)/.test(h);
-}
-
-function walk(node: Node, out: string[]): void {
-  var children = node.childNodes;
-  for (var i = 0; i < children.length; i++) {
-    var child = children[i];
-    if (child.nodeType === 3) { // Node.TEXT_NODE
-      out.push(escapeText(child.nodeValue || ''));
-      continue;
-    }
-    if (child.nodeType !== 1) continue; // skip comments/etc.
-    var el = child as Element;
-    var tag = el.tagName;
-    if (DROP_TAGS[tag]) continue; // drop node + its whole subtree
-    if (tag === 'BR') { out.push('<br>'); continue; }
-    if (tag === 'A') {
-      var href = el.getAttribute('href') || '';
-      var innerA: string[] = [];
-      walk(el, innerA);
-      if (isSafeHref(href)) {
-        out.push('<a href="' + escapeText(href) + '">' + innerA.join('') + '</a>');
-      } else {
-        out.push(innerA.join(''));
-      }
-      continue;
-    }
-    var mapped = INLINE_TAG_MAP[tag];
-    if (mapped) {
-      var innerEl: string[] = [];
-      walk(el, innerEl);
-      out.push('<' + mapped + '>' + innerEl.join('') + '</' + mapped + '>');
-      continue;
-    }
-    // Anything else (div/p/li/h1-6/ul/table/...): unwrap, keep only its content.
-    walk(el, out);
-    if (LINE_TAGS[tag]) out.push('<br>');
-  }
-}
-
 export function sanitizePastedHtml(html: string): string {
+  // Tags whose own text content forms one "line" — a trailing <br> is emitted
+  // after each so pasted paragraphs/list items/headings don't run together.
+  var LINE_TAGS: Record<string, true> = {
+    P: true, DIV: true, LI: true, TR: true, BLOCKQUOTE: true,
+    H1: true, H2: true, H3: true, H4: true, H5: true, H6: true,
+  };
+  // Dropped entirely, content included (never just unwrapped).
+  var DROP_TAGS: Record<string, true> = {
+    SCRIPT: true, STYLE: true, NOSCRIPT: true, IFRAME: true, OBJECT: true, EMBED: true, TEMPLATE: true,
+  };
+  var INLINE_TAG_MAP: Record<string, string> = {
+    B: 'b', STRONG: 'strong', I: 'i', EM: 'em', U: 'u', S: 's', STRIKE: 'strike', SPAN: 'span',
+  };
+
+  function escapeText(s: string): string {
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function isSafeHref(href: string): boolean {
+    var h = String(href || '').trim().toLowerCase();
+    return /^(https?:|mailto:|tel:|#|\/)/.test(h);
+  }
+
+  function walk(node: Node, out: string[]): void {
+    var children = node.childNodes;
+    for (var i = 0; i < children.length; i++) {
+      var child = children[i];
+      if (child.nodeType === 3) { // Node.TEXT_NODE
+        out.push(escapeText(child.nodeValue || ''));
+        continue;
+      }
+      if (child.nodeType !== 1) continue; // skip comments/etc.
+      var el = child as Element;
+      var tag = el.tagName;
+      if (DROP_TAGS[tag]) continue; // drop node + its whole subtree
+      if (tag === 'BR') { out.push('<br>'); continue; }
+      if (tag === 'A') {
+        var href = el.getAttribute('href') || '';
+        var innerA: string[] = [];
+        walk(el, innerA);
+        if (isSafeHref(href)) {
+          out.push('<a href="' + escapeText(href) + '">' + innerA.join('') + '</a>');
+        } else {
+          out.push(innerA.join(''));
+        }
+        continue;
+      }
+      var mapped = INLINE_TAG_MAP[tag];
+      if (mapped) {
+        var innerEl: string[] = [];
+        walk(el, innerEl);
+        out.push('<' + mapped + '>' + innerEl.join('') + '</' + mapped + '>');
+        continue;
+      }
+      // Anything else (div/p/li/h1-6/ul/table/...): unwrap, keep only its content.
+      walk(el, out);
+      if (LINE_TAGS[tag]) out.push('<br>');
+    }
+  }
+
   if (!html) return '';
   var doc: Document;
   try {
