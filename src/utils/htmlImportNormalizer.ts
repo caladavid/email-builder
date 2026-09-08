@@ -85,6 +85,48 @@ export function mergeOrphanedBlockMarkers(doc: Document, body: HTMLElement) {
   }
 }
 
+// Plain <p>/<div> text content with no data-block-type at all (hand-written
+// HTML, content pasted straight into the HTML tab, a ZIP built outside this
+// app...) is only ever selectable by its raw tag — click-to-select shows
+// "<p>" or "<div>" instead of "Texto", and none of the Texto-specific Style
+// panel affordances apply. Every text-bearing element should end up as the
+// SAME block type regardless of how it got into the document — one canonical
+// "Texto", not a mix of raw tags — so the editing experience doesn't depend
+// on which tool originally produced the markup.
+//
+// Deliberately conservative — only tags an element when doing so can't
+// possibly swallow something that should stay its own block:
+//   - already marked, or already living inside a marked ancestor → skip
+//     (never touch/renest an existing block)
+//   - wraps a marked descendant (e.g. an unmarked <div> around an Imagen
+//     block) → skip (would nest a real block inside a fake "Texto" one)
+//   - contains a replaced/structural element (img, video, table, form,
+//     button, hr...) → skip (that's a distinct block, not text — an inline
+//     <a> link is fine and stays, since "click here to read more" is
+//     legitimate rich text)
+//   - no real text anywhere in it → skip (nothing to classify)
+// Processes top-down (document order): once a wrapper is tagged, its
+// descendants are skipped on their own turn via the "inside a marked
+// ancestor" check, so nested <div><p>text</p></div> becomes ONE Texto block
+// (the outer element) rather than two nested ones. Siblings at the same
+// depth (e.g. several <p> directly in a <td>) each become their own block,
+// same as building them one-by-one from the block picker would.
+const NON_TEXT_TAGS: Record<string, true> = {
+  IMG: true, VIDEO: true, AUDIO: true, IFRAME: true, TABLE: true, FORM: true,
+  INPUT: true, BUTTON: true, SELECT: true, TEXTAREA: true, HR: true,
+  CANVAS: true, SVG: true, OBJECT: true, EMBED: true, SCRIPT: true, STYLE: true,
+};
+export function autoTagPlainTextBlocks(body: HTMLElement) {
+  const candidates = Array.from(body.querySelectorAll<HTMLElement>('p, div'));
+  for (const el of candidates) {
+    if (el.closest('[data-block-type]')) continue; // already marked, or inside a marked block
+    if (el.querySelector('[data-block-type]')) continue; // wraps a real block — don't renest it
+    if (Array.from(el.querySelectorAll<HTMLElement>('*')).some((d) => NON_TEXT_TAGS[d.tagName])) continue;
+    if (!(el.textContent || '').trim()) continue; // nothing to classify
+    el.setAttribute('data-block-type', 'Texto');
+  }
+}
+
 // Text styling (color, size, weight...) that lives on a lone child <span>/<font>
 // instead of the data-block-type root is invisible to the app: the Styles panel
 // always reads/writes the root element, so the color picker shows the wrong
@@ -131,6 +173,7 @@ export function bakeHostIndependentDefaults(html: string): string {
   const body = doc.body;
   if (!body) return html;
   mergeOrphanedBlockMarkers(doc, body);
+  autoTagPlainTextBlocks(body);
   hoistSingleRunChildStyle(body);
   body.querySelectorAll<HTMLElement>('*').forEach((el) => {
     if (hasConcreteColor(el) || !hasDirectText(el)) return;

@@ -139,7 +139,7 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
   // itself, so a bold word inside running text doesn't become its own tiny
   // selectable "block". <A> is deliberately excluded — plain text links keep
   // their own selection (Link panel: href/text) when not wrapped in a Botón block.
-  const INLINE_FORMAT_TAGS = new Set(['STRONG', 'B', 'EM', 'I', 'U', 'S', 'STRIKE', 'SPAN', 'SMALL', 'MARK', 'SUB', 'SUP', 'Q', 'ABBR', 'CITE', 'TIME', 'KBD', 'VAR', 'CODE']);
+  const INLINE_FORMAT_TAGS = new Set(['STRONG', 'B', 'EM', 'I', 'U', 'S', 'STRIKE', 'SPAN', 'SMALL', 'MARK', 'SUB', 'SUP', 'Q', 'ABBR', 'CITE', 'TIME', 'KBD', 'VAR', 'CODE', 'FONT']);
 
   // Walk up to data-block-type; if not found, use the clicked element directly
   // (imported templates have no data-block-type so we allow individual element selection)

@@ -93,3 +93,77 @@ describe('bakeHostIndependentDefaults — hoistSingleRunChildStyle', () => {
     expect(out).toContain('<a href="https://x.com"');
   });
 });
+
+describe('bakeHostIndependentDefaults — autoTagPlainTextBlocks', () => {
+  it('tags a plain unmarked <p> as Texto (the actual "shows <p> instead of Texto" bug)', () => {
+    const out = bodyOf('<p>Haz este ejercicio rápido</p>');
+    expect(out).toMatch(/<p[^>]*data-block-type="Texto"[^>]*>Haz este ejercicio rápido<\/p>/);
+  });
+
+  it('tags a plain unmarked <div> with nested font/span formatting as Texto', () => {
+    const html = '<div><font face="Arial"><span>Junto a los correos</span></font></div>';
+    const out = bodyOf(html);
+    expect(out).toMatch(/<div[^>]*data-block-type="Texto"/);
+    expect(out).toContain('Junto a los correos');
+  });
+
+  it('tags each sibling paragraph as its own separate Texto block, not merged into one', () => {
+    const html = '<td><p>First</p><p>Second</p></td>';
+    const out = bodyOf(`<table><tbody><tr>${html}</tr></tbody></table>`);
+    const matches = out.match(/data-block-type="Texto"/g) || [];
+    expect(matches.length).toBe(2);
+    expect(out).toContain('First');
+    expect(out).toContain('Second');
+  });
+
+  it('tags only the OUTER wrapper for nested <div><p>...</p></div>, not both', () => {
+    const html = '<div><p>Nested paragraph</p></div>';
+    const out = bodyOf(html);
+    const matches = out.match(/data-block-type="Texto"/g) || [];
+    expect(matches.length).toBe(1);
+    // The tag landed on the outer <div>, not the inner <p>.
+    expect(out).toMatch(/<div[^>]*data-block-type="Texto"[^>]*><p[^>]*>Nested paragraph<\/p><\/div>/);
+  });
+
+  it('does not tag a wrapper around an already-marked block (would renest a real block)', () => {
+    const html = '<div><div data-block-type="Imagen"><img src="x.png"></div></div>';
+    const out = bodyOf(html);
+    // Only the original Imagen marker exists — the outer wrapper was left alone.
+    const matches = out.match(/data-block-type="/g) || [];
+    expect(matches.length).toBe(1);
+    expect(out).toContain('data-block-type="Imagen"');
+  });
+
+  it('does not tag an element containing a structural/replaced child (img, table, button...)', () => {
+    const html = '<div>Caption text<img src="x.png"></div>';
+    const out = bodyOf(html);
+    expect(out).not.toContain('data-block-type="Texto"');
+  });
+
+  it('does not tag an empty element (nothing to classify)', () => {
+    const out = bodyOf('<p></p><div></div>');
+    expect(out).not.toContain('data-block-type');
+  });
+
+  it('tags an element containing only an inline <a> link (legitimate rich text, not structural)', () => {
+    const html = '<p>Click <a href="https://x.com">here</a> to read more</p>';
+    const out = bodyOf(html);
+    expect(out).toMatch(/<p[^>]*data-block-type="Texto"/);
+    expect(out).toMatch(/<a href="https:\/\/x\.com"[^>]*>here<\/a>/);
+  });
+
+  it('leaves an already-marked element alone (idempotent, does not duplicate/change the marker)', () => {
+    const html = '<p data-block-type="Texto" style="color: red;">already a block</p>';
+    const out = bodyOf(html);
+    const matches = out.match(/data-block-type="Texto"/g) || [];
+    expect(matches.length).toBe(1);
+  });
+
+  it('composes with hoistSingleRunChildStyle: a freshly auto-tagged block still gets its lone <span> color hoisted', () => {
+    const html = '<div><span style="color: rgb(255, 0, 0);">red text</span></div>';
+    const out = bodyOf(html);
+    expect(out).not.toContain('<span');
+    expect(out).toMatch(/data-block-type="Texto"[^>]*color: rgb\(255, 0, 0\)/);
+    expect(out).toContain('red text');
+  });
+});
