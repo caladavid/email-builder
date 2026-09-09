@@ -167,6 +167,38 @@ describe('bakeHostIndependentDefaults — autoTagPlainTextBlocks', () => {
     expect(out).toContain('red text');
   });
 
+  it('tags a plain <p> sitting inside a Columnas cell (the actual "click selects Columnas instead" bug)', () => {
+    // Real shape from a client template: an unmarked <p> living in a
+    // data-block-type="Columnas" table's <td>. A naive "already inside a
+    // marked ancestor" check saw the TABLE's own marker and skipped the <p>
+    // entirely — click-to-select then walked past it straight up to the
+    // Columnas table, since nothing closer ever carried a marker.
+    const html =
+      '<table data-block-type="Columnas"><tbody><tr>' +
+      '<td><div data-block-type="Imagen"><img src="x.png"></div></td>' +
+      '<td><p>El lado oscuro de crear contenido con IA</p></td>' +
+      '</tr></tbody></table>';
+    const out = bodyOf(html);
+    expect(out).toMatch(/<p[^>]*data-block-type="Texto"[^>]*>El lado oscuro/);
+    // The Imagen block and the Columnas table itself must be untouched.
+    expect(out).toMatch(/<table[^>]*data-block-type="Columnas"/);
+    const columnasCount = (out.match(/data-block-type="Columnas"/g) || []).length;
+    expect(columnasCount).toBe(1); // not accidentally re-marked or duplicated
+  });
+
+  it('tags a plain <div> sitting inside a Contenedor', () => {
+    const html = '<div data-block-type="Contenedor"><div>plain text in a container</div></div>';
+    const out = bodyOf(html);
+    expect(out).toMatch(/<div[^>]*data-block-type="Texto"[^>]*>plain text in a container<\/div>/);
+  });
+
+  it('still does NOT tag something already inside a marked ATOMIC block (e.g. nested inside Texto itself)', () => {
+    const html = '<div data-block-type="Texto"><p>nested paragraph</p></div>';
+    const out = bodyOf(html);
+    const matches = out.match(/data-block-type="Texto"/g) || [];
+    expect(matches.length).toBe(1); // only the outer marker — inner <p> left alone
+  });
+
   it('does NOT tag a div whose only content is one button-styled link (the real "Apply Now!" bug)', () => {
     // Real shape from a client template: a button-styled <a> is the ENTIRE
     // content of the wrapper. Tagging the wrapper "Texto" would hide the
@@ -214,5 +246,18 @@ describe('bakeHostIndependentDefaults — autoTagPlainHeadings', () => {
   it('does not tag a heading whose only content is a lone link', () => {
     const out = bodyOf('<h2><a href="https://x.com">Click here</a></h2>');
     expect(out).not.toContain('data-block-type="Encabezado"');
+  });
+
+  it('an unmarked <div><h1>Title</h1></div> tags the h1 as Encabezado, not the wrapper as Texto (the actual bug: headings must claim themselves before the Texto pass can swallow their wrapper)', () => {
+    const out = bodyOf('<div><h1>Title</h1></div>');
+    expect(out).toMatch(/<h1[^>]*data-block-type="Encabezado"[^>]*>Title<\/h1>/);
+    expect(out).not.toContain('data-block-type="Texto"');
+  });
+
+  it('a wrapper with a heading AND real sibling text: heading gets Encabezado, the text gets its own Texto', () => {
+    const out = bodyOf('<div><h2>Title</h2><p>body text</p></div>');
+    expect(out).toMatch(/<h2[^>]*data-block-type="Encabezado"/);
+    expect(out).toMatch(/<p[^>]*data-block-type="Texto"[^>]*>body text<\/p>/);
+    expect(out).not.toMatch(/<div[^>]*data-block-type="Texto"/);
   });
 });

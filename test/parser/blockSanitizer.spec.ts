@@ -23,23 +23,38 @@ describe('sanitizeBlocks', () => {
   });
 
   it('maps unknown type with children to Container', () => {
+    // 'Carousel' — a genuinely unsupported type, not one of the real ones
+    // (Video/List/ListItem now ARE supported, see SUPPORTED_BLOCK_TYPES below).
     const blocks = {
-      'unknown1': { type: 'Video', data: { props: { childrenIds: ['child1'] }, style: {} } },
+      'unknown1': { type: 'Carousel', data: { props: { childrenIds: ['child1'] }, style: {} } },
       'child1': { type: 'Text', data: { props: { text: 'hi' }, style: {} } },
     };
     const { blocks: result, remapped } = sanitizeBlocks(blocks, new Map());
     expect(result['unknown1'].type).toBe('Container');
-    expect(remapped[0]).toContain('Video → Container');
+    expect(remapped[0]).toContain('Carousel → Container');
   });
 
   it('maps unknown type without children to Html using outerHTML', () => {
-    const sourceMap = new Map([['vid1', '<video src="x.mp4"></video>']]);
+    const sourceMap = new Map([['car1', '<div class="carousel"></div>']]);
     const blocks = {
-      'vid1': { type: 'Video', data: { props: {}, style: {} } },
+      'car1': { type: 'Carousel', data: { props: {}, style: {} } },
     };
     const { blocks: result } = sanitizeBlocks(blocks, sourceMap);
-    expect(result['vid1'].type).toBe('Html');
-    expect(result['vid1'].data.props.contents).toBe('<video src="x.mp4"></video>');
+    expect(result['car1'].type).toBe('Html');
+    expect(result['car1'].data.props.contents).toBe('<div class="carousel"></div>');
+  });
+
+  it('SUPPORTED_BLOCK_TYPES includes Video/List/ListItem (Reader can render them, sanitizer must not downgrade them)', () => {
+    const blocks = {
+      'v1': { type: 'Video', data: { props: { url: 'https://x.com/v.mp4' }, style: {} } },
+      'l1': { type: 'List', data: { props: { childrenIds: ['li1'] }, style: {} } },
+      'li1': { type: 'ListItem', data: { props: { text: 'item' }, style: {} } },
+    };
+    const { blocks: result, remapped } = sanitizeBlocks(blocks, new Map());
+    expect(result['v1'].type).toBe('Video');
+    expect(result['l1'].type).toBe('List');
+    expect(result['li1'].type).toBe('ListItem');
+    expect(remapped).toHaveLength(0);
   });
 
   it('drops unknown type without children and without outerHTML', () => {

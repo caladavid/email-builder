@@ -17,7 +17,11 @@ function createColumnsTemplate(count: number) {
   let tds = '';
   
   for (let i = 0; i < count; i++) {
-    tds += `<td width="${percentage}" style="padding:8px; vertical-align:top; border: 1px dashed transparent;">${emptyPlaceholder}</td>`;
+    // width lives in BOTH the attribute (Outlook/legacy clients honour only
+    // this) and the inline style (the editor's own column-width field reads
+    // style.width — without it, "Ancho col. N" showed blank on the very
+    // first selection of a freshly-inserted Columnas block).
+    tds += `<td width="${percentage}" style="width:${percentage}; padding:8px; vertical-align:top; border: 1px dashed transparent;">${emptyPlaceholder}</td>`;
   }
   
   return `<table data-block-type="Columnas" style="width:100%;max-width:600px;border-collapse:collapse;margin:0 auto;background:#ffffff;table-layout:fixed;"><tbody><tr>${tds}</tr></tbody></table>`;
@@ -210,7 +214,14 @@ export const BUTTONS: TButtonProps[] = [
   {
     label: 'Contenedor',
     icon: 'material-symbols:library-add-outline',
-    htmlTemplate: `<div data-block-type="Contenedor" style="padding:16px 24px;background:#ffffff;border:1px dashed #cccccc;max-width:600px;margin:0 auto;"><p style="margin:0;color:#999;font-size:14px;font-family:inherit;text-align:center;">${emptyPlaceholder}</p></div>`,
+    // NOTE: the placeholder (a <div>) must NOT be wrapped in a <p> — a <div>
+    // inside a <p> is invalid HTML, and the browser's own parser splits it
+    // into [empty <p>, placeholder <div>, empty <p>] on the way in. Those
+    // stray empty <p>s then count as "real children" to the delete-refill
+    // logic, so the placeholder never comes back once the container is
+    // emptied (production bug — see htmlImportNormalizer's mergeOrphanedBlockMarkers
+    // for the general version of this same invalid-nesting problem).
+    htmlTemplate: `<div data-block-type="Contenedor" style="padding:16px 24px;background:#ffffff;border:1px dashed #cccccc;max-width:600px;margin:0 auto;">${emptyPlaceholder}</div>`,
     block: () => ({
       type: 'Container',
       data: {

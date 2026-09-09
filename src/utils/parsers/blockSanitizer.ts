@@ -1,6 +1,10 @@
 export type SourceHtmlMap = Map<string, string>;
 
-// Block types supported by the local READER_DICTIONARY (ReaderBlock.vue)
+// Block types supported by the local READER_DICTIONARY (ReaderBlock.vue).
+// Video/List/ListItem were missing here even though the parser emits them
+// (HTMLToBlockParser.ts) and the Readers can render them — this list being
+// out of sync with the dictionary silently downgraded them to Html/Container
+// below before those working Readers ever got a chance.
 export const SUPPORTED_BLOCK_TYPES = new Set([
   'ColumnsContainer',
   'Container',
@@ -17,6 +21,9 @@ export const SUPPORTED_BLOCK_TYPES = new Set([
   'TableRow',
   'TableCell',
   'TableSection',
+  'Video',
+  'List',
+  'ListItem',
 ]);
 
 // Semantic mappings for unsupported types

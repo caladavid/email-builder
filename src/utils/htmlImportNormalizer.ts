@@ -97,8 +97,15 @@ export function mergeOrphanedBlockMarkers(doc: Document, body: HTMLElement) {
 //
 // Deliberately conservative — only tags an element when doing so can't
 // possibly swallow something that should stay its own block:
-//   - already marked, or already living inside a marked ancestor → skip
-//     (never touch/renest an existing block)
+//   - already marked, or already living inside a marked ATOMIC block (Texto,
+//     Botón, Imagen...) → skip (never touch/renest an existing block). A
+//     CONTAINER block (Columnas, Contenedor) does NOT count as "already
+//     inside a block" for this purpose — its cells are LAYOUT, meant to hold
+//     their own independently-tagged children. Production bug this fixes:
+//     a <p> of plain text sitting in a Columnas <td> was never getting
+//     tagged, because the naive check saw the table's own data-block-type
+//     and treated the whole cell as "already spoken for" — click-to-select
+//     then walked past the paragraph straight up to the Columnas table.
 //   - wraps a marked descendant (e.g. an unmarked <div> around an Imagen
 //     block) → skip (would nest a real block inside a fake wrapper)
 //   - contains a replaced/structural element (img, video, table, form,
@@ -123,7 +130,17 @@ const NON_TEXT_TAGS: Record<string, true> = {
   IMG: true, VIDEO: true, AUDIO: true, IFRAME: true, TABLE: true, FORM: true,
   INPUT: true, BUTTON: true, SELECT: true, TEXTAREA: true, HR: true,
   CANVAS: true, SVG: true, OBJECT: true, EMBED: true, SCRIPT: true, STYLE: true,
+  // Headings get their OWN pass (autoTagPlainHeadings, called before this
+  // one) — a <div> wrapping one must never be tagged Texto itself, or the
+  // heading's own ancestor-check would see it as "already inside an atomic
+  // block" and skip. Calling headings first already prevents this in the
+  // common case; this is the belt-and-suspenders backstop.
+  H1: true, H2: true, H3: true, H4: true, H5: true, H6: true,
 };
+// Container block types are layout, not content — text inside one of their
+// cells is still eligible to become its own block, unlike text inside an
+// atomic block (Texto, Botón, Imagen...), which is already "spoken for".
+const CONTAINER_BLOCK_TYPES: Record<string, true> = { Columnas: true, Contenedor: true };
 function isLoneLinkWrapper(el: HTMLElement): boolean {
   const meaningful = Array.from(el.childNodes).filter((n) => {
     if (n.nodeType === 3) return !!(n.textContent || '').trim(); // real text node
@@ -134,7 +151,12 @@ function isLoneLinkWrapper(el: HTMLElement): boolean {
 function tagPlainLeaves(body: HTMLElement, selector: string, blockType: string) {
   const candidates = Array.from(body.querySelectorAll<HTMLElement>(selector));
   for (const el of candidates) {
-    if (el.closest('[data-block-type]')) continue; // already marked, or inside a marked block
+    if (el.hasAttribute('data-block-type')) continue; // already marked itself — never re-tag
+    // closest() from the PARENT (not el itself) — a container's own marked
+    // root must not be excluded from "does this live inside a marked
+    // ancestor" just because el.closest() would also match itself.
+    const nearestMarkedAncestor = el.parentElement ? el.parentElement.closest('[data-block-type]') : null;
+    if (nearestMarkedAncestor && !CONTAINER_BLOCK_TYPES[nearestMarkedAncestor.getAttribute('data-block-type') || '']) continue; // inside a marked ATOMIC block
     if (el.querySelector('[data-block-type]')) continue; // wraps a real block — don't renest it
     if (Array.from(el.querySelectorAll<HTMLElement>('*')).some((d) => NON_TEXT_TAGS[d.tagName])) continue;
     if (isLoneLinkWrapper(el)) continue; // a bare link, not text — leave it to the 'link' raw-tag fallback
@@ -202,8 +224,12 @@ export function bakeHostIndependentDefaults(html: string): string {
   const body = doc.body;
   if (!body) return html;
   mergeOrphanedBlockMarkers(doc, body);
-  autoTagPlainTextBlocks(body);
+  // Headings claim themselves FIRST — otherwise a <div><h1>Title</h1></div>
+  // gets tagged "Texto" on the wrapper before the heading ever gets a turn,
+  // and the heading's own ancestor-check then sees "already inside an
+  // atomic block" and skips it forever.
   autoTagPlainHeadings(body);
+  autoTagPlainTextBlocks(body);
   hoistSingleRunChildStyle(body);
   body.querySelectorAll<HTMLElement>('*').forEach((el) => {
     if (hasConcreteColor(el) || !hasDirectText(el)) return;
