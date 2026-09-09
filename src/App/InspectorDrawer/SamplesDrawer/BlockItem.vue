@@ -59,15 +59,21 @@ const handleDragStart = (event: DragEvent) => {
   }
 };
 
+// Mirrors IframeCanvas.vue's insertBlockAt(): only ever REPLACE when the
+// selection is a placeholder — any other selection gets the new block
+// inserted after it. A previous version replaced whatever was selected
+// unconditionally, so clicking a palette item while e.g. a whole Columnas
+// table was selected silently deleted it. The "no selection" branch used to
+// sniff `store.rawHtml` for the FIRST placeholder anywhere in the document
+// (wrong slot, and also 150ms stale behind the live canvas) — with nothing
+// selected we just insert at the end, same as `path: null` does in the bridge.
 function handleClick() {
-  if (!store.rawHtml) return;
   if (!htmlTemplate.value) return;
-  const selectedPath = store.selectedElementPath;
-  if (selectedPath) {
-    sendToCanvas({ type: 'replace-html', path: selectedPath, html: htmlTemplate.value });
-  } else if (store.rawHtml.includes('data-block-type="placeholder"')) {
-    // Auto-replace placeholder even if user never clicked it first
-    sendToCanvas({ type: 'replace-html', path: '[data-block-type="placeholder"]', html: htmlTemplate.value });
+  const path = store.selectedElementPath;
+  if (path && store.selectedElementTagName === 'placeholder') {
+    sendToCanvas({ type: 'replace-html', path, html: htmlTemplate.value });
+  } else if (path) {
+    sendToCanvas({ type: 'insert-html', path, position: 'after', html: htmlTemplate.value });
   } else {
     sendToCanvas({ type: 'insert-html', path: null, position: 'after', html: htmlTemplate.value });
   }

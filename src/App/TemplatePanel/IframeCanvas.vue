@@ -387,7 +387,10 @@ function handleMessage(event: MessageEvent) {
       store.selectedElementAttrs = data.attrs ?? {};
       store.selectedElementTagName = data.blockType ?? data.tagName ?? '';
       store.selectedElementInnerText = data.innerText ?? '';
+      store.selectedElementInnerHtml = data.innerHtml ?? '';
+      store.selectedElementContentTruncated = data.contentTruncated ?? false;
       store.selectedElementHasRichText = data.hasRichText ?? false;
+      store.selectedElementHasBlockChildren = data.hasBlockChildren ?? false;
       store.selectedElementChildData = data.childData ?? null;
       overlayRect.value = data.rect ?? null;
       store.selectedSidebarTab = 'styles';

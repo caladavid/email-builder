@@ -93,7 +93,10 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   const selectedElementAttrs = ref<Record<string, string>>({});
   const selectedElementTagName = ref<string>('');
   const selectedElementInnerText = ref<string>('');
+  const selectedElementInnerHtml = ref<string>('');
+  const selectedElementContentTruncated = ref<boolean>(false);
   const selectedElementHasRichText = ref<boolean>(false);
+  const selectedElementHasBlockChildren = ref<boolean>(false);
   const selectedElementChildData = ref<Record<string, string> | null>(null);
   const htmlClipboard = ref<string>('');
   const draggedHtml = ref<string>('');
@@ -202,7 +205,10 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     selectedElementAttrs.value = {};
     selectedElementTagName.value = '';
     selectedElementInnerText.value = '';
+    selectedElementInnerHtml.value = '';
+    selectedElementContentTruncated.value = false;
     selectedElementHasRichText.value = false;
+    selectedElementHasBlockChildren.value = false;
     selectedElementChildData.value = null;
 
     document.value = newDocument;
@@ -602,7 +608,10 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     selectedElementAttrs.value = {};
     selectedElementTagName.value = '';
     selectedElementInnerText.value = '';
+    selectedElementInnerHtml.value = '';
+    selectedElementContentTruncated.value = false;
     selectedElementHasRichText.value = false;
+    selectedElementHasBlockChildren.value = false;
     selectedElementChildData.value = null;
     htmlHistory.value = [html];
     htmlHistoryIndex.value = 0;
@@ -653,7 +662,10 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     selectedElementAttrs.value = {};
     selectedElementTagName.value = '';
     selectedElementInnerText.value = '';
+    selectedElementInnerHtml.value = '';
+    selectedElementContentTruncated.value = false;
     selectedElementHasRichText.value = false;
+    selectedElementHasBlockChildren.value = false;
     selectedElementChildData.value = null;
   }
 
@@ -748,7 +760,10 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     selectedElementAttrs,
     selectedElementTagName,
     selectedElementInnerText,
+    selectedElementInnerHtml,
+    selectedElementContentTruncated,
     selectedElementHasRichText,
+    selectedElementHasBlockChildren,
     selectedElementChildData,
     htmlClipboard,
     draggedHtml,
