@@ -12,18 +12,21 @@
     <!-- ── Contenido (block-type-specific) ─────────────────────────────── -->
 
     <!-- PLACEHOLDER -->
-    <StyleSection v-if="blockType === 'placeholder'" title="Bloque vacío">
+    <StyleSection v-if="blockType === 'placeholder'" title="Bloque vacío" :key="store.selectedElementPath">
       <div style="text-align:center;padding:8px 0;color:#64748b;font-size:11px;line-height:1.6;">
         Haz clic en un bloque de la barra izquierda para reemplazar este espacio.
       </div>
     </StyleSection>
 
     <!-- HEADING -->
-    <StyleSection v-else-if="blockType === 'heading'" title="Contenido">
-      <div v-if="store.selectedElementHasRichText" style="font-size:11px;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;padding:6px 8px;">
+    <StyleSection v-else-if="blockType === 'heading'" title="Contenido" :key="store.selectedElementPath">
+      <div v-if="textEditBlocked" style="font-size:11px;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;padding:6px 8px;">
+        ⚠️ Este bloque contiene otro bloque adentro (o es muy largo) — editalo con doble clic directo en el canvas para no perder ese contenido.
+      </div>
+      <div v-else-if="store.selectedElementHasRichText" style="font-size:11px;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;padding:6px 8px;">
         ⚠️ Este texto tiene formato (negrita, enlace, etc.) — escribir acá lo va a borrar. Para conservarlo, editalo con doble click directo en el bloque.
       </div>
-      <StyleRow label="Texto" type="text" :value="store.selectedElementInnerText" placeholder="Texto del encabezado" @change="setInnerText" />
+      <StyleRow v-if="!textEditBlocked" label="Texto" type="text" :value="store.selectedElementInnerText" placeholder="Texto del encabezado" @change="setInnerText" />
       <div style="display:flex;flex-direction:column;gap:5px;">
         <label style="font-size:11px;font-weight:600;color:var(--color-primary);">Nivel</label>
         <div style="display:flex;gap:6px;">
@@ -41,15 +44,18 @@
     </StyleSection>
 
     <!-- TEXT / PARAGRAPH -->
-    <StyleSection v-else-if="blockType === 'text'" title="Contenido">
-      <div v-if="store.selectedElementHasRichText" style="font-size:11px;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;padding:6px 8px;">
+    <StyleSection v-else-if="blockType === 'text'" title="Contenido" :key="store.selectedElementPath">
+      <div v-if="textEditBlocked" style="font-size:11px;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;padding:6px 8px;">
+        ⚠️ Este bloque contiene otro bloque adentro (o es muy largo) — editalo con doble clic directo en el canvas para no perder ese contenido.
+      </div>
+      <div v-else-if="store.selectedElementHasRichText" style="font-size:11px;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;padding:6px 8px;">
         ⚠️ Este texto tiene formato (negrita, enlace, etc.) — escribir acá lo va a borrar. Para conservarlo, editalo con doble click directo en el bloque.
       </div>
-      <StyleRow label="Texto" type="text" :value="store.selectedElementInnerText" placeholder="Texto del párrafo" @change="setInnerText" />
+      <StyleRow v-if="!textEditBlocked" label="Texto" type="textarea" :value="store.selectedElementInnerText" placeholder="Texto del párrafo" @change="setInnerText" />
     </StyleSection>
 
     <!-- BUTTON -->
-    <StyleSection v-else-if="blockType === 'button'" title="Contenido">
+    <StyleSection v-else-if="blockType === 'button'" title="Contenido" :key="store.selectedElementPath">
       <StyleRow label="Texto del botón" type="text" :value="childData.text" placeholder="Texto del botón" @change="setChildInnerText('a', $event)" />
       <div v-if="variableItems.length > 0" style="display:flex;flex-wrap:wrap;align-items:center;gap:4px;">
         <span style="font-size:10px;color:#94a3b8;white-space:nowrap;">Vars:</span>
@@ -70,7 +76,7 @@
     </StyleSection>
 
     <!-- IMAGE (wrapper block) -->
-    <StyleSection v-else-if="blockType === 'image-block'" title="Imagen">
+    <StyleSection v-else-if="blockType === 'image-block'" title="Imagen" :key="store.selectedElementPath">
       <div style="display:flex;flex-direction:column;gap:6px;">
         <label style="font-size:11px;font-weight:600;color:var(--color-primary);">Subir imagen</label>
         <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;padding:5px 12px;border-radius:6px;border:1.5px solid var(--color-primary);background:white;color:var(--color-primary);font-size:11px;font-weight:600;width:fit-content;user-select:none;">
@@ -114,7 +120,7 @@
     </StyleSection>
 
     <!-- IMAGE (direct img tag) -->
-    <StyleSection v-else-if="store.selectedElementTagName === 'IMG'" title="Imagen">
+    <StyleSection v-else-if="store.selectedElementTagName === 'IMG'" title="Imagen" :key="store.selectedElementPath">
       <div style="display:flex;flex-direction:column;gap:6px;">
         <label style="font-size:11px;font-weight:600;color:var(--color-primary);">Subir imagen</label>
         <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;padding:5px 12px;border-radius:6px;border:1.5px solid var(--color-primary);background:white;color:var(--color-primary);font-size:11px;font-weight:600;width:fit-content;user-select:none;">
@@ -131,7 +137,7 @@
     </StyleSection>
 
     <!-- VIDEO -->
-    <StyleSection v-else-if="blockType === 'video'" title="Video">
+    <StyleSection v-else-if="blockType === 'video'" title="Video" :key="store.selectedElementPath">
       <div style="display:flex;flex-direction:column;gap:6px;">
         <label style="font-size:11px;font-weight:600;color:var(--color-primary);">Subir video</label>
         <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;padding:5px 12px;border-radius:6px;border:1.5px solid var(--color-primary);background:white;color:var(--color-primary);font-size:11px;font-weight:600;width:fit-content;user-select:none;">
@@ -163,7 +169,7 @@
     </StyleSection>
 
     <!-- AVATAR -->
-    <StyleSection v-else-if="blockType === 'avatar'" title="Avatar">
+    <StyleSection v-else-if="blockType === 'avatar'" title="Avatar" :key="store.selectedElementPath">
       <div style="display:flex;flex-direction:column;gap:6px;">
         <label style="font-size:11px;font-weight:600;color:var(--color-primary);">Subir imagen</label>
         <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;padding:5px 12px;border-radius:6px;border:1.5px solid var(--color-primary);background:white;color:var(--color-primary);font-size:11px;font-weight:600;width:fit-content;user-select:none;">
@@ -187,35 +193,43 @@
     </StyleSection>
 
     <!-- LINK -->
-    <StyleSection v-else-if="blockType === 'link'" title="Contenido">
-      <StyleRow label="Texto" type="text" :value="store.selectedElementInnerText" placeholder="Texto del enlace" @change="setInnerText" />
-      <div v-if="variableItems.length > 0" style="display:flex;flex-wrap:wrap;align-items:center;gap:4px;">
-        <span style="font-size:10px;color:#94a3b8;white-space:nowrap;">Vars:</span>
-        <button v-for="v in variableItems" :key="v.key" @mousedown.prevent="appendVar(v.key)"
-          style="font-size:10px;padding:1px 7px;border-radius:10px;border:1px solid #c7d8f5;background:#f0f5ff;color:var(--color-primary);cursor:pointer;font-family:monospace;">
-          {{ '{' + v.key + '}' }}
-        </button>
+    <StyleSection v-else-if="blockType === 'link'" title="Contenido" :key="store.selectedElementPath">
+      <div v-if="textEditBlocked" style="font-size:11px;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;padding:6px 8px;">
+        ⚠️ Este bloque contiene otro bloque adentro (o es muy largo) — editalo con doble clic directo en el canvas para no perder ese contenido.
       </div>
+      <template v-else>
+        <StyleRow label="Texto" type="text" :value="store.selectedElementInnerText" placeholder="Texto del enlace" @change="setInnerText" />
+        <div v-if="variableItems.length > 0" style="display:flex;flex-wrap:wrap;align-items:center;gap:4px;">
+          <span style="font-size:10px;color:#94a3b8;white-space:nowrap;">Vars:</span>
+          <button v-for="v in variableItems" :key="v.key" @mousedown.prevent="appendVar(v.key)"
+            style="font-size:10px;padding:1px 7px;border-radius:10px;border:1px solid #c7d8f5;background:#f0f5ff;color:var(--color-primary);cursor:pointer;font-family:monospace;">
+            {{ '{' + v.key + '}' }}
+          </button>
+        </div>
+      </template>
       <StyleRow label="URL" type="text" :value="store.selectedElementAttrs?.href" placeholder="https://..." @change="setAttr('href', $event)" />
     </StyleSection>
 
     <!-- SEPARATOR -->
-    <StyleSection v-else-if="blockType === 'separator'" title="Contenido">
-      <StyleRow label="Color de línea" type="color" :value="childData.borderColor" @change="setChildStyle('hr', 'borderTopColor', $event)" />
-      <StyleRow label="Grosor" type="slider" :max="10" :value="childData.borderWidth" @change="setChildStyle('hr', 'borderTopWidth', $event)" />
+    <StyleSection v-else-if="blockType === 'separator'" title="Contenido" :key="store.selectedElementPath">
+      <StyleRow label="Color de línea" type="color" :value="childData.borderColor" @change="v => { setChildStyle('hr', 'borderTopColor', v); patchChildData({ borderColor: v }); }" />
+      <StyleRow label="Grosor" type="slider" :max="10" :value="childData.borderWidth" @change="v => { setChildStyle('hr', 'borderTopWidth', v); patchChildData({ borderWidth: v }); }" />
     </StyleSection>
 
     <!-- SPACER -->
-    <StyleSection v-else-if="blockType === 'spacer'" title="Contenido">
+    <StyleSection v-else-if="blockType === 'spacer'" title="Contenido" :key="store.selectedElementPath">
       <StyleRow label="Alto" type="slider-text" :max="200" :value="styles.height" placeholder="ej. 32px" @change="setStyle('height', $event)" />
     </StyleSection>
 
     <!-- HTML -->
-    <StyleSection v-else-if="blockType === 'html'" title="Contenido">
-      <div style="display:flex;flex-direction:column;gap:5px;">
+    <StyleSection v-else-if="blockType === 'html'" title="Contenido" :key="store.selectedElementPath">
+      <div v-if="store.selectedElementContentTruncated" style="font-size:11px;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;padding:6px 8px;">
+        ⚠️ Este bloque es muy largo para editar acá sin riesgo de recortarlo — editalo con doble clic directo en el canvas.
+      </div>
+      <div v-else style="display:flex;flex-direction:column;gap:5px;">
         <label style="font-size:11px;font-weight:600;color:var(--color-primary);">HTML</label>
         <textarea
-          :value="store.selectedElementInnerText"
+          :value="store.selectedElementInnerHtml"
           placeholder="HTML personalizado..."
           style="width:100%;font-size:11px;padding:6px 8px;border:1px solid #c7d8f5;border-radius:7px;color:#111;background:white;outline:none;box-sizing:border-box;font-family:monospace;resize:vertical;min-height:80px;"
           @change="setInnerHtml(($event.target as HTMLTextAreaElement).value)"
@@ -224,10 +238,20 @@
     </StyleSection>
 
     <!-- COLUMNAS -->
-    <StyleSection v-else-if="blockType === 'columns'" title="Columnas">
+    <StyleSection v-else-if="blockType === 'columns'" title="Columnas" :key="store.selectedElementPath">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
         <span style="font-size:11px;font-weight:600;color:var(--color-primary);">N° columnas:</span>
-        <span style="font-size:13px;font-weight:700;color:#111;">{{ childData.columnsCount || '—' }}</span>
+        <button type="button" title="Quitar columna" @click="removeColumn"
+          :disabled="(parseInt(childData.columnsCount) || 0) <= 1"
+          style="width:22px;height:22px;border:1px solid #c7d8f5;border-radius:6px;background:white;color:var(--color-primary);font-size:14px;font-weight:700;line-height:1;cursor:pointer;"
+          :style="{ opacity: (parseInt(childData.columnsCount) || 0) <= 1 ? 0.4 : 1, cursor: (parseInt(childData.columnsCount) || 0) <= 1 ? 'not-allowed' : 'pointer' }"
+        >−</button>
+        <span style="font-size:13px;font-weight:700;color:#111;min-width:14px;text-align:center;">{{ childData.columnsCount || '—' }}</span>
+        <button type="button" title="Agregar columna" @click="addColumn"
+          :disabled="(parseInt(childData.columnsCount) || 0) >= 6"
+          style="width:22px;height:22px;border:1px solid #c7d8f5;border-radius:6px;background:white;color:var(--color-primary);font-size:14px;font-weight:700;line-height:1;cursor:pointer;"
+          :style="{ opacity: (parseInt(childData.columnsCount) || 0) >= 6 ? 0.4 : 1, cursor: (parseInt(childData.columnsCount) || 0) >= 6 ? 'not-allowed' : 'pointer' }"
+        >+</button>
       </div>
       <StyleRow label="Espacio entre col." type="slider" :max="48" :value="childData.colGap ? childData.colGap+'px' : '8px'" @change="setColumnsGap" />
       <template v-for="i in (parseInt(childData.columnsCount)||0)" :key="i">
@@ -235,53 +259,70 @@
           placeholder="ej. 33.33% o 200px"
           @change="v => setColumnWidth(i, v)" />
       </template>
-      <StyleRow label="Alineación V" type="select" :value="'top'"
+      <StyleRow label="Alineación V" type="select" :value="childData.vAlign || 'top'"
         :options="[{label:'Arriba',value:'top'},{label:'Centro',value:'middle'},{label:'Abajo',value:'bottom'}]"
-        @change="setChildrenStyle('td', 'verticalAlign', $event)" />
+        @change="v => { setChildrenStyle('td', 'verticalAlign', v); patchChildData({ vAlign: v }); }" />
     </StyleSection>
 
     <!-- CONTENEDOR -->
-    <StyleSection v-else-if="blockType === 'container'" title="Contenedor">
+    <StyleSection v-else-if="blockType === 'container'" title="Contenedor" :key="store.selectedElementPath">
       <StyleRow label="Ancho máximo" type="text" :value="styles.maxWidth||''" placeholder="ej. 600px"
         @change="setStyle('maxWidth', $event)" />
       <StyleRow label="Display" type="select" :value="styles.display||'block'"
-        :options="[{label:'Block',value:'block'},{label:'Flex',value:'flex'}]"
+        :options="displayOptionsR"
         @change="setStyle('display', $event)" />
       <StyleRow label="Alineación texto" type="select" :value="styles.textAlign||'left'"
         :options="alignOptions" @change="setStyle('textAlign', $event)" />
     </StyleSection>
 
     <!-- TABLE -->
-    <StyleSection v-else-if="blockType === 'table'" title="Tabla">
+    <StyleSection v-else-if="blockType === 'table'" title="Tabla" :key="store.selectedElementPath">
       <StyleRow label="Color borde celdas" type="color" :value="childData.cellBorderColor||'#cccccc'"
-        @change="setChildrenStyle('td, th', 'borderColor', $event)" />
+        @change="v => setChildrenStyle('td, th', 'borderColor', v, 'cellBorderColor')" />
       <StyleRow label="Grosor borde" type="slider" :max="8" :value="childData.cellBorderWidth ? childData.cellBorderWidth+'px' : '1px'" @change="setTableBorderWidth" />
       <StyleRow label="Padding celda" type="slider" :max="32" :value="childData.cellPadding ? childData.cellPadding+'px' : '8px'" @change="setTableCellPadding" />
       <StyleRow label="Fondo tabla" type="color" :value="styles.backgroundColor||''"
         @change="setStyle('backgroundColor', $event)" />
     </StyleSection>
 
+    <!-- LISTA -->
+    <StyleSection v-else-if="blockType === 'list'" title="Lista" :key="store.selectedElementPath">
+      <StyleRow label="Tipo" type="select" :value="childData.ordered ? 'ol' : 'ul'"
+        :options="[{label:'Viñetas',value:'ul'},{label:'Numerada',value:'ol'}]"
+        @change="v => setListOrdered(v === 'ol')" />
+      <StyleRow label="Estilo de marcador" type="select" :value="styles.listStyleType || ''"
+        :options="markerOptionsR"
+        @change="v => setStyle('listStyleType', v)" />
+      <div style="font-size:11px;color:#64748b;line-height:1.5;">
+        Agregar o quitar ítems: doble clic en el bloque, luego Enter/Backspace.
+      </div>
+      <template v-for="i in (parseInt(childData.itemCount)||0)" :key="i">
+        <StyleRow :label="`Ítem ${i}`" type="text" :value="childData['li_'+(i-1)+'_text']||''"
+          @change="v => setListItemText(i-1, v)" />
+      </template>
+    </StyleSection>
+
     <!-- Tipografía -->
-    <StyleSection title="Tipografía">
-      <StyleRow label="Color de texto" type="color"  :value="styles.color"          @change="setStyle('color', $event)" />
+    <StyleSection title="Tipografía" :key="store.selectedElementPath">
+      <StyleRow label="Color de texto" type="color" :value="inline.color" :computed-value="styles.color" @change="setStyle('color', $event)" />
       <StyleRow label="Tamaño de fuente" type="slider" :max="72" :value="styles.fontSize"    @change="setStyle('fontSize', $event)" />
       <StyleRow label="Familia de fuente" type="select-text" :value="styles.fontFamily"
         :options="fontFamilyOptions" placeholder="ej. Arial, sans-serif" @change="setStyle('fontFamily', $event)" />
-      <StyleRow label="Peso" type="select" :value="styles.fontWeight"
-        :options="fontWeightOptions" @change="setStyle('fontWeight', $event)" />
+      <StyleRow label="Peso" type="select" :value="fontWeightValue"
+        :options="fontWeightOptionsR" @change="setStyle('fontWeight', $event)" />
       <StyleRow label="Estilo" type="select" :value="styles.fontStyle"
-        :options="fontStyleOptions" @change="setStyle('fontStyle', $event)" />
+        :options="fontStyleOptionsR" @change="setStyle('fontStyle', $event)" />
       <StyleRow label="Decoración" type="select" :value="styles.textDecoration"
-        :options="textDecorationOptions" @change="setStyle('textDecoration', $event)" />
+        :options="textDecorationOptionsR" @change="setStyle('textDecoration', $event)" />
       <StyleRow label="Alineación" type="select" :value="styles.textAlign || 'left'"
         :options="alignOptions" @change="setStyle('textAlign', $event)" />
-      <StyleRow label="Altura de línea" type="slider-text" :max="4" :value="styles.lineHeight" placeholder="ej. 1.5" @change="setStyle('lineHeight', $event)" />
+      <StyleRow label="Altura de línea" type="slider-text" :min="0.8" :max="3" :step="0.1" unit="" :value="styles.lineHeight" placeholder="ej. 1.5" @change="setStyle('lineHeight', $event)" />
       <StyleRow label="Espaciado letras" type="slider-text" :max="20" :value="styles.letterSpacing" placeholder="ej. 0.05em" @change="setStyle('letterSpacing', $event)" />
     </StyleSection>
 
     <!-- Fondo -->
-    <StyleSection title="Fondo">
-      <StyleRow label="Color de fondo" type="color" :value="styles.backgroundColor" @change="setStyle('backgroundColor', $event)" />
+    <StyleSection title="Fondo" :key="store.selectedElementPath">
+      <StyleRow label="Color de fondo" type="color" :value="inline.backgroundColor" :computed-value="styles.backgroundColor" @change="setStyle('backgroundColor', $event)" />
       <div style="display:flex;flex-direction:column;gap:5px;">
         <label style="font-size:11px;font-weight:600;color:var(--color-primary);">Imagen de fondo</label>
         <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;padding:5px 12px;border-radius:6px;border:1.5px solid var(--color-primary);background:white;color:var(--color-primary);font-size:11px;font-weight:600;width:fit-content;user-select:none;">
@@ -299,19 +340,19 @@
           @change="onBgImageChange(($event.target as HTMLInputElement).value)"
         />
       </div>
-      <StyleRow label="Tamaño fondo" type="select" :value="styles.backgroundSize||''"
-        :options="[{label:'Auto',value:'auto'},{label:'Cover',value:'cover'},{label:'Contain',value:'contain'},{label:'100% auto',value:'100% auto'}]"
+      <StyleRow label="Tamaño fondo" type="select" :value="inline.backgroundSize||''"
+        :options="backgroundSizeOptionsR"
         @change="setStyle('backgroundSize', $event)" />
-      <StyleRow label="Posición fondo" type="select" :value="styles.backgroundPosition||''"
-        :options="[{label:'Center',value:'center'},{label:'Top',value:'top'},{label:'Bottom',value:'bottom'},{label:'Left',value:'left'},{label:'Right',value:'right'}]"
+      <StyleRow label="Posición fondo" type="select" :value="inline.backgroundPosition||''"
+        :options="backgroundPositionOptionsR"
         @change="setStyle('backgroundPosition', $event)" />
-      <StyleRow label="Repetición" type="select" :value="styles.backgroundRepeat||''"
-        :options="[{label:'No repeat',value:'no-repeat'},{label:'Repeat',value:'repeat'},{label:'Repeat-X',value:'repeat-x'},{label:'Repeat-Y',value:'repeat-y'}]"
+      <StyleRow label="Repetición" type="select" :value="inline.backgroundRepeat||''"
+        :options="backgroundRepeatOptionsR"
         @change="setStyle('backgroundRepeat', $event)" />
     </StyleSection>
 
     <!-- Padding -->
-    <StyleSection title="Espaciado interno (Padding)">
+    <StyleSection title="Espaciado interno (Padding)" :key="store.selectedElementPath">
       <StyleRow label="Arriba"    type="slider" :max="80" :value="inline.paddingTop"    :computed-value="styles.paddingTop"    @change="setStyle('paddingTop', $event)" />
       <StyleRow label="Derecha"   type="slider" :max="80" :value="inline.paddingRight"  :computed-value="styles.paddingRight"  @change="setStyle('paddingRight', $event)" />
       <StyleRow label="Abajo"     type="slider" :max="80" :value="inline.paddingBottom" :computed-value="styles.paddingBottom" @change="setStyle('paddingBottom', $event)" />
@@ -319,7 +360,7 @@
     </StyleSection>
 
     <!-- Margin -->
-    <StyleSection title="Espaciado externo (Margin)" :defaultOpen="false">
+    <StyleSection title="Espaciado externo (Margin)" :defaultOpen="false" :key="store.selectedElementPath">
       <StyleRow label="Arriba"    type="slider" :max="80" :value="inline.marginTop"    :computed-value="styles.marginTop"    @change="setStyle('marginTop', $event)" />
       <StyleRow label="Derecha"   type="slider" :max="80" :value="inline.marginRight"  :computed-value="styles.marginRight"  @change="setStyle('marginRight', $event)" />
       <StyleRow label="Abajo"     type="slider" :max="80" :value="inline.marginBottom" :computed-value="styles.marginBottom" @change="setStyle('marginBottom', $event)" />
@@ -327,19 +368,23 @@
     </StyleSection>
 
     <!-- Dimensiones -->
-    <StyleSection title="Dimensiones">
+    <StyleSection title="Dimensiones" :key="store.selectedElementPath">
       <StyleRow label="Ancho"      type="slider-text" :max="800" :value="inline.width"    :computed-value="styles.width"    placeholder="ej. 100%" @change="setStyle('width', $event)" />
       <StyleRow label="Alto"       type="slider-text" :max="600" :value="inline.height"   :computed-value="styles.height"   placeholder="ej. auto" @change="setStyle('height', $event)" />
       <StyleRow label="Ancho máx." type="slider-text" :max="800" :value="inline.maxWidth" :computed-value="styles.maxWidth" placeholder="ej. 600px" @change="setStyle('maxWidth', $event)" />
     </StyleSection>
 
     <!-- Borde -->
-    <StyleSection title="Borde" :defaultOpen="false">
-      <StyleRow label="Grosor"      type="slider" :max="10" :value="styles.borderWidth"  @change="setStyle('borderWidth', $event)" />
-      <StyleRow label="Color borde" type="color"            :value="styles.borderColor"  @change="setStyle('borderColor', $event)" />
-      <StyleRow label="Estilo"      type="select"           :value="styles.borderStyle"
-        :options="borderStyleOptions" @change="setStyle('borderStyle', $event)" />
-      <StyleRow label="Radio"       type="slider" :max="50" :value="styles.borderRadius" @change="setStyle('borderRadius', $event)" />
+    <StyleSection title="Borde" :defaultOpen="false" :key="store.selectedElementPath">
+      <div v-if="styles.borderWidthMixed || styles.borderColorMixed || styles.borderStyleMixed"
+        style="font-size:11px;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;padding:6px 8px;margin-bottom:4px;">
+        ⚠️ Los lados no son todos iguales — se muestra el valor del lado superior; aplicar aquí lo pareja en los 4 lados.
+      </div>
+      <StyleRow label="Grosor"      type="slider" :max="10" :value="inline.borderWidth" :computed-value="styles.borderWidth" @change="setBorderWidth" />
+      <StyleRow label="Color borde" type="color"            :value="inline.borderColor" :computed-value="styles.borderColor" @change="setBorderColor" />
+      <StyleRow label="Estilo"      type="select"           :value="inline.borderStyle||''"
+        :options="borderStyleOptionsR" @change="setStyle('borderStyle', $event)" />
+      <StyleRow label="Radio"       type="slider" :max="50" :value="inline.borderRadius" :computed-value="styles.borderRadius" @change="setStyle('borderRadius', $event)" />
     </StyleSection>
   </div>
 
@@ -365,18 +410,20 @@ import EmailLayoutSidebarPanel from './ConfigurationPanel/input-panels/EmailLayo
 import type { EmailLayoutProps } from '@flyhub/email-builder/blocks/EmailLayout';
 import StyleSection from './StylesPanel/StyleSection.vue';
 import StyleRow from './StylesPanel/StyleRow.vue';
-import { normalizeLength, toPxInt } from '../../utils/css-length';
+import { normalizeLength, normalizeCssLength, toPxInt } from '../../utils/css-length';
+import { normalizeFontWeight, reconcileOptions } from '../../utils/style-display';
 
 const store = useInspectorDrawer();
 const block = computed(() => store.document.root);
 const styles = computed(() => store.selectedElementStyles ?? {});
 const inline = computed(() => store.selectedElementInlineStyles ?? {});
 const childData = computed(() => (store.selectedElementChildData ?? {}) as Record<string, string>);
-// For video: when wrapper div selected, attrs come from child <video>; when video element itself, from selectedElementAttrs
-const videoChildData = computed(() => {
-  if (store.selectedElementTagName === 'VIDEO') return (store.selectedElementAttrs ?? {}) as Record<string, any>;
-  return (store.selectedElementChildData ?? {}) as Record<string, any>;
-});
+// canvas-bridge's selectElement() now populates childData.src/poster/controls/
+// autoplay whether the wrapper div OR the <video> element itself is selected
+// (it reads el.tagName === 'VIDEO' directly in that case) — no need to fall
+// back to selectedElementAttrs, which only ever had the raw DOM attributes
+// and not the <source src> fallback the palette's own template needs.
+const videoChildData = computed(() => (store.selectedElementChildData ?? {}) as Record<string, any>);
 
 const uploadWarning = ref(false);
 const isDev = import.meta.env.DEV;
@@ -399,6 +446,7 @@ const variableItems = computed(() =>
 );
 
 function appendVar(key: string) {
+  if (textEditBlocked.value) return; // the field is hidden in this state; guard direct calls too
   setInnerText((store.selectedElementInnerText || '') + `{${key}}`);
 }
 
@@ -412,17 +460,16 @@ const currentImgSrc = computed(() => {
   return '';
 });
 
-const displayImgSrc = computed(() => {
-  const src = currentImgSrc.value;
-  if (!src) return '—';
-  if (src.startsWith('data:')) {
-    const commaIdx = src.indexOf(',');
-    const header = commaIdx > -1 ? src.slice(0, commaIdx) : src.slice(0, 30);
-    const tail = src.slice(-3);
-    return `${header},...${tail}`;
-  }
-  return src.length > 60 ? src.slice(0, 57) + '...' : src;
-});
+// Editing a "Texto"-style field through this panel replaces textContent
+// wholesale — safe for plain text, destructive when the element actually
+// contains a nested real block (hasBlockChildren) or was too large to send
+// in full (contentTruncated, so we'd be writing back a partial value).
+// Those states hide the field entirely rather than just warning, unlike
+// selectedElementHasRichText (inline formatting only — a real but smaller,
+// warn-and-allow loss).
+const textEditBlocked = computed(() =>
+  store.selectedElementHasBlockChildren || store.selectedElementContentTruncated
+);
 
 // ── Block type detection ──────────────────────────────────────────────────────
 
@@ -442,6 +489,7 @@ const blockType = computed(() => {
   if (t === 'Columnas') return 'columns';
   if (t === 'Contenedor') return 'container';
   if (t === 'Table') return 'table';
+  if (t === 'Lista' || t === 'Lista Ordenada' || t === 'UL' || t === 'OL') return 'list';
   return null;
 });
 
@@ -531,6 +579,7 @@ function setInnerText(value: string) {
 function setInnerHtml(value: string) {
   if (!store.selectedElementPath) return;
   sendToCanvas({ type: 'set-innerHTML', path: store.selectedElementPath, value });
+  store.selectedElementInnerHtml = value;
 }
 
 function changeTag(tag: string) {
@@ -553,7 +602,13 @@ function setChildAttr(selector: string, property: string, value: string) {
   // time the canvas sends dom-changed back, the listener is already removed.
   // Fix: directly modify the live iframe DOM (same-origin, synchronous) and
   // snapshot immediately — no race condition.
-  if (selector === 'a' && property === 'href') {
+  // Scoped to image/avatar blocks specifically — the "clear URL → unwrap the
+  // <a>" branch below is meant for "this image is no longer a link", but
+  // without this guard it also fired for the Botón block's own href field:
+  // clearing a button's URL unwrapped its <a>, destroying the button's
+  // background/padding/border-radius (all inline styles on that <a>) along
+  // with it. A Botón's href is set via the normal sendToCanvas path below instead.
+  if (selector === 'a' && property === 'href' && (blockType.value === 'image-block' || blockType.value === 'avatar')) {
     const doc = getCanvasIframe()?.contentDocument;
     if (doc) {
       const target = doc.querySelector(store.selectedElementPath) as HTMLElement | null;
@@ -586,8 +641,12 @@ function setChildAttr(selector: string, property: string, value: string) {
   }
 
   sendToCanvas({ type: 'set-child-attr', path: store.selectedElementPath, selector, property, value });
-  // 'href' is exposed as 'linkHref' in childData (from selectElement in canvas-bridge)
-  const cdKey = (selector === 'a' && property === 'href') ? 'linkHref' : property;
+  // 'href' is exposed as 'linkHref' in childData, but only for the Imagen
+  // block's own separate "Link URL" field (applyLinkHref, above) — a Botón's
+  // URL row reads childData.href directly (line ~67). Remapping unconditionally
+  // used to leave the Botón URL field showing the stale value until the next
+  // full reselect, since the write landed under a key nothing read.
+  const cdKey = (selector === 'a' && property === 'href' && blockType.value === 'image-block') ? 'linkHref' : property;
   store.selectedElementChildData = { ...store.selectedElementChildData, [cdKey]: value };
 }
 
@@ -653,7 +712,7 @@ function setStyle(property: string, value: string) {
   if (!store.selectedElementPath) return;
   let v = value;
   if (LENGTH_PROPS.has(property)) {
-    const normalized = normalizeLength(value);
+    const normalized = normalizeCssLength(property, value);
     if (normalized === null) return; // invalid length — don't send, don't optimistic-write
     v = normalized;
   }
@@ -667,9 +726,38 @@ function setStyle(property: string, value: string) {
   }
 }
 
-function setChildrenStyle(selector: string, property: string, value: string) {
+// Setting a width/color on a borderless element (border-style: none, the
+// browser default) produces zero visible change — the shorthand needs a
+// style too. Piggyback a 'solid' write onto the SAME optimistic update so
+// the panel and canvas agree immediately, only when nothing solid is set yet.
+function ensureBorderStyleSolid() {
+  if (styles.value.borderStyle && styles.value.borderStyle !== 'none') return;
+  if (!store.selectedElementPath) return;
+  sendToCanvas({ type: 'set-style', path: store.selectedElementPath, property: 'borderStyle', value: 'solid' });
+  store.selectedElementStyles = { ...store.selectedElementStyles, borderStyle: 'solid' };
+  store.selectedElementInlineStyles = { ...store.selectedElementInlineStyles, borderStyle: 'solid' };
+}
+function setBorderWidth(v: string) { ensureBorderStyleSolid(); setStyle('borderWidth', v); }
+function setBorderColor(v: string) { ensureBorderStyleSolid(); setStyle('borderColor', v); }
+
+// childDataKey: optional key to optimistically patch under — setChildrenStyle
+// used to write NOTHING optimistic at all (unlike setChildStyle/setChildAttr),
+// so every Table row it drives froze at its stale value for the whole
+// round-trip to the next notifyStyleDebounced resync.
+function setChildrenStyle(selector: string, property: string, value: string, childDataKey?: string) {
   if (!store.selectedElementPath) return;
   sendToCanvas({ type: 'set-children-style', path: store.selectedElementPath, selector, property, value });
+  if (childDataKey) patchChildData({ [childDataKey]: value });
+}
+
+// Optimistic childData write for multi-action setters below — several of them
+// were writing under a key nothing reads (e.g. Separador's color setter wrote
+// borderTopColor while the row reads childData.borderColor), so the widget
+// showed a stale value for the whole 120ms round-trip to the next
+// notifyStyleDebounced → selectElement resync. setChildrenStyle in particular
+// wrote NO optimistic value at all, freezing the Table rows during any drag.
+function patchChildData(patch: Record<string, string>) {
+  store.selectedElementChildData = { ...store.selectedElementChildData, ...patch };
 }
 
 // ── Block-specific multi-action helpers ───────────────────────────────────────
@@ -677,6 +765,10 @@ function setChildrenStyle(selector: string, property: string, value: string) {
 function setAvatarSize(v: string) {
   setChildStyle('img', 'width', v);
   setChildStyle('img', 'height', v);
+  // Read back as childData.size, a bare number the row re-appends 'px' to —
+  // not childData.width/height, which is what setChildStyle's generic
+  // key-mapping would have written instead.
+  patchChildData({ size: String(toPxInt(v) ?? (parseInt(v) || 0)) });
 }
 
 function setImageWidth(raw: string) {
@@ -692,6 +784,12 @@ function setImageWidth(raw: string) {
     const wrapPx = toPxInt(childData.value.wrapMaxWidth || '');
     if (wrapPx !== null && px > wrapPx) setStyle('maxWidth', v);
   }
+  // Read back as childData.imgWidth — setChildStyle('img','width',v) above
+  // already patched under 'width', a key this row never reads. Height is
+  // forced to 'auto' above (aspect ratio) — clear the stale explicit height
+  // so the Alto field falls back to its 'auto' placeholder instead of
+  // showing whatever px value was there before this width change.
+  patchChildData({ imgWidth: v, imgHeight: '' });
 }
 
 function setImageHeight(raw: string) {
@@ -700,38 +798,95 @@ function setImageHeight(raw: string) {
   setChildStyle('img', 'height', v);
   const px = toPxInt(v);
   setChildAttr('img', 'height', px === null ? '' : String(px));
+  patchChildData({ imgHeight: v });
 }
 
 function setAvatarShape(v: string) {
   const radius = v === 'circle' ? '50%' : v === 'rounded' ? '8px' : '0';
   setChildStyle('img', 'borderRadius', radius);
+  patchChildData({ shape: v }); // setChildStyle would have patched under 'borderRadius', not 'shape'
 }
 
 function setBtnPaddingH(v: string) {
   setChildStyle('a', 'paddingLeft', v);
   setChildStyle('a', 'paddingRight', v);
+  patchChildData({ btnPaddingH: v });
 }
 
 function setBtnPaddingV(v: string) {
   setChildStyle('a', 'paddingTop', v);
   setChildStyle('a', 'paddingBottom', v);
+  patchChildData({ btnPaddingV: v });
 }
 
 function setColumnsGap(v: string) {
+  // Per-side longhands only — the shorthand 'padding' also overwrote the
+  // cell's own vertical padding (whatever the template had), and reading
+  // paddingLeft back as "the gap" without ever multiplying by 2 meant the
+  // displayed value HALVED itself on every single reselect.
   const half = Math.round(parseInt(v) / 2) + 'px';
-  setChildrenStyle('td', 'padding', half);
+  setChildrenStyle('td', 'paddingLeft', half);
+  setChildrenStyle('td', 'paddingRight', half);
+  patchChildData({ colGap: String(parseInt(v) || 0) });
 }
 
-function setColumnWidth(colIndex: number, v: string) {
-  setChildStyle(`tr:first-child > td:nth-child(${colIndex})`, 'width', v);
+// Flips ul<->ol AND the data-block-type marker in the SAME change-tag
+// command (see the comment on change-tag in canvas-bridge.ts) — sending them
+// as two separate commands would race, since the second one needs the path
+// the first one's replaceChild just created.
+function setListOrdered(ordered: boolean) {
+  if (!store.selectedElementPath) return;
+  sendToCanvas({
+    type: 'change-tag',
+    path: store.selectedElementPath,
+    tag: ordered ? 'ol' : 'ul',
+    attrs: { 'data-block-type': ordered ? 'Lista Ordenada' : 'Lista' },
+  });
+}
+
+// set-child-text (unlike most other commands) doesn't trigger a full
+// selectElement resync on its own — the optimistic patchChildData write
+// below is the only thing keeping the OTHER items' fields from reverting
+// while this one is mid-edit.
+function setListItemText(index: number, value: string) {
+  if (!store.selectedElementPath) return;
+  sendToCanvas({ type: 'set-child-text', path: store.selectedElementPath, selector: `li:nth-child(${index + 1})`, value });
+  patchChildData({ ['li_' + index + '_text']: value });
+}
+
+function addColumn() {
+  if (!store.selectedElementPath) return;
+  sendToCanvas({ type: 'columns-add', path: store.selectedElementPath });
+}
+
+function removeColumn() {
+  if (!store.selectedElementPath) return;
+  sendToCanvas({ type: 'columns-remove', path: store.selectedElementPath });
+}
+
+function setColumnWidth(colIndex: number, raw: string) {
+  const v = normalizeLength(raw);
+  if (v === null) return; // invalid length — don't send, don't optimistic-write
+  const sel = `tr:first-child > td:nth-child(${colIndex})`;
+  setChildStyle(sel, 'width', v);
+  // Keep the attribute in sync too — Outlook/legacy clients only honour the
+  // width ATTRIBUTE, not the inline style, so leaving it stale would silently
+  // desync what the editor shows from what actually ships in the export.
+  const px = toPxInt(v);
+  setChildAttr(sel, 'width', v.endsWith('%') ? v : (px === null ? '' : String(px)));
+  patchChildData({ ['col_' + (colIndex - 1) + '_width']: v });
 }
 
 function setTableBorderWidth(v: string) {
+  // childData reads cellBorderWidth as a bare number (it appends 'px' itself), unlike
+  // the CSS value the canvas needs — strip the unit before patching the optimistic copy.
   setChildrenStyle('td, th', 'borderWidth', v);
+  patchChildData({ cellBorderWidth: String(toPxInt(v) ?? (parseInt(v) || 0)) });
 }
 
 function setTableCellPadding(v: string) {
   setChildrenStyle('td, th', 'padding', v);
+  patchChildData({ cellPadding: String(toPxInt(v) ?? (parseInt(v) || 0)) });
 }
 
 function handleUpdateData(data: Omit<EmailLayoutProps, 'document'>) {
@@ -762,17 +917,21 @@ const fontFamilyOptions = [
 
 
 const fontWeightOptions = [
-  { label: 'Normal (400)',   value: '400' },
+  { label: 'Extra ligero (100)', value: '100' },
+  { label: 'Ligero (200)',   value: '200' },
   { label: 'Ligero (300)',   value: '300' },
+  { label: 'Normal (400)',   value: '400' },
   { label: 'Medio (500)',    value: '500' },
   { label: 'Semi-negrita (600)', value: '600' },
   { label: 'Negrita (700)', value: '700' },
   { label: 'Extra negrita (800)', value: '800' },
+  { label: 'Máxima negrita (900)', value: '900' },
 ];
 
 const fontStyleOptions = [
   { label: 'Normal', value: 'normal' },
   { label: 'Cursiva', value: 'italic' },
+  { label: 'Oblicua', value: 'oblique' },
 ];
 
 const textDecorationOptions = [
@@ -782,12 +941,58 @@ const textDecorationOptions = [
   { label: 'Sobrelineado', value: 'overline' },
 ];
 
+// The Encabezado palette template ships font-weight:bold — normalize it to
+// the numeric string the select's options list actually contains before
+// even reconciling, so it lands on "Negrita (700)" instead of a synthetic
+// "bold (actual)" entry.
+const fontWeightValue = computed(() => normalizeFontWeight(styles.value.fontWeight || ''));
+const fontWeightOptionsR = computed(() => reconcileOptions(fontWeightValue.value, fontWeightOptions));
+const fontStyleOptionsR = computed(() => reconcileOptions(styles.value.fontStyle || '', fontStyleOptions));
+const textDecorationOptionsR = computed(() => reconcileOptions(styles.value.textDecoration || '', textDecorationOptions));
+
+const backgroundSizeOptions = [
+  { label: 'Auto', value: 'auto' }, { label: 'Cover', value: 'cover' },
+  { label: 'Contain', value: 'contain' }, { label: '100% auto', value: '100% auto' },
+];
+const backgroundPositionOptions = [
+  { label: 'Center', value: 'center' }, { label: 'Top', value: 'top' }, { label: 'Bottom', value: 'bottom' },
+  { label: 'Left', value: 'left' }, { label: 'Right', value: 'right' },
+];
+const backgroundRepeatOptions = [
+  { label: 'No repeat', value: 'no-repeat' }, { label: 'Repeat', value: 'repeat' },
+  { label: 'Repeat-X', value: 'repeat-x' }, { label: 'Repeat-Y', value: 'repeat-y' },
+];
+const backgroundSizeOptionsR = computed(() => reconcileOptions(inline.value.backgroundSize || '', backgroundSizeOptions, styles.value.backgroundSize));
+const backgroundPositionOptionsR = computed(() => reconcileOptions(inline.value.backgroundPosition || '', backgroundPositionOptions, styles.value.backgroundPosition));
+const backgroundRepeatOptionsR = computed(() => reconcileOptions(inline.value.backgroundRepeat || '', backgroundRepeatOptions, styles.value.backgroundRepeat));
+
+const displayOptions = [{ label: 'Block', value: 'block' }, { label: 'Flex', value: 'flex' }];
+const displayOptionsR = computed(() => reconcileOptions(styles.value.display || 'block', displayOptions));
+
 const alignOptions = [
   { label: 'Izquierda', value: 'left' },
   { label: 'Centro',    value: 'center' },
   { label: 'Derecha',   value: 'right' },
   { label: 'Justificado', value: 'justify' },
 ];
+
+const unorderedMarkerOptions = [
+  { label: 'Disco', value: 'disc' },
+  { label: 'Círculo', value: 'circle' },
+  { label: 'Cuadrado', value: 'square' },
+  { label: 'Ninguno', value: 'none' },
+];
+
+const orderedMarkerOptions = [
+  { label: 'Números (1, 2, 3)', value: 'decimal' },
+  { label: 'Letras minúsculas (a, b, c)', value: 'lower-alpha' },
+  { label: 'Números romanos (i, ii, iii)', value: 'lower-roman' },
+  { label: 'Ninguno', value: 'none' },
+];
+const markerOptionsR = computed(() => reconcileOptions(
+  styles.value.listStyleType || '',
+  childData.value.ordered ? orderedMarkerOptions : unorderedMarkerOptions
+));
 
 const borderStyleOptions = [
   { label: 'Sólido',    value: 'solid' },
@@ -796,4 +1001,5 @@ const borderStyleOptions = [
   { label: 'Doble',     value: 'double' },
   { label: 'Ninguno',   value: 'none' },
 ];
+const borderStyleOptionsR = computed(() => reconcileOptions(inline.value.borderStyle || '', borderStyleOptions, styles.value.borderStyle));
 </script>

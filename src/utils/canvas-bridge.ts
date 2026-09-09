@@ -2,6 +2,7 @@
 // assigns `window.DOMPurify` there (no module system present in that context).
 import purifySrc from 'dompurify/dist/purify.min.js?raw';
 import { sanitizePastedHtml } from './pasteSanitizer';
+import { isFillerNode, hasRealChildren, readColumnsChildData, collapseSides, getElementPath } from './canvasDomHelpers';
 
 export const CANVAS_BRIDGE_CODE = purifySrc + `
 (function () {
@@ -32,10 +33,23 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
   // runtime and the tested source can never drift apart.
   var sanitizePastedHtml = ${sanitizePastedHtml.toString()};
 
+  // Real functions live in src/utils/canvasDomHelpers.ts (unit tested there
+  // via vitest/happy-dom) — embedded verbatim via toString(), same contract
+  // as sanitizePastedHtml above: each must be fully self-contained.
+  var isFillerNode = ${isFillerNode.toString()};
+  var hasRealChildren = ${hasRealChildren.toString()};
+  var collapseSides = ${collapseSides.toString()};
+  var readColumnsChildData = ${readColumnsChildData.toString()};
+  var getElementPath = ${getElementPath.toString()};
+
   const IGNORE_TAGS = new Set(['HTML', 'HEAD', 'BODY', 'STYLE', 'SCRIPT', 'META', 'LINK', 'TITLE', 'NOSCRIPT']);
   // Denylist: any element NOT in this set can be inline-edited on dblclick
   const NON_EDITABLE_TAGS = new Set(['TABLE', 'THEAD', 'TBODY', 'TFOOT', 'TR', 'COLGROUP', 'COL', 'IMG', 'VIDEO', 'AUDIO', 'CANVAS', 'SVG', 'IFRAME', 'OBJECT', 'EMBED', 'FORM', 'INPUT', 'SELECT', 'TEXTAREA', 'BUTTON', 'BR', 'HR', 'WBR']);
   const TABLE_INT = new Set(['TR', 'TD', 'TH', 'TBODY', 'THEAD', 'TFOOT', 'COLGROUP', 'COL']);
+  // Real block-level elements — used to detect "this text field would delete
+  // a real nested block if you typed through it", distinct from inline
+  // formatting (b/i/span/a), which only loses styling, not whole blocks.
+  const BLOCK_LEVEL_TAGS = new Set(['P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'TABLE', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'SECTION', 'ARTICLE', 'HEADER', 'FOOTER', 'FIGURE', 'IMG', 'HR', 'VIDEO', 'IFRAME']);
 
   var hoveredEl = null;
   var selectedEl = null;
@@ -160,25 +174,6 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
     return target || null;
   }
 
-  function getElementPath(el) {
-    if (!el || el === document.body) return 'body';
-    var parts = [];
-    var cur = el;
-    while (cur && cur !== document.body && cur !== document.documentElement) {
-      var parent = cur.parentElement;
-      if (!parent) break;
-      var siblings = Array.from(parent.children).filter(function(s) { return s.tagName === cur.tagName; });
-      var sel = cur.tagName.toLowerCase();
-      if (siblings.length > 1) {
-        var idx = siblings.indexOf(cur);
-        sel += ':nth-of-type(' + (idx + 1) + ')';
-      }
-      parts.unshift(sel);
-      cur = parent;
-    }
-    return 'body > ' + parts.join(' > ');
-  }
-
   // Single source of truth for the style properties the panel reads. Plain 1:1
   // properties only — textAlign/textDecoration need extra logic and are handled
   // separately below. Kept as a flat list (not a map) so getInlineStyles (added
@@ -190,7 +185,7 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
     'marginTop', 'marginRight', 'marginBottom', 'marginLeft',
     'width', 'height', 'maxWidth',
     'borderWidth', 'borderColor', 'borderStyle', 'borderRadius',
-    'display',
+    'display', 'listStyleType',
   ];
 
   function getElementStyles(el) {
@@ -202,6 +197,15 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
       var k = STYLE_KEYS[i];
       out[k] = pick(s[k], cs[k]);
     }
+    // Per-side computed values, always real (getComputedStyle never returns
+    // ''), so collapseSides sees the browser's true resolved border — not
+    // just what happens to be set inline on this one element.
+    var widthC = collapseSides(cs.borderTopWidth, cs.borderRightWidth, cs.borderBottomWidth, cs.borderLeftWidth);
+    var colorC = collapseSides(cs.borderTopColor, cs.borderRightColor, cs.borderBottomColor, cs.borderLeftColor);
+    var styleC = collapseSides(cs.borderTopStyle, cs.borderRightStyle, cs.borderBottomStyle, cs.borderLeftStyle);
+    out.borderWidth = widthC.value; out.borderWidthMixed = widthC.mixed ? '1' : '';
+    out.borderColor = colorC.value; out.borderColorMixed = colorC.mixed ? '1' : '';
+    out.borderStyle = styleC.value; out.borderStyleMixed = styleC.mixed ? '1' : '';
     out.textAlign = (function(v){ return v==='start'?'left':v==='end'?'right':v; })(pick(s.textAlign, cs.textAlign));
     out.textDecoration = (function() {
       if (s.textDecoration) return s.textDecoration;
@@ -224,6 +228,12 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
       var k = STYLE_KEYS[i];
       out[k] = s[k] || '';
     }
+    var widthC = collapseSides(s.borderTopWidth || '', s.borderRightWidth || '', s.borderBottomWidth || '', s.borderLeftWidth || '');
+    var colorC = collapseSides(s.borderTopColor || '', s.borderRightColor || '', s.borderBottomColor || '', s.borderLeftColor || '');
+    var styleC = collapseSides(s.borderTopStyle || '', s.borderRightStyle || '', s.borderBottomStyle || '', s.borderLeftStyle || '');
+    out.borderWidth = widthC.value; out.borderWidthMixed = widthC.mixed ? '1' : '';
+    out.borderColor = colorC.value; out.borderColorMixed = colorC.mixed ? '1' : '';
+    out.borderStyle = styleC.value; out.borderStyleMixed = styleC.mixed ? '1' : '';
     return out;
   }
 
@@ -389,12 +399,8 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
         childData.shape = br === '50%' ? 'circle' : (br && br !== '0' && br !== '0px') ? 'rounded' : 'square';
       }
     } else if (blockType === 'Columnas') {
-      var colTds = el.querySelectorAll('tr:first-child > td, tr:first-child > th');
-      childData.columnsCount = String(colTds.length);
-      childData.colGap = colTds[0] ? (colTds[0].style.paddingLeft || '8').replace('px', '') : '8';
-      for (var ci = 0; ci < colTds.length; ci++) {
-        childData['col_' + ci + '_width'] = colTds[ci].style.width || '';
-      }
+      var colData = readColumnsChildData(el);
+      for (var colKey in colData) { if (colData.hasOwnProperty(colKey)) childData[colKey] = colData[colKey]; }
     } else if (blockType === 'Table') {
       var firstTd = el.querySelector('td');
       if (firstTd) {
@@ -402,13 +408,30 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
         childData.cellBorderWidth = (firstTd.style.borderWidth || firstTd.style.borderTopWidth || '1').replace('px', '');
         childData.cellPadding = (firstTd.style.padding || firstTd.style.paddingTop || '8').replace('px', '');
       }
-    } else if (blockType === 'video') {
-      var vidEl = el.querySelector('video');
+    } else if (blockType === 'video' || blockType === 'Video' || el.tagName === 'VIDEO') {
+      // The lowercase 'video' branch matched VideoReader.vue's own rendered
+      // output (data-block-type="video"), but the palette's own insert
+      // template emits "Video" (capital V, buttons.ts) — a freshly-inserted
+      // Video block never matched this branch at all, so the panel showed
+      // empty src/poster and unchecked Controles/Autoplay even though the
+      // template ships the controls attribute.
+      var vidEl = el.tagName === 'VIDEO' ? el : el.querySelector('video');
       if (vidEl) {
-        childData.src = vidEl.getAttribute('src') || '';
+        // The palette template puts the URL on <source src>, not on the
+        // <video> element itself — read whichever one actually has it.
+        var vidSource = vidEl.querySelector('source');
+        childData.src = vidEl.getAttribute('src') || (vidSource ? vidSource.getAttribute('src') : '') || '';
         childData.poster = vidEl.getAttribute('poster') || '';
-        childData.controls = vidEl.hasAttribute('controls') ? 'controls' : null;
-        childData.autoplay = vidEl.hasAttribute('autoplay') ? 'autoplay' : null;
+        childData.controls = vidEl.hasAttribute('controls') ? 'controls' : '';
+        childData.autoplay = vidEl.hasAttribute('autoplay') ? 'autoplay' : '';
+      }
+    } else if (blockType === 'Lista' || blockType === 'Lista Ordenada' || el.tagName === 'UL' || el.tagName === 'OL') {
+      var liEls = el.querySelectorAll(':scope > li');
+      childData.itemCount = String(liEls.length);
+      childData.ordered = (el.tagName === 'OL') ? '1' : '';
+      childData.markerStyle = el.style.listStyleType || '';
+      for (var liI = 0; liI < liEls.length; liI++) {
+        childData['li_' + liI + '_text'] = (liEls[liI].textContent || '').trim();
       }
     }
     // Does this element contain formatting (bold/link/line-break/etc.)? The "Texto"
@@ -418,6 +441,26 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
     for (var _rtI = 0; _rtI < el.childNodes.length; _rtI++) {
       if (el.childNodes[_rtI].nodeType === 1) { hasRichText = true; break; }
     }
+    // Stronger than hasRichText: does it contain a BLOCK-level child (a
+    // nested heading, paragraph, list...)? Overwriting textContent here
+    // doesn't just lose inline formatting, it DELETES that whole nested
+    // block — production bug: an imported <div><h1>Title</h1></div> that got
+    // auto-tagged "Texto" on the wrapper had its <h1> silently erased the
+    // first time someone used the "Texto" field. hasBlockChildren gates
+    // hiding the field entirely (see StylesPanel.vue); set-inner-text below
+    // refuses to run on one regardless, as a second line of defense for
+    // content that predates this check.
+    var hasBlockChildren = false;
+    for (var _bcI = 0; _bcI < el.children.length; _bcI++) {
+      if (BLOCK_LEVEL_TAGS.has(el.children[_bcI].tagName)) { hasBlockChildren = true; break; }
+    }
+    // No truncation — an earlier 200-char slice() meant editing (or even just
+    // clicking "insert variable" on) any longer block silently chopped it.
+    // Still capped, generously, so a resync during hover/scroll on a huge
+    // imported template doesn't ship the whole document over postMessage.
+    var _rawInnerText = (el.innerText || '').trim();
+    var _rawInnerHtml = blockType === 'Html' ? (el.innerHTML || '') : '';
+    var TEXT_CAP = 20000, HTML_CAP = 50000;
     parent.postMessage({
       type: 'select',
       path: getElementPath(el),
@@ -426,8 +469,11 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
       attrs: getElementAttrs(el),
       tagName: el.tagName,
       blockType: blockType || null,
-      innerText: (el.innerText || '').trim().slice(0, 200),
+      innerText: _rawInnerText.slice(0, TEXT_CAP),
+      innerHtml: _rawInnerHtml.slice(0, HTML_CAP),
+      contentTruncated: _rawInnerText.length > TEXT_CAP || _rawInnerHtml.length > HTML_CAP,
       hasRichText: hasRichText,
+      hasBlockChildren: hasBlockChildren,
       childData: childData,
       rect: {
         top: rect.top + window.scrollY,
@@ -628,11 +674,13 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
   // Prevents stale/tiny overlayRect when image hasn't loaded yet.
   function selectAfterImagesLoad(el) {
     var gen = ++_selectGen;
+    // Select IMMEDIATELY — the panel should reflect the freshly-inserted
+    // block right away, not wait on image loads. If the image host never
+    // responds, this used to be the ONLY select that ever happened, up to
+    // 5s later; now it's just a rect correction once images actually settle.
+    selectElement(el);
     var imgs = el.querySelectorAll('img');
-    if (imgs.length === 0) {
-      if (gen === _selectGen) selectElement(el);
-      return;
-    }
+    if (imgs.length === 0) return;
     var pending = imgs.length;
     function done() {
       pending--;
@@ -642,7 +690,7 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
       if (imgs[i].complete) { done(); }
       else {
         (function(img) {
-          var t = setTimeout(done, 5000);
+          var t = setTimeout(done, 1500);
           img.addEventListener('load', function() { clearTimeout(t); done(); }, { once: true });
           img.addEventListener('error', function() { clearTimeout(t); done(); }, { once: true });
         })(imgs[i]);
@@ -685,7 +733,7 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
             _rmSpans.forEach(function(_rms) {
               if (_rms.style[cmd.property]) {
                 _rms.style[cmd.property] = '';
-                var _rmsStyle = (_rms.getAttribute('style') || '').replace(/[\s;]/g, '');
+                var _rmsStyle = (_rms.getAttribute('style') || '').replace(/[\\s;]/g, '');
                 if (!_rmsStyle && !_rms.className) {
                   var _rmsFrag = document.createDocumentFragment();
                   while (_rms.firstChild) _rmsFrag.appendChild(_rms.firstChild);
@@ -738,7 +786,7 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
                 var _asNTag = _asN.tagName;
                 var _asNIsW = (_asNTag === 'SPAN' || _asNTag === 'U' || _asNTag === 'S' || _asNTag === 'STRIKE');
                 if (_asN.style) _asN.style[cmd.property] = '';
-                var _asNStyle = (_asN.getAttribute('style') || '').replace(/[\s;]/g, '');
+                var _asNStyle = (_asN.getAttribute('style') || '').replace(/[\\s;]/g, '');
                 if (_asNIsW && !_asNStyle && !_asN.className) {
                   var _asNFrag = document.createDocumentFragment();
                   while (_asN.firstChild) _asNFrag.appendChild(_asN.firstChild);
@@ -772,7 +820,7 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
                 var _asETag = _asExistSpan.tagName;
                 var _asIsWrapper = (_asETag === 'SPAN' || _asETag === 'U' || _asETag === 'S' || _asETag === 'STRIKE');
                 if (_asExistSpan.style) _asExistSpan.style[cmd.property] = '';
-                var _asStyleStr = (_asExistSpan.getAttribute('style') || '').replace(/[\s;]/g, '');
+                var _asStyleStr = (_asExistSpan.getAttribute('style') || '').replace(/[\\s;]/g, '');
                 // Only unwrap inline wrappers (SPAN/U/S) with no remaining style — don't unwrap block elements
                 if (_asIsWrapper && !_asStyleStr && !_asExistSpan.className) {
                   var _ph = document.createDocumentFragment();
@@ -868,7 +916,22 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
         break;
 
       case 'set-inner-text':
-        if (target) { target.textContent = cmd.value || ''; }
+        if (target) {
+          // Refuse to nuke a real nested block (e.g. a <div><h1> that got
+          // auto-tagged Texto on the wrapper) — textContent= would silently
+          // delete it. StylesPanel already hides this field in that state;
+          // this is the second line of defense for content saved before
+          // that check existed, or reached via a direct command.
+          var _sitBlocked = false;
+          for (var _sitI = 0; _sitI < target.children.length; _sitI++) {
+            if (BLOCK_LEVEL_TAGS.has(target.children[_sitI].tagName)) { _sitBlocked = true; break; }
+          }
+          if (_sitBlocked) {
+            parent.postMessage({ type: 'command-rejected', command: 'set-inner-text', reason: 'block-children' }, _parentOrigin);
+            break;
+          }
+          target.textContent = cmd.value || '';
+        }
         notifyDomChanged();
         if (target === selectedEl) selectElement(target);
         break;
@@ -889,8 +952,15 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
           if (chAttr) {
             if (cmd.value === '') {
               chAttr.removeAttribute(cmd.property);
-              // Unwrap <a> with no href so it doesn't leave an inert anchor tag
-              if (cmd.selector === 'a' && cmd.property === 'href' && !chAttr.getAttribute('href')) {
+              // Unwrap <a> with no href — but ONLY when it wraps just an
+              // image (the "this image is no longer a link" case this was
+              // written for). A Botón's <a> IS the button — all of its
+              // background/padding/border-radius styling lives on that same
+              // element, so unwrapping it on an empty URL used to destroy the
+              // whole button. Leave a non-image <a> in place as an inert
+              // (href-less) anchor instead; its styling survives.
+              var _wrapsOnlyImg = cmd.selector === 'a' && chAttr.querySelector('img') && !(chAttr.textContent || '').trim();
+              if (cmd.selector === 'a' && cmd.property === 'href' && !chAttr.getAttribute('href') && _wrapsOnlyImg) {
                 var _unwrapFrag = document.createDocumentFragment();
                 while (chAttr.firstChild) _unwrapFrag.appendChild(chAttr.firstChild);
                 if (chAttr.parentNode) chAttr.parentNode.replaceChild(_unwrapFrag, chAttr);
@@ -942,6 +1012,15 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
             var a = target.attributes[ai];
             newEl.setAttribute(a.name, a.value);
           }
+          // Optional attribute overrides applied in the SAME command as the
+          // tag swap (e.g. Lista -> Lista Ordenada alongside ul -> ol) — doing
+          // it in one round-trip avoids a second command racing the new
+          // element's path, which only exists after this one lands.
+          if (cmd.attrs) {
+            for (var attrKey in cmd.attrs) {
+              if (cmd.attrs.hasOwnProperty(attrKey)) newEl.setAttribute(attrKey, cmd.attrs[attrKey]);
+            }
+          }
           newEl.innerHTML = target.innerHTML;
           var headingSizes = { h1:'36px', h2:'28px', h3:'22px', h4:'18px', h5:'16px', h6:'14px' };
           var hSize = headingSizes[cmd.tag.toLowerCase()];
@@ -964,13 +1043,22 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
           var deleteIsNested = deleteParent && (deleteParent.tagName === 'TD' || deleteParentType === 'Contenedor');
           target.remove();
           if (deleteIsNested) {
-            var nestedKids = [].slice.call(deleteParent.children).filter(function(c) {
-              return c.tagName !== 'SCRIPT' && c.getAttribute('data-block-type') !== 'placeholder';
-            });
-            if (nestedKids.length === 0) deleteParent.appendChild(makePlaceholder());
+            if (!hasRealChildren(deleteParent)) {
+              // Sweep any filler debris too (e.g. the empty <p>s a broken
+              // "<div> inside a <p>" template leaves behind) — a container
+              // reported as having no real children should end up with
+              // NOTHING but the fresh placeholder, not filler + placeholder.
+              while (deleteParent.firstElementChild) deleteParent.removeChild(deleteParent.firstElementChild);
+              deleteParent.appendChild(makePlaceholder());
+            }
           } else {
-            var remaining = [].slice.call(document.body.children).filter(function(c) { return c.tagName !== 'SCRIPT'; });
-            if (remaining.length === 0) document.body.appendChild(makePlaceholder());
+            if (!hasRealChildren(document.body)) {
+              var _bodyKids = [].slice.call(document.body.children);
+              for (var _bkI = 0; _bkI < _bodyKids.length; _bkI++) {
+                if (_bodyKids[_bkI].tagName !== 'SCRIPT' && _bodyKids[_bkI].tagName !== 'STYLE') document.body.removeChild(_bodyKids[_bkI]);
+              }
+              document.body.appendChild(makePlaceholder());
+            }
           }
           notifyDomChanged();
           parent.postMessage({ type: 'deselect' }, _parentOrigin);
@@ -980,54 +1068,35 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
 
       case 'duplicate':
         if (target) {
+          // TD/TH/TR/... are structural table pieces, not a "block" — cloning
+          // one silently adds a column/row with no UI to remove it again
+          // (column count elsewhere is display-only text). Reject instead of
+          // corrupting the table; no notifyDomChanged means no undo entry either.
+          if (TABLE_INT.has(target.tagName)) {
+            parent.postMessage({ type: 'command-rejected', command: 'duplicate', reason: 'table-internal' }, _parentOrigin);
+            break;
+          }
           var clone = target.cloneNode(true);
           clone.style.outline = '';
           clone.style.outlineOffset = '';
+          clone.removeAttribute('id');
+          clone.removeAttribute('draggable');
+          clone.removeAttribute('contenteditable');
+          var _dupIds = clone.querySelectorAll('[id]');
+          for (var _dI = 0; _dI < _dupIds.length; _dI++) _dupIds[_dI].removeAttribute('id');
           target.after(clone);
           notifyDomChanged();
           selectElement(clone);
         }
         break;
 
-      case 'move-up': {
-        if (target) {
-          // TD/TH → start from parent TR directly
-          var muEl = (target.tagName === 'TD' || target.tagName === 'TH') && target.parentElement
-            ? target.parentElement : target;
-          // If element itself has no prev sibling, try its nearest TR ancestor (one table level up max)
-          if (!muEl.previousElementSibling) {
-            var muWalk = muEl.parentElement;
-            while (muWalk && muWalk !== document.body && muWalk.tagName !== 'TR') {
-              muWalk = muWalk.parentElement;
-            }
-            if (muWalk && muWalk !== document.body && muWalk.tagName === 'TR') muEl = muWalk;
-          }
-          if (!muEl || !muEl.previousElementSibling) break;
-          muEl.parentElement.insertBefore(muEl, muEl.previousElementSibling);
-          notifyDomChanged();
-          selectElement(target);
-        }
+      case 'move-up':
+        moveBlock(target, 'prev');
         break;
-      }
 
-      case 'move-down': {
-        if (target) {
-          var mdEl = (target.tagName === 'TD' || target.tagName === 'TH') && target.parentElement
-            ? target.parentElement : target;
-          if (!mdEl.nextElementSibling) {
-            var mdWalk = mdEl.parentElement;
-            while (mdWalk && mdWalk !== document.body && mdWalk.tagName !== 'TR') {
-              mdWalk = mdWalk.parentElement;
-            }
-            if (mdWalk && mdWalk !== document.body && mdWalk.tagName === 'TR') mdEl = mdWalk;
-          }
-          if (!mdEl || !mdEl.nextElementSibling) break;
-          mdEl.nextElementSibling.after(mdEl);
-          notifyDomChanged();
-          selectElement(target);
-        }
+      case 'move-down':
+        moveBlock(target, 'next');
         break;
-      }
 
       case 'select-parent':
         if (editingEl) exitEditing();
@@ -1060,18 +1129,34 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
         var newEl = wrapper.firstElementChild;
         if (!newEl) { break; }
         var ref = target || document.body;
+        // Placeholders are always CONSUMED, never left orphaned next to new
+        // content — inserting "near" a placeholder means "fill this slot".
         if (ref === document.body) {
           var bodyChildren = document.body.children;
           var lastRealChild = null;
           for (var lci = bodyChildren.length - 1; lci >= 0; lci--) {
             if (!isInternalOverlayId(bodyChildren[lci].id)) { lastRealChild = bodyChildren[lci]; break; }
           }
-          if (lastRealChild) { lastRealChild.after(newEl); }
-          else { document.body.appendChild(newEl); }
+          if (lastRealChild && lastRealChild.getAttribute && lastRealChild.getAttribute('data-block-type') === 'placeholder') {
+            document.body.replaceChild(newEl, lastRealChild);
+          } else if (lastRealChild) {
+            lastRealChild.after(newEl);
+          } else {
+            document.body.appendChild(newEl);
+          }
         } else if (cmd.position === 'inside' || cmd.position === 'center') {
-          var insidePh = ref.querySelector('[data-block-type="placeholder"]');
-          if (insidePh) insidePh.remove();
+          // Sweep every placeholder + filler node (not just the first match) —
+          // a legacy container broken by invalid HTML nesting can look like
+          // [empty <p>, placeholder, empty <p>]; all of it needs to go.
+          var _refKids = [].slice.call(ref.children);
+          for (var _rkI = 0; _rkI < _refKids.length; _rkI++) {
+            var _rk = _refKids[_rkI];
+            var _rkIsPlaceholder = _rk.getAttribute && _rk.getAttribute('data-block-type') === 'placeholder';
+            if (_rkIsPlaceholder || isFillerNode(_rk)) ref.removeChild(_rk);
+          }
           ref.appendChild(newEl);
+        } else if (ref.getAttribute && ref.getAttribute('data-block-type') === 'placeholder') {
+          ref.parentElement.replaceChild(newEl, ref);
         } else if (cmd.position === 'before') {
           ref.before(newEl);
         } else {
@@ -1098,6 +1183,71 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
           target.parentElement.replaceChild(rNewEl, target);
           notifyDomChanged();
           selectAfterImagesLoad(rNewEl);
+        }
+        break;
+      }
+
+      // Add/remove a column from a Columnas table. Applied per-row (in
+      // practice this app's Columnas blocks are single-row, but this stays
+      // correct if a table ever has more), then every cell's width is
+      // recalculated together so the columns stay evenly split.
+      case 'columns-add': {
+        if (target && target.tagName === 'TABLE') {
+          var caRows = target.querySelectorAll('tr');
+          for (var caRI = 0; caRI < caRows.length; caRI++) {
+            var caCells = caRows[caRI].querySelectorAll('td, th');
+            if (caCells.length >= 6) continue; // hard cap
+            var caNewTd = document.createElement('td');
+            caNewTd.setAttribute('style', 'padding:8px; vertical-align:top; border: 1px dashed transparent;');
+            caNewTd.appendChild(makePlaceholder());
+            caRows[caRI].appendChild(caNewTd);
+          }
+          var caFirstRowCells = target.querySelectorAll('tr:first-child > td, tr:first-child > th');
+          var caPct = (100 / caFirstRowCells.length).toFixed(2) + '%';
+          var caAllCells = target.querySelectorAll('tr > td, tr > th');
+          for (var caCI = 0; caCI < caAllCells.length; caCI++) {
+            caAllCells[caCI].style.width = caPct;
+            caAllCells[caCI].setAttribute('width', caPct);
+          }
+          notifyDomChanged();
+          selectElement(target);
+        }
+        break;
+      }
+
+      case 'columns-remove': {
+        if (target && target.tagName === 'TABLE') {
+          var crRows = target.querySelectorAll('tr');
+          for (var crRI = 0; crRI < crRows.length; crRI++) {
+            var crCells = crRows[crRI].querySelectorAll('td, th');
+            if (crCells.length <= 1) continue; // never go below 1 column
+            var crLastCell = crCells[crCells.length - 1];
+            var crTargetCell = crCells[crCells.length - 2];
+            // Move the removed cell's REAL content into the cell that stays
+            // last, instead of discarding it — the user's own content should
+            // never silently disappear just because the column layout changed.
+            var crLastKids = [].slice.call(crLastCell.children);
+            for (var crLkI = 0; crLkI < crLastKids.length; crLkI++) {
+              var crLk = crLastKids[crLkI];
+              var crIsPlaceholder = crLk.getAttribute && crLk.getAttribute('data-block-type') === 'placeholder';
+              if (crIsPlaceholder || isFillerNode(crLk)) continue;
+              crTargetCell.appendChild(crLk);
+            }
+            crLastCell.remove();
+            if (!hasRealChildren(crTargetCell)) {
+              while (crTargetCell.firstElementChild) crTargetCell.removeChild(crTargetCell.firstElementChild);
+              crTargetCell.appendChild(makePlaceholder());
+            }
+          }
+          var crFirstRowCells = target.querySelectorAll('tr:first-child > td, tr:first-child > th');
+          var crPct = (100 / crFirstRowCells.length).toFixed(2) + '%';
+          var crAllCells = target.querySelectorAll('tr > td, tr > th');
+          for (var crCI = 0; crCI < crAllCells.length; crCI++) {
+            crAllCells[crCI].style.width = crPct;
+            crAllCells[crCI].setAttribute('width', crPct);
+          }
+          notifyDomChanged();
+          selectElement(target);
         }
         break;
       }
@@ -1215,7 +1365,7 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
             // Only clear ancestor style if at least one wrap succeeded — otherwise leave intact
             if (_ciAfterOk || _ciBeforeOk) {
               _cssInheritEl.style[_cssInheritProp] = '';
-              if (!(_cssInheritEl.getAttribute('style') || '').replace(/[\s;]/g, '')) {
+              if (!(_cssInheritEl.getAttribute('style') || '').replace(/[\\s;]/g, '')) {
                 _cssInheritEl.removeAttribute('style');
               }
               _cmdHandled = true;
@@ -1325,6 +1475,30 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
     return !el || isInternalOverlayId(el.id) || el.tagName === 'SCRIPT' || el.tagName === 'STYLE';
   }
 
+  // Sibling-only move — deliberately never walks up to a <tr> ancestor. An
+  // earlier version did that when the target was the first/last child of a
+  // TD, which silently moved the WHOLE ROW while the selection stayed on the
+  // inner block (confusing, and one class of table corruption). Standard
+  // market builders (Unlayer/Stripo) scope move-up/down to the current
+  // container and no-op at its edges — escaping a column is done by
+  // dragging, not by "up" enough times. isSkippableSibling above already
+  // excludes the permanent box-model-overlay/drop-indicator divs and
+  // SCRIPT/STYLE, so the last real block never "moves" behind an invisible one.
+  function realSibling(el, dir) {
+    var s = dir === 'prev' ? el.previousElementSibling : el.nextElementSibling;
+    while (s && isSkippableSibling(s)) s = dir === 'prev' ? s.previousElementSibling : s.nextElementSibling;
+    return s;
+  }
+  function moveBlock(el, dir) {
+    if (!el) return;
+    var sib = realSibling(el, dir);
+    if (!sib) return; // already first/last among real siblings — no-op, no undo entry
+    if (dir === 'prev') el.parentElement.insertBefore(el, sib);
+    else sib.after(el);
+    notifyDomChanged();
+    selectElement(el);
+  }
+
   // Nearest real sibling in the given direction — skipping overlay elements
   // (drop indicator, box-model overlay) and non-visual tags.
   function getAdjacentBlockRect(el, direction) {
@@ -1397,6 +1571,15 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
     }
   });
 
+  // A fixed 24px edge band was fine for a normal-height block but ate ~63% of
+  // a freshly-inserted Columnas table (~76px tall, 24px top + 24px bottom) —
+  // dropping on the visible placeholder inside it landed "outside" about half
+  // the time. Scale the band down for short elements: 15% of the relevant
+  // dimension, clamped to [6, 24]px.
+  function edgeBand(size) {
+    return Math.max(6, Math.min(24, size * 0.15));
+  }
+
   // Pure computation, no side effects — resolves where a drop AT THESE COORDINATES
   // would land: { target, position: 'inside'|'before'|'after' }, or null. Called by
   // dragover (rAF-throttled, just for the visual indicator) AND synchronously by
@@ -1432,6 +1615,18 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
     }
     if (!candidate || candidate === document.documentElement) return null;
 
+    // A placeholder always wins "inside", checked on the RAW candidate before
+    // any of the edge-band/reroute logic below gets a chance to overwrite it.
+    // findBlockEl already resolves hovering anywhere inside a placeholder
+    // (including its 24px SVG icon) to the placeholder element itself — so if
+    // this check ran AFTER the Columnas-ancestor edge-band reroute further
+    // down (which reassigns candidate to the whole table), a placeholder
+    // near that table's top/bottom edge would already have been overwritten
+    // away from before this ever got to look at it.
+    if (candidate.getAttribute && candidate.getAttribute('data-block-type') === 'placeholder') {
+      return { target: candidate, position: 'inside' };
+    }
+
     var candidateBlockType = candidate.getAttribute && candidate.getAttribute('data-block-type');
 
     // Columnas block: check if cursor is inside any TD rect (both X+Y) — but only
@@ -1442,8 +1637,8 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
     // the new block landed squeezed into it instead of after the whole row.
     if (candidateBlockType === 'Columnas') {
       var colOuterRect = candidate.getBoundingClientRect();
-      var COL_EDGE_PX = 24;
-      var nearColumnsEdge = e.clientY < colOuterRect.top + COL_EDGE_PX || e.clientY > colOuterRect.bottom - COL_EDGE_PX;
+      var colEdgeY = edgeBand(colOuterRect.height);
+      var nearColumnsEdge = e.clientY < colOuterRect.top + colEdgeY || e.clientY > colOuterRect.bottom - colEdgeY;
       var colTds = nearColumnsEdge ? [] : candidate.querySelectorAll('td');
       for (var ci = 0; ci < colTds.length; ci++) {
         var tdR = colTds[ci].getBoundingClientRect();
@@ -1475,9 +1670,10 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
         // never offers 'inside' at all (an icon row isn't a sensible place to
         // append a new block either), only before/after the whole thing.
         var contRect = candidate.getBoundingClientRect();
-        var CONT_EDGE_PX = 24;
-        if (e.clientX > contRect.left + CONT_EDGE_PX && e.clientX < contRect.right - CONT_EDGE_PX &&
-            e.clientY > contRect.top  + CONT_EDGE_PX && e.clientY < contRect.bottom - CONT_EDGE_PX) {
+        var contEdgeX = edgeBand(contRect.width);
+        var contEdgeY = edgeBand(contRect.height);
+        if (e.clientX > contRect.left + contEdgeX && e.clientX < contRect.right - contEdgeX &&
+            e.clientY > contRect.top  + contEdgeY && e.clientY < contRect.bottom - contEdgeY) {
           return { target: candidate, position: 'inside' };
         }
       }
@@ -1516,20 +1712,10 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
     }
     if (columnsAncestor) {
       var caRect = columnsAncestor.getBoundingClientRect();
-      var EDGE_PX = 24;
-      if (e.clientY < caRect.top + EDGE_PX || e.clientY > caRect.bottom - EDGE_PX) {
+      var caEdgeY = edgeBand(caRect.height);
+      if (e.clientY < caRect.top + caEdgeY || e.clientY > caRect.bottom - caEdgeY) {
         candidate = columnsAncestor;
       }
-    }
-
-    // Walk up to find placeholder ancestor
-    var phEl = candidate;
-    while (phEl && phEl !== document.body) {
-      if (phEl.getAttribute && phEl.getAttribute('data-block-type') === 'placeholder') break;
-      phEl = phEl.parentElement;
-    }
-    if (phEl && phEl !== document.body) {
-      return { target: phEl, position: 'inside' };
     }
 
     // Determine before/after based on cursor Y vs element midpoint
@@ -1595,10 +1781,10 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
         }
         // If block moved out of a TD/Contenedor, restore placeholder if now empty
         if (dragSourceIsContainer && dragSourceParent !== _internalDragEl.parentElement) {
-          var srcKids = [].slice.call(dragSourceParent.children).filter(function(c) {
-            return c.tagName !== 'SCRIPT' && c.getAttribute('data-block-type') !== 'placeholder';
-          });
-          if (srcKids.length === 0) dragSourceParent.appendChild(makePlaceholder());
+          if (!hasRealChildren(dragSourceParent)) {
+            while (dragSourceParent.firstElementChild) dragSourceParent.removeChild(dragSourceParent.firstElementChild);
+            dragSourceParent.appendChild(makePlaceholder());
+          }
         }
         notifyDomChanged();
         selectElement(_internalDragEl);
@@ -1636,25 +1822,45 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
     }
     var block = null;
     var _dbgStep = 'none';
+    // Nearest ancestor with a data-block-type, checked FIRST and independent
+    // of what el itself is — a placeholder's inner 24px SVG icon has no
+    // data-block-type of its own, so without this upfront check the walk
+    // below would treat the icon as if it were outside the placeholder
+    // entirely and anchor the "+" to it.
+    var insidePlaceholder = false;
     if (el && el !== document.body && el !== document.documentElement) {
+      var _phCur = el;
+      while (_phCur && _phCur !== document.body) {
+        if (_phCur.getAttribute && _phCur.getAttribute('data-block-type')) {
+          insidePlaceholder = _phCur.getAttribute('data-block-type') === 'placeholder';
+          break;
+        }
+        _phCur = _phCur.parentElement;
+      }
+    }
+    if (!insidePlaceholder && el && el !== document.body && el !== document.documentElement) {
       var cur = el;
       while (cur && cur !== document.body) {
         if (cur.getAttribute && cur.getAttribute('data-block-type')) { block = cur; break; }
         cur = cur.parentElement;
       }
-      if (block && block.getAttribute('data-block-type') === 'placeholder') block = null;
       if (block) _dbgStep = 'data-block-type';
       // Fallback for imported templates: walk up from e.target and find the first
       // non-IGNORE, non-TABLE_INT, non-inline-formatting element the cursor is
       // hovering in/near. TABLE_INT (TD/TR/TH etc.) are excluded because inserting
       // after them breaks table structure; INLINE_FORMAT_TAGS (SPAN, STRONG…) are
       // excluded so the "+" anchors to the paragraph, not a formatted word inside it.
-      // DIV, P, H1-H6, IMG, A… remain valid insert targets.
+      // DIV, P, H1-H6, IMG, A… remain valid insert targets. tagName is upper-cased
+      // before the Set lookups — an inline <svg>/<path> keeps the lowercase tagName
+      // it was authored with (SVG is case-sensitive XML, unlike HTML), so a raw
+      // comparison against these all-uppercase Sets silently never matched it,
+      // letting a tiny icon slip through as a "valid" hover target.
       if (!block) {
         var wb = el;
         while (wb && wb !== document.body && wb !== document.documentElement) {
+          var wbTag = String(wb.tagName || '').toUpperCase();
           var wbType = wb.getAttribute && wb.getAttribute('data-block-type');
-          if (!IGNORE_TAGS.has(wb.tagName) && !TABLE_INT.has(wb.tagName) && !INLINE_FORMAT_TAGS.has(wb.tagName) && wbType !== 'placeholder') {
+          if (!IGNORE_TAGS.has(wbTag) && !TABLE_INT.has(wbTag) && !INLINE_FORMAT_TAGS.has(wbTag) && wbType !== 'placeholder') {
             var wbBr = wb.getBoundingClientRect();
             // max(50%, 30px): short elements (single-line span/p) always get a 30px zone
             var wbZone = Math.max(wbBr.height * 0.5, 30);
@@ -1665,10 +1871,13 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
           wb = wb.parentElement;
         }
       }
-      // Last resort: selected element — trigger in the bottom half
-      // Exclude TABLE_INT (TD/TR etc.) — inserting after a table cell is invalid HTML
+      // Last resort: selected element — trigger in the bottom half.
+      // Exclude TABLE_INT (TD/TR etc.) — inserting after a table cell is invalid
+      // HTML — and exclude a selected placeholder itself (the other two branches
+      // above already exclude placeholders; this was the one fallback that didn't).
       var _fromFallback = false;
-      if (!block && selectedEl && !IGNORE_TAGS.has(selectedEl.tagName) && !TABLE_INT.has(selectedEl.tagName)) {
+      if (!block && selectedEl && !IGNORE_TAGS.has(selectedEl.tagName) && !TABLE_INT.has(selectedEl.tagName) &&
+          selectedEl.getAttribute('data-block-type') !== 'placeholder') {
         var selBr = selectedEl.getBoundingClientRect();
         var selThresh = Math.min(selBr.top + selBr.height * 0.5, selBr.bottom - 10);
         if (e.clientY >= selThresh) { block = selectedEl; _dbgStep = 'selectedEl'; _fromFallback = true; }

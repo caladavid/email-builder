@@ -67,12 +67,18 @@ async function main() {
       record('S1: clicking the text selects a Texto block (not Columnas)',
         (badgeText || '').toLowerCase().includes('texto'), badgeText);
 
-      // Tipografía accordion may render collapsed (pre-existing StyleSection UI
-      // behavior, unrelated to this fix) — open it to reach the color picker.
-      const tipografiaHeader = page.locator('button:has-text("Tipografía")').first();
-      if (await tipografiaHeader.count()) {
-        await tipografiaHeader.click({ force: true });
-        await page.waitForTimeout(300);
+      // Tipografía now remounts fresh (defaultOpen=true) on every selection —
+      // see StylesPanel.vue's `:key="store.selectedElementPath"` fix (Tanda 3
+      // item 5). Only click the header if the color picker isn't ALREADY
+      // visible; clicking unconditionally would now CLOSE an already-open
+      // section instead of opening a closed one.
+      const colorInputsProbe = page.locator('input[type="color"]');
+      if (!(await colorInputsProbe.first().isVisible().catch(() => false))) {
+        const tipografiaHeader = page.locator('button:has-text("Tipografía")').first();
+        if (await tipografiaHeader.count()) {
+          await tipografiaHeader.click({ force: true });
+          await page.waitForTimeout(300);
+        }
       }
       const colorInputs = page.locator('input[type="color"]');
       const colorCount = await colorInputs.count();

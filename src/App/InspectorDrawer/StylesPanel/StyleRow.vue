@@ -11,32 +11,49 @@
           type="button"
           style="display:flex;align-items:center;gap:6px;background:var(--color-primary);color:white;border:none;border-radius:7px;padding:6px 10px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;"
         >
+          <!-- Unset (no concrete color) shows a diagonal-stripe swatch instead
+               of a color dot — a solid black/white circle here used to be
+               indistinguishable from "the user actually chose black/white". -->
           <span :style="{
             width: '14px', height: '14px', borderRadius: '50%',
-            background: hexDisplay || '#000000',
+            background: isUnset
+              ? 'repeating-linear-gradient(45deg, #fff, #fff 2px, #cbd5e1 2px, #cbd5e1 4px)'
+              : swatchHex,
             border: '2px solid rgba(255,255,255,0.6)',
             flexShrink: 0, display: 'inline-block',
           }" />
           Elegir color
         </button>
-        <!-- invisible overlay — opens native color picker -->
+        <!-- invisible overlay — opens native color picker, seeded with the
+             RESOLVED color (real or inherited/computed fallback) so it opens
+             on what the user actually sees. Emits nothing on its own — only
+             an explicit pick (the 'input' event) writes a value. -->
         <input
           type="color"
-          :value="hexDisplay"
+          :value="swatchHex"
           style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;border:none;padding:0;"
           @input="onColorPick"
         />
       </div>
-      <!-- Hex text input -->
+      <!-- Text input shows the LITERAL declared value ('inherit', 'red',
+           'rgba(0,0,0,.5)', or empty when unset) — not a forced hex
+           conversion. computedValue (when unset) is shown as a grey hint,
+           matching the computed-value idiom the Padding/Margin rows use. -->
       <input
         type="text"
-        v-model="hexDisplay"
-        placeholder="#RRGGBB"
-        maxlength="7"
+        v-model="colorText"
+        :placeholder="computedValue ? `heredado: ${computedValue}` : '#RRGGBB'"
         style="flex:1;font-size:11px;padding:6px 8px;border:1px solid #c7d8f5;border-radius:7px;color:#111;background:white;outline:none;"
-        @change="onHexChange"
-        @keydown.enter.prevent="onHexChange"
+        @change="onColorTextChange"
+        @keydown.enter.prevent="onColorTextChange"
       />
+      <button
+        v-if="value"
+        type="button"
+        title="Quitar color"
+        @click="onColorClear"
+        style="flex-shrink:0;width:22px;height:22px;border:1px solid #c7d8f5;border-radius:6px;background:white;color:#64748b;font-size:13px;line-height:1;cursor:pointer;"
+      >×</button>
     </div>
 
     <!-- SELECT -->
@@ -61,9 +78,9 @@
     <div v-else-if="type === 'slider'" style="display:flex;align-items:center;gap:8px;">
       <input
         type="range"
-        :min="0"
+        :min="min ?? 0"
         :max="max ?? 100"
-        step="1"
+        :step="step ?? 1"
         :value="sliderDisplayVal"
         style="flex:1;accent-color:var(--color-primary);height:4px;cursor:pointer;"
         @input="onSliderInput"
@@ -111,9 +128,9 @@
     <div v-else-if="type === 'slider-text'" style="display:flex;align-items:center;gap:6px;">
       <input
         type="range"
-        :min="0"
+        :min="min ?? 0"
         :max="max ?? 800"
-        step="1"
+        :step="step ?? 1"
         :value="sliderDisplayVal"
         style="flex:1;accent-color:var(--color-primary);height:4px;cursor:pointer;"
         @input="onSliderInput"
@@ -131,6 +148,15 @@
       />
     </div>
 
+    <!-- TEXTAREA (long text — a paragraph, HTML markup) -->
+    <textarea
+      v-else-if="type === 'textarea'"
+      :value="value"
+      :placeholder="computedValue || placeholder || ''"
+      style="width:100%;font-size:11px;padding:6px 8px;border:1px solid #c7d8f5;border-radius:7px;color:#111;background:white;outline:none;box-sizing:border-box;resize:vertical;min-height:60px;font-family:inherit;"
+      @change="emit('change', ($event.target as HTMLTextAreaElement).value)"
+    />
+
     <!-- TEXT -->
     <input
       v-else
@@ -145,10 +171,11 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import { parseCssColor, toHex6, formatColor } from '../../../utils/css-color';
 
 const props = defineProps<{
   label: string;
-  type: 'color' | 'text' | 'select' | 'slider' | 'slider-text' | 'select-text';
+  type: 'color' | 'text' | 'textarea' | 'select' | 'slider' | 'slider-text' | 'select-text';
   value?: string;
   // Read-only computed value shown as a placeholder/hint when `value` is empty —
   // distinguishes "the browser resolved this to 600px" from "the user set 600px".
@@ -156,6 +183,12 @@ const props = defineProps<{
   placeholder?: string;
   options?: { label: string; value: string }[];
   max?: number;
+  min?: number;
+  step?: number;
+  // Unit appended to the emitted slider value. Defaults to 'px' (every prior
+  // usage was px-calibrated). Pass '' for a unitless value (e.g. line-height,
+  // where the CSS multiplier itself has no unit).
+  unit?: string;
 }>();
 
 const emit = defineEmits<{
@@ -176,46 +209,61 @@ function onSelectTextChange(e: Event) {
 }
 
 // ── Color helpers ──────────────────────────────────────────────────────────
+// See src/utils/css-color.ts for why this exists: the previous toHex()
+// returned '#000000' for anything it couldn't parse (empty, 'inherit', named
+// colors, rgba() with alpha) — an unset/inherited color and a genuinely black
+// one looked identical, and the first touch of the picker silently
+// overwrote the real value with black.
 
-function toHex(color: string): string {
-  if (!color) return '#000000';
-  const c = color.trim();
-  if (c.startsWith('#')) {
-    const h = c.slice(0, 7);
-    return h.length === 7 ? h : '#000000';
-  }
-  const m = c.match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/);
-  if (m) {
-    return '#' + [m[1], m[2], m[3]]
-      .map(n => parseInt(n).toString(16).padStart(2, '0'))
-      .join('');
-  }
-  return '#000000';
-}
-
-const hexDisplay = ref(toHex(props.value ?? ''));
-
-watch(() => props.value, (v) => {
-  hexDisplay.value = toHex(v ?? '');
+const parsed = computed(() => parseCssColor(props.value ?? ''));
+const fallback = computed(() => parseCssColor(props.computedValue ?? ''));
+// a===0 (transparent) counts as "nothing to show a real swatch for" too.
+const isUnset = computed(() => !parsed.value || parsed.value.a === 0);
+const swatchHex = computed(() => {
+  if (parsed.value && parsed.value.a > 0) return toHex6(parsed.value);
+  if (fallback.value) return toHex6(fallback.value);
+  return '#ffffff';
 });
+
+// Shows the LITERAL declared value as typed/received ('inherit', 'red',
+// 'rgba(0,0,0,.5)') — kept as a separate local ref (not a computed off
+// props.value) so the user can type freely without each keystroke being
+// reformatted mid-edit; re-synced whenever the prop changes underneath it
+// (selection change, or the round-trip after a picker/text commit).
+const colorText = ref(props.value ?? '');
+watch(() => props.value, (v) => { colorText.value = v ?? ''; });
 
 let colorTimer: ReturnType<typeof setTimeout> | null = null;
 function onColorPick(e: Event) {
   const hex = (e.target as HTMLInputElement).value;
-  hexDisplay.value = hex; // immediate local update (no lag)
+  // Preserve any existing alpha — the native <input type=color> is opaque-only,
+  // so without this a semi-transparent color would silently become fully opaque.
+  const alpha = parsed.value ? parsed.value.a : 1;
+  const picked = parseCssColor(hex)!; // <input type=color> always yields a valid #rrggbb
+  const value = alpha < 1 ? formatColor({ ...picked, a: alpha }) : hex;
+  colorText.value = value; // immediate local update (no lag)
   if (colorTimer) clearTimeout(colorTimer);
   colorTimer = setTimeout(() => {
-    emit('change', hex);
+    emit('change', value);
     colorTimer = null;
   }, 30);
 }
 
-function onHexChange() {
-  let h = hexDisplay.value.trim();
-  if (!h.startsWith('#')) h = '#' + h;
-  if (/^#[0-9a-fA-F]{6}$/.test(h)) {
-    emit('change', h);
+function onColorTextChange() {
+  const raw = colorText.value.trim();
+  if (raw === '') { emit('change', ''); return; } // explicit clear
+  let candidate = raw;
+  if (/^([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(candidate)) candidate = '#' + candidate;
+  if (parseCssColor(candidate)) {
+    emit('change', candidate);
   }
+  // Unparseable: don't emit — the field re-syncs back to the last real value
+  // via the `props.value` watcher above rather than silently writing garbage.
+}
+
+function onColorClear() {
+  colorText.value = '';
+  emit('change', '');
 }
 
 // ── Slider helpers ─────────────────────────────────────────────────────────
@@ -232,10 +280,19 @@ function onHexChange() {
 // touches the DOM value until the user actually releases.
 const isDragging = ref(false);
 
+// Round to the nearest step, then strip float garbage (0.1 + 0.1 + 0.1 style
+// imprecision) by rounding to the step's own decimal precision rather than a
+// fixed integer — a step of 1 (the default) still rounds to a whole number.
+function roundToStep(n: number, step: number): number {
+  const rounded = Math.round(n / step) * step;
+  const decimals = (String(step).split('.')[1] || '').length;
+  return parseFloat(rounded.toFixed(decimals));
+}
+
 const numericVal = computed(() => {
   const raw = props.value || props.computedValue || '0';
   const n = parseFloat(raw);
-  return isNaN(n) ? 0 : Math.round(n);
+  return isNaN(n) ? 0 : roundToStep(n, props.step ?? 1);
 });
 
 const sliderDisplayVal = ref(numericVal.value);
@@ -249,14 +306,11 @@ function onSliderRelease() {
 }
 
 function onSliderInput(e: Event) {
-  // The slider's numeric range (the :max prop) is always calibrated in pixels
-  // across every usage in this panel — inferring '%' from the pre-edit value
-  // (e.g. an image at "100%") produced nonsense like dragging to 200 -> "200%".
   const n = (e.target as HTMLInputElement).value;
   // Track the drag position locally so a mid-drag reactive re-render (from the
   // optimistic store write elsewhere) can't force the DOM value back to a
   // stale point — see the comment above sliderDisplayVal.
   sliderDisplayVal.value = Number(n);
-  emit('change', n + 'px');
+  emit('change', n + (props.unit ?? 'px'));
 }
 </script>
