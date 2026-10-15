@@ -4,6 +4,7 @@ import { isGrapesJsProject, grapesJsProjectToHtml } from "../../utils/grapesJsTo
 import { bakeHostIndependentDefaults } from "../../utils/htmlImportNormalizer";
 import { sanitizeTemplateHtml } from "../../utils/htmlSecurity";
 import { isSvgFile, svgFileToPng, notifySvgConverted, convertZipSvgsToPng } from "../../utils/svgToPng";
+import { authorizedUpload, notifySessionExpired } from "../../utils/uploadAuth";
 import type { TEditorConfiguration } from "./core";
 import { defineStore } from "pinia";
 import { computed, nextTick, onScopeDispose, ref, render } from "vue";
@@ -85,6 +86,8 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
   const historyIndex = ref<number>(-1);
   const maxHistorySize = ref<number>(50);
   const authToken = ref<string | null>(null);
+  // Upload token (Bearer) from Flex: memory only, never logged or re-sent
+  const uploadJwt = ref<string | null>(null);
   let debounceTimer: NodeJS.Timeout | null = null;
 
   // ── IFRAME CANVAS STATE ──────────────────────────────────────────────────
@@ -167,12 +170,13 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
 
 
   // Función para enviar datos a la aplicación padre
-  function sendToParent(data: TReceivedMessage) {
-    if (!window.parent || window.parent === window) return;
+  function sendToParent(data: TReceivedMessage): boolean {
+    if (!window.parent || window.parent === window) return false;
     // Priority: 1) captured from first cross-origin message, 2) env var, 3) drop (never '*')
     const target = parentOrigin ?? import.meta.env.VITE_PARENT_ORIGIN ?? null;
-    if (!target) return;
+    if (!target) return false;
     window.parent.postMessage(data, target);
+    return true;
   }
   
 
@@ -359,6 +363,45 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     /* console.log('📊 Valor actual de authToken:', authToken.value);  */ 
   }
 
+  // Resolvers waiting for the setToken that answers a requestToken
+  let credentialWaiters: Array<() => void> = [];
+
+  /** setToken from Flex: each credential only replaces the stored one when present. */
+  function setUploadCredentials(token: string | null, jwt: string | null) {
+    if (token) authToken.value = token;
+    if (jwt) uploadJwt.value = jwt;
+    const waiters = credentialWaiters;
+    credentialWaiters = [];
+    waiters.forEach((resolve) => resolve());
+  }
+
+  /**
+   * Asks Flex for a fresh upload token (requestToken) and waits for its
+   * setToken, at most `timeoutMs`. On timeout the last known token is used
+   * (a 401 then triggers the retry path).
+   */
+  function refreshUploadCredentials(timeoutMs = 3000): Promise<void> {
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = () => { if (!done) { done = true; clearTimeout(timer); resolve(); } };
+      const timer = setTimeout(() => {
+        credentialWaiters = credentialWaiters.filter((w) => w !== finish);
+        finish();
+      }, timeoutMs);
+      credentialWaiters.push(finish);
+      if (!sendToParent({ type: 'requestToken' })) {
+        credentialWaiters = credentialWaiters.filter((w) => w !== finish);
+        finish();
+      }
+    });
+  }
+
+  const uploadAuthDeps = {
+    getCredentials: () => ({ token: authToken.value, jwt: uploadJwt.value }),
+    refreshCredentials: () => refreshUploadCredentials(),
+    onSessionExpired: notifySessionExpired,
+  };
+
   
   function saveToHistory(){
       const currentState = JSON.parse(JSON.stringify(document.value));
@@ -414,9 +457,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
 
   async function sendZip(file: File): Promise<boolean> {
     try {
-      const token = authToken.value
-
-      if (!token){
+      if (!authToken.value && !uploadJwt.value){
         console.error('❌ No hay token disponible');
         return false;
       }
@@ -435,20 +476,18 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
         notifySvgConverted();
       }
 
-      const formData = new FormData()
-      formData.append('TOKEN', token)
-      formData.append('file', file);
+      const zipFile = file;
+      const response = await authorizedUpload(`${API_BASE}/rest/protected/flex_email/addFileZip`, (token) => {
+        const formData = new FormData();
+        if (token) formData.append('TOKEN', token);
+        formData.append('file', zipFile);
+        return formData;
+      }, uploadAuthDeps);
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-      const response = await fetch(`${API_BASE}/rest/protected/flex_email/addFileZip`, {
-        method: "POST",
-        body: formData,
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-
+      if (!response) {
+        console.error('❌ No hay token disponible');
+        return false;
+      }
       if (!response.ok){
         throw new Error(`Error HTTP: ${response.status}`);
       }
@@ -539,27 +578,23 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
         return null;
       }
 
-      const token = authToken.value;
-
-      if (!token) {
+      if (!authToken.value && !uploadJwt.value) {
         console.error('❌ No hay token disponible');
         return null;
       }
 
-      const formData = new FormData();
-      formData.append('TOKEN', token);
-      formData.append('image', file);
+      const imageFile = file;
+      const response = await authorizedUpload(`${API_BASE}/rest/protected/flex_email/addFileImage`, (token) => {
+        const formData = new FormData();
+        if (token) formData.append('TOKEN', token);
+        formData.append('image', imageFile);
+        return formData;
+      }, uploadAuthDeps);
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-      const response = await fetch(`${API_BASE}/rest/protected/flex_email/addFileImage`, {
-        method: "POST",
-        body: formData,
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-
+      if (!response) {
+        console.error('❌ No hay token disponible');
+        return null;
+      }
       if (!response.ok) {
         throw new Error(`Error HTTP: ${response.status}`);
       }
@@ -779,6 +814,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     canRedo,  
     authToken,
     setAuthToken,
+    setUploadCredentials,
     sendZip,
     getHtmlFromDocument,
     uploadImage,

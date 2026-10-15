@@ -16,6 +16,7 @@ import { onMounted, onUnmounted } from 'vue';
 import Editor from './App/index.vue'
 import { useInspectorDrawer } from './documents/editor/editor.store';
 import { isFromParent, isOriginAllowed } from './utils/allowedOrigins';
+import { parseSetTokenMessage } from './utils/uploadAuth';
 import getConfiguration from './getConfiguration';
 
 const editorStore = useInspectorDrawer();
@@ -81,15 +82,17 @@ onMounted(() => {
         /* console.log('🎯 Case setToken ejecutado');
         console.log('🔑 Token recibido:', data.token); */
         {
-          // Acepta string o número (se convierte); rechaza vacío/objetos.
-          // Nunca se loguea el valor del token, solo su tipo y largo.
-          const t = typeof data.token === 'number' ? String(data.token) : data.token;
-          if (typeof t === 'string' && t.trim().length > 0 && t.length <= 65536) {
-            editorStore.setAuthToken(t.trim());
+          // token (AES, legacy) y jwt (token acotado de subidas) se validan
+          // por separado: string o número, no vacío. Basta con uno válido.
+          // Nunca se loguea el valor, solo tipo y largo.
+          const { token, jwt } = parseSetTokenMessage(data);
+          if (token || jwt) {
+            editorStore.setUploadCredentials(token, jwt);
           } else {
             console.warn('[Builder] setToken ignorado: token inválido', {
               tipo: typeof data.token,
               largo: typeof data.token === 'string' ? data.token.length : null,
+              tipoJwt: typeof data.jwt,
             });
           }
         }

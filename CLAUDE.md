@@ -114,12 +114,14 @@ Parent sends to iframe:
 | `type` | Payload | Action |
 |--------|---------|--------|
 | `loadDocument` | `{ document, variables? }` | Load template + variables |
+| `setToken` | `{ token?, jwt? }` | Upload credentials, memory only. `token` = legacy AES TOKEN (FormData field); `jwt` = scoped upload token (`Authorization: Bearer`). Each validated on its own (`src/utils/uploadAuth.ts`) |
 
 Iframe sends to parent:
 
 | `type` | Payload |
 |--------|---------|
 | `htmlAndJsonResponse` | `{ html, json }` |
+| `requestToken` | `{}`: sent before each upload, only once a `jwt` has been received; Flex answers with `setToken`. 3 s timeout (then the last token is used), one refresh + retry on 401, then a "Tu sesión expiró" toast. Without a `jwt` uploads behave exactly as before |
 
 ## Sample Templates
 
