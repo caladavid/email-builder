@@ -15,7 +15,7 @@
 import { onMounted, onUnmounted } from 'vue';
 import Editor from './App/index.vue'
 import { useInspectorDrawer } from './documents/editor/editor.store';
-import { isFromParent } from './utils/allowedOrigins';
+import { isFromParent, isOriginAllowed } from './utils/allowedOrigins';
 import getConfiguration from './getConfiguration';
 
 const editorStore = useInspectorDrawer();
@@ -24,7 +24,16 @@ const editorStore = useInspectorDrawer();
 onMounted(() => {
   window.addEventListener('message', async (event) => {
     if (!isFromParent(event)) {
-      if (event.data?.type) console.warn('Mensaje ignorado, origen no seguro:', event.origin);
+      if (event.data?.type) {
+        // Diagnóstico (sin datos sensibles): distingue origen no permitido de
+        // remitente que no es el padre directo del iframe
+        console.warn('[Builder] Mensaje ignorado:', {
+          type: event.data.type,
+          origin: event.origin,
+          originPermitido: isOriginAllowed(event.origin),
+          remitenteEsPadre: event.source === window.parent,
+        });
+      }
       return;
     }
 
@@ -67,8 +76,18 @@ onMounted(() => {
       case 'setToken':
         /* console.log('🎯 Case setToken ejecutado');
         console.log('🔑 Token recibido:', data.token); */
-        if (typeof data.token === 'string' && data.token.length > 0 && data.token.length <= 4096) {
-          editorStore.setAuthToken(data.token);
+        {
+          // Acepta string o número (se convierte); rechaza vacío/objetos.
+          // Nunca se loguea el valor del token, solo su tipo y largo.
+          const t = typeof data.token === 'number' ? String(data.token) : data.token;
+          if (typeof t === 'string' && t.trim().length > 0 && t.length <= 65536) {
+            editorStore.setAuthToken(t.trim());
+          } else {
+            console.warn('[Builder] setToken ignorado: token inválido', {
+              tipo: typeof data.token,
+              largo: typeof data.token === 'string' ? data.token.length : null,
+            });
+          }
         }
         break;
       default:

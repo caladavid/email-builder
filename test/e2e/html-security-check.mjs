@@ -133,9 +133,14 @@ async function main() {
   const afterCanvas = await getStore();
   record('setToken from canvas iframe ignored', afterCanvas.token === 'legit-token', afterCanvas.token);
   record('loadDocument from canvas iframe ignored', afterCanvas.hasSec === true);
-  await page.evaluate(() => window.postMessage({ type: 'setToken', token: 12345 }, window.location.origin));
+  await page.evaluate(() => window.postMessage({ type: 'setToken', token: { evil: true } }, window.location.origin));
   await page.waitForTimeout(200);
-  record('non-string token rejected', (await getStore()).token === 'legit-token');
+  record('object token rejected', (await getStore()).token === 'legit-token');
+  await page.evaluate(() => window.postMessage({ type: 'setToken', token: 'x'.repeat(5000) }, window.location.origin));
+  await page.waitForTimeout(200);
+  record('long token (JWT-sized, 5000 chars) accepted', ((await getStore()).token || '').length === 5000);
+  await page.evaluate(() => window.postMessage({ type: 'setToken', token: 'legit-token' }, window.location.origin));
+  await page.waitForTimeout(200);
 
   // 7. Fase 2: sinks secundarios (DOMPurify / readers), evaluated in real Chrome
   const p2 = await page.evaluate(async () => {
