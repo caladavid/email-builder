@@ -126,6 +126,40 @@ async function main() {
     await page.unroute('**/*.{png,jpg,jpeg,gif,webp}');
   }
 
+  // D4: grabbing an Imagen block ON its <img> (natively draggable) must move the
+  // whole block. Used to be ignored: the drag started from the <img>, not from
+  // the selected wrapper, so the drop never moved anything. Repeated twice
+  // because the user saw "first time works, second doesn't" (first grab was on
+  // the padding, second on the image).
+  {
+    const html = '<!DOCTYPE html><html><body>' +
+      '<h1 id="d4h" data-block-type="Encabezado" style="padding:16px">Titulo</h1>' +
+      '<p id="d4t" data-block-type="Texto" style="padding:16px">Parrafo</p>' +
+      '<div id="d4im" data-block-type="Imagen" style="padding:16px 24px;text-align:center;"><img src="data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==" style="width:300px;height:100px;display:block;margin:0 auto;" /></div>' +
+      '</body></html>';
+    await loadDoc(page, html);
+    let frame = null;
+    for (const f of page.frames()) {
+      if (f.url() === 'about:srcdoc') continue;
+      try { if (await f.evaluate(() => !!document.getElementById('d4im'))) frame = f; } catch (e) {}
+    }
+    const order = () => frame.evaluate(() => Array.from(document.body.querySelectorAll('[data-block-type]')).map((e) => e.id).join(','));
+    const dragImgTo = async (targetSel) => {
+      await frame.locator('#d4im img').click({ force: true });
+      await page.waitForTimeout(300);
+      const box = await frame.locator(targetSel).boundingBox();
+      await frame.locator('#d4im img').dragTo(frame.locator(targetSel), { force: true, targetPosition: { x: 40, y: box.height - 3 } });
+      await page.waitForTimeout(700);
+    };
+    await dragImgTo('#d4h');
+    const first = await order();
+    await dragImgTo('#d4t'); // back to the end
+    await dragImgTo('#d4h');
+    const second = await order();
+    record('D4: dragging an Imagen block by its <img> moves the block (twice in a row)',
+      first === 'd4h,d4im,d4t' && second === 'd4h,d4im,d4t', `first=${first} second=${second}`);
+  }
+
   console.log('\nconsole/page errors observed:', consoleErrors.length ? consoleErrors : 'none');
   await browser.close();
 

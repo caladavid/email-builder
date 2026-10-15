@@ -1563,11 +1563,21 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
   }
 
   document.addEventListener('dragstart', function(e) {
-    if (e.target && e.target === selectedEl) {
-      _internalDragEl = e.target;
+    var dragFrom = e.target;
+    // <img> and <a href> are natively draggable: grabbing an Imagen/Boton
+    // block ON its image or link starts the drag from that child, not from
+    // the selected block, so the drop was ignored. Treat it as dragging the
+    // whole selected block (not while editing text: there the browser's own
+    // text drag must keep working).
+    var isNativeDraggableChild = dragFrom && dragFrom !== selectedEl && selectedEl && !editingEl
+      && (dragFrom.tagName === 'IMG' || dragFrom.tagName === 'A')
+      && selectedEl.contains(dragFrom);
+    if (dragFrom && (dragFrom === selectedEl || isNativeDraggableChild)) {
+      _internalDragEl = selectedEl;
       if (e.dataTransfer) {
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', '__internal__');
+        if (isNativeDraggableChild) { try { e.dataTransfer.setDragImage(selectedEl, 10, 10); } catch (err) {} }
       }
     }
   }, true);

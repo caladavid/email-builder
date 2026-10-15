@@ -20,11 +20,15 @@ import getConfiguration from './getConfiguration';
 
 const editorStore = useInspectorDrawer();
 
+const PARENT_COMMANDS = ['updateVariables', 'addVariable', 'requestHtml', 'loadTemplate', 'requestJson', 'requestHtmlAndJson', 'clearTemplate', 'setToken'];
+
 // Escuchar los mensajes desde el padre (página principal)
 onMounted(() => {
   window.addEventListener('message', async (event) => {
     if (!isFromParent(event)) {
-      if (event.data?.type) {
+      // Only warn for parent commands: the canvas iframe also posts here
+      // (select, dom-changed, hover...) and those are handled by IframeCanvas
+      if (PARENT_COMMANDS.includes(event.data?.type)) {
         // Diagnóstico (sin datos sensibles): distingue origen no permitido de
         // remitente que no es el padre directo del iframe
         console.warn('[Builder] Mensaje ignorado:', {
@@ -39,7 +43,7 @@ onMounted(() => {
 
     const data = event.data;
 
-    if (!data || typeof data !== 'object' || !data.type || !['updateVariables', 'addVariable', 'requestHtml', 'loadTemplate', "requestJson", "requestHtmlAndJson", "clearTemplate", "setToken"].includes(data.type)) {
+    if (!data || typeof data !== 'object' || !data.type || !PARENT_COMMANDS.includes(data.type)) {
       return;
     }
 
