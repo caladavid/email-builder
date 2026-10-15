@@ -98,7 +98,7 @@ El texto que se edita con doble click en el canvas (`contentEditable`, dentro de
 
 ## Known Issues / Gotchas
 
-- **Origin validation disabled**: `allowedOrigins.ts` always returns `true` — do not ship to prod without fixing.
+- **Parent channel** (`src/utils/allowedOrigins.ts`): `App.vue` and `editor.store.ts` only obey messages that pass `isFromParent` (allowed https origin AND `event.source === window.parent`). The list is the `flex.*` parents + `VITE_PARENT_ORIGIN` + optional `VITE_ALLOWED_ORIGINS` (comma-separated); localhost only in dev. Never add the builder's own `email-builder.*` origins: the canvas iframe is same-origin and would pass the check. Builder↔canvas messages check `event.source` on both sides (`isFromCanvas` in `useCanvasBridge.ts`, `window.parent` in the bridge).
 - **Dark mode forced** on init (`document.body.classList.add('dark')` in `main.ts`).
 - **Accordion state leak** (`StylesPanel.vue`'s `<StyleSection>` instances): fixed via `:key="store.selectedElementPath"` on all of them — if a future refactor removes that key, a section's open/closed state will silently carry over from whatever was previously selected.
 

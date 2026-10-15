@@ -349,7 +349,9 @@ function handleMessage(event: MessageEvent) {
   // Only handle messages from the editor iframe, not from the preview iframe
   const editorDoc = iframeRef.value?.contentDocument;
   const editorWin = iframeRef.value?.contentWindow;
-  if (event.source && editorWin && event.source !== editorWin) return;
+  // Fail closed: no mounted canvas or a different sender (preview iframe,
+  // parent page, any other window) means the message is not for us
+  if (!editorWin || event.source !== editorWin) return;
 
   switch (data.type) {
     case 'bridge-ready':

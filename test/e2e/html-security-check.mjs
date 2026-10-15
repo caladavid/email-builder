@@ -117,6 +117,26 @@ async function main() {
   await page.waitForTimeout(300);
   record('command from non-parent window ignored', (await frame.evaluate(() => document.getElementById('sec-p').getAttribute('title'))) === 'ok-title');
 
+  // 6b. Fase 3: the parent channel (App.vue / store) only obeys window.parent
+  const getStore = () => page.evaluate(() => {
+    const st = document.querySelector('#app').__vue_app__.config.globalProperties.$pinia._s.get('inspectorDrawer');
+    return { token: st.authToken, hasSec: (st.rawHtml || '').includes('id="sec-p"') };
+  });
+  await page.evaluate(() => window.postMessage({ type: 'setToken', token: 'legit-token' }, window.location.origin));
+  await page.waitForTimeout(200);
+  record('setToken from parent window accepted', (await getStore()).token === 'legit-token');
+  await frame.evaluate(() => {
+    parent.postMessage({ type: 'setToken', token: 'evil-token' }, '*');
+    parent.postMessage({ type: 'loadDocument', html: '<p id="hijack">hijack</p>' }, '*');
+  });
+  await page.waitForTimeout(800);
+  const afterCanvas = await getStore();
+  record('setToken from canvas iframe ignored', afterCanvas.token === 'legit-token', afterCanvas.token);
+  record('loadDocument from canvas iframe ignored', afterCanvas.hasSec === true);
+  await page.evaluate(() => window.postMessage({ type: 'setToken', token: 12345 }, window.location.origin));
+  await page.waitForTimeout(200);
+  record('non-string token rejected', (await getStore()).token === 'legit-token');
+
   // 7. Fase 2: sinks secundarios (DOMPurify / readers), evaluated in real Chrome
   const p2 = await page.evaluate(async () => {
     const { sanitizeInlineHtml, sanitizeTemplateHtml } = await import('/src/utils/htmlSecurity.ts');

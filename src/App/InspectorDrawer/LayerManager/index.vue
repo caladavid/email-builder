@@ -37,7 +37,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useInspectorDrawer } from '../../../documents/editor/editor.store';
-import { sendToCanvas } from '../../../composables/useCanvasBridge';
+import { sendToCanvas, isFromCanvas } from '../../../composables/useCanvasBridge';
 import LayerItem, { type DomNode } from './LayerItem.vue';
 
 const store = useInspectorDrawer();
@@ -48,6 +48,7 @@ function requestTree() {
 }
 
 function handleMessage(event: MessageEvent) {
+  if (!isFromCanvas(event)) return;
   if (event.data?.type === 'tree-response' && event.data.tree) {
     tree.value = event.data.tree;
   }

@@ -13,7 +13,9 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
   window.__canvasBridgeActive = true;
 
   // Capture parent origin from first incoming message so postMessage calls are not sent with '*'
-  var _parentOrigin = '*';
+  // about:blank canvas inherits the builder origin; read it from the parent
+  // (same-origin access) so even the first messages are not sent with '*'.
+  var _parentOrigin = (function () { try { return window.parent.location.origin || '*'; } catch (err) { return '*'; } })();
   var _parentOriginCaptured = false;
 
   // Real sanitizer (DOMPurify, loaded above as a plain global) — the previous

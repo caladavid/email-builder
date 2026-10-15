@@ -1,5 +1,5 @@
 import getConfiguration from "../../getConfiguration";
-import { isOriginAllowed } from "../../utils/allowedOrigins";
+import { isFromParent } from "../../utils/allowedOrigins";
 import { isGrapesJsProject, grapesJsProjectToHtml } from "../../utils/grapesJsToHtml";
 import { bakeHostIndependentDefaults } from "../../utils/htmlImportNormalizer";
 import { sanitizeTemplateHtml } from "../../utils/htmlSecurity";
@@ -119,15 +119,18 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
 
   // Escuchar mensajes de la aplicación padre
   const handleMessage = (event: MessageEvent) => {
-    if (!isOriginAllowed(event.origin)) return;
+    // Allowed origin AND sent by window.parent: the canvas iframe (same
+    // origin) and any other window on an allowed origin are ignored.
+    if (!isFromParent(event)) return;
 
-    // Only capture parent origin from cross-origin messages.
-    // Same-origin messages (Vite HMR, canvas bridge, etc.) must not overwrite it.
+    // Capture the reply target only from the real parent, so no other window
+    // can redirect htmlResponse/jsonResponse exports to itself.
     if (!parentOrigin && event.origin !== window.location.origin) {
       parentOrigin = event.origin;
     }
 
     const data = event.data as TReceivedMessage;
+    if (!data || typeof data !== 'object') return;
 
     if (data.type === 'loadDocument') {
       if (data.html) {

@@ -7,7 +7,16 @@ export function registerCanvasIframe(el: HTMLIFrameElement | null) {
 }
 
 export function sendToCanvas(cmd: Record<string, unknown>) {
-  _iframeRef.value?.contentWindow?.postMessage(cmd, '*');
+  // The canvas is an about:blank iframe written via doc.write, so it inherits
+  // the builder's origin. Never '*': if canvas content ever navigated the
+  // frame elsewhere, commands (with clipboard/block HTML) would follow it.
+  _iframeRef.value?.contentWindow?.postMessage(cmd, window.location.origin);
+}
+
+/** True when a message was posted by the editor canvas iframe itself. */
+export function isFromCanvas(event: MessageEvent): boolean {
+  const win = _iframeRef.value?.contentWindow;
+  return !!win && event.source === win;
 }
 
 export function getCanvasIframe(): HTMLIFrameElement | null {
