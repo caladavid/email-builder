@@ -31,11 +31,15 @@ export default function getConfiguration(template: string) {
     }
   }
 
-  if (template.startsWith('#code/')) {
-    const encodedString = template.replace('#code/', '');
-    const configurationString = decodeURIComponent(atob(encodedString));
+  // Dev-only: a crafted #code/ link is otherwise a one-click XSS (an Html
+  // block or javascript: URL renders in the builder's own origin on load).
+  // Nothing in the app generates these links; the parent uses postMessage.
+  if (import.meta.env.DEV && template.startsWith('#code/')) {
     try {
-      return JSON.parse(configurationString);
+      const encodedString = template.replace('#code/', '');
+      const parsed = JSON.parse(decodeURIComponent(atob(encodedString)));
+      if (parsed && typeof parsed === 'object' && parsed.root?.type === 'EmailLayout') return parsed;
+      console.error(`Hash configuration has no EmailLayout root.`);
     } catch {
       console.error(`Couldn't load configuration from hash.`);
     }

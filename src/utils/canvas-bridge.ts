@@ -3,6 +3,7 @@
 import purifySrc from 'dompurify/dist/purify.min.js?raw';
 import { sanitizePastedHtml } from './pasteSanitizer';
 import { isFillerNode, hasRealChildren, readColumnsChildData, collapseSides, getElementPath } from './canvasDomHelpers';
+import { isSafeAttribute } from './htmlSecurity';
 
 export const CANVAS_BRIDGE_CODE = purifySrc + `
 (function () {
@@ -41,6 +42,15 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
   var collapseSides = ${collapseSides.toString()};
   var readColumnsChildData = ${readColumnsChildData.toString()};
   var getElementPath = ${getElementPath.toString()};
+
+  // Real function lives in src/utils/htmlSecurity.ts (unit tested there),
+  // embedded verbatim via toString() under the same self-contained contract.
+  var isSafeAttribute = ${isSafeAttribute.toString()};
+
+  // Only formatting commands the editor UI actually sends (FormattingToolbar,
+  // IframeCanvas toolbar, variable insertion). Anything else, notably
+  // insertHTML, would bypass sanitizeHtml.
+  var ALLOWED_EXEC_COMMANDS = { bold: 1, italic: 1, underline: 1, strikeThrough: 1, removeFormat: 1, createLink: 1, insertText: 1 };
 
   const IGNORE_TAGS = new Set(['HTML', 'HEAD', 'BODY', 'STYLE', 'SCRIPT', 'META', 'LINK', 'TITLE', 'NOSCRIPT']);
   // Denylist: any element NOT in this set can be inline-edited on dblclick
@@ -701,6 +711,10 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
   // COMMANDS FROM PARENT
   var _msgHandler = function (e) {
     if (!e.data || !e.data.type) return;
+    // Commands are only ever sent by the builder window that owns this canvas.
+    // Without this check any page holding a reference to this frame (an
+    // attacker framing the builder, a popup opener) could drive it.
+    if (e.source !== window.parent) return;
     // Capture parent origin from first incoming message
     if (!_parentOriginCaptured && e.origin !== window.location.origin) {
       _parentOrigin = e.origin;
@@ -901,6 +915,10 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
         break;
 
       case 'set-attr':
+        if (!isSafeAttribute(cmd.property, cmd.value)) {
+          parent.postMessage({ type: 'command-rejected', command: 'set-attr', reason: 'unsafe-attribute' }, _parentOrigin);
+          break;
+        }
         if (target) { target.setAttribute(cmd.property, cmd.value); }
         notifyDomChanged();
         break;
@@ -937,6 +955,10 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
         break;
 
       case 'set-child-attr':
+        if (cmd.value !== '' && !isSafeAttribute(cmd.property, cmd.value)) {
+          parent.postMessage({ type: 'command-rejected', command: 'set-child-attr', reason: 'unsafe-attribute' }, _parentOrigin);
+          break;
+        }
         if (target) {
           var chAttr = target.querySelector(cmd.selector);
           // No <a> exists and user is setting href on image → create wrapper <a>
@@ -1281,6 +1303,10 @@ export const CANVAS_BRIDGE_CODE = purifySrc + `
         break;
 
       case 'exec-command':
+        if (!Object.prototype.hasOwnProperty.call(ALLOWED_EXEC_COMMANDS, cmd.command) || (cmd.command === 'createLink' && !isSafeAttribute('href', cmd.value))) {
+          parent.postMessage({ type: 'command-rejected', command: 'exec-command', reason: 'not-allowed' }, _parentOrigin);
+          break;
+        }
         // Auto-enter edit mode so format commands work without double-click
         if (!editingEl && target && !NON_EDITABLE_TAGS.has(target.tagName)) {
           editingEl = target;

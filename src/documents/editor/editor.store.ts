@@ -2,6 +2,7 @@ import getConfiguration from "../../getConfiguration";
 import { isOriginAllowed } from "../../utils/allowedOrigins";
 import { isGrapesJsProject, grapesJsProjectToHtml } from "../../utils/grapesJsToHtml";
 import { bakeHostIndependentDefaults } from "../../utils/htmlImportNormalizer";
+import { sanitizeTemplateHtml } from "../../utils/htmlSecurity";
 import type { TEditorConfiguration } from "./core";
 import { defineStore } from "pinia";
 import { computed, nextTick, onScopeDispose, ref, render } from "vue";
@@ -259,7 +260,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     // En modo iframe, el rawHtml ya es el HTML final 1:1
     if (rawHtml.value) {
       // Strip CSS comments + @media blocks from <style> — parent CSS inliner crashes on both
-      return rawHtml.value.replace(/<style([^>]*)>([\s\S]*?)<\/style>/gi, (_m, attrs, css) => {
+      return sanitizeTemplateHtml(rawHtml.value).replace(/<style([^>]*)>([\s\S]*?)<\/style>/gi, (_m, attrs, css) => {
         let clean = css.replace(/\/\*[\s\S]*?\*\//g, '');
         clean = clean.replace(/@media[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, '');
         return `<style${attrs}>${clean}</style>`;
@@ -276,7 +277,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
 
     const html = await renderToStaticMarkup(proccessedDocument, { rootBlockId: 'root' })
 
-    return html;
+    return sanitizeTemplateHtml(html);
   }
 
   async function sendHtmlToParent() {
@@ -596,6 +597,9 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
     html = html.replace(/\s*contenteditable="[^"]*"/gi, '');
     html = html.replace(/\s*draggable="[^"]*"/gi, '');
     html = bakeHostIndependentDefaults(html);
+    // Security: strip script, on* handlers, javascript: URLs, etc. — every
+    // import vector funnels through here before reaching the same-origin canvas
+    html = sanitizeTemplateHtml(html);
     return html;
   }
 
