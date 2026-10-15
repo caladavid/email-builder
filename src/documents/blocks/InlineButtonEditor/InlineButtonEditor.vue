@@ -27,6 +27,7 @@
     
 </template>
 <script setup lang="ts">
+import { sanitizeInlineHtml } from '../../../utils/htmlSecurity';
 import { computed, inject, nextTick, onMounted, ref, watch } from 'vue';
 import { useInspectorDrawer } from '../../editor/editor.store';
 import { currentBlockIdSymbol } from '../../editor/EditorBlock.vue';
@@ -599,7 +600,7 @@ function insertVariable(variableKey: string) {
     // ÚLTIMO RECURSO: innerHTML
     /* console.warn('🔄 Last resort: innerHTML append'); */
     const currentHTML = editableDiv.value.innerHTML;
-    editableDiv.value.innerHTML = currentHTML + variableText;
+    editableDiv.value.innerHTML = sanitizeInlineHtml(currentHTML + variableText);
     handleInput();
   }
   
@@ -646,7 +647,7 @@ watch(blockProps, (newProps, oldProps) => {
             const wasFocused = document.activeElement === editableDiv.value;
             if (wasFocused) saveCursorPosition();
     
-            editableDiv.value.innerHTML = htmlContent;
+            editableDiv.value.innerHTML = sanitizeInlineHtml(htmlContent);
     
             if (wasFocused){
                 nextTick(() => restoreCursorPosition());
@@ -666,7 +667,7 @@ watch(blockProps, (newProps, oldProps) => {
         const wasFocused = document.activeElement === editableDiv.value;
         if (wasFocused) saveCursorPosition();
 
-        editableDiv.value.innerHTML = newText;
+        editableDiv.value.innerHTML = sanitizeInlineHtml(newText);
 
         if (wasFocused){
             nextTick(() => restoreCursorPosition());
@@ -691,7 +692,7 @@ onMounted(() => {
     const htmlContent = textWithFormatsToHtml(text, formats);  */
 
 
-    editableDiv.value.innerHTML = text;
+    editableDiv.value.innerHTML = sanitizeInlineHtml(text);
 })
 
 </script>

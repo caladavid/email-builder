@@ -92,6 +92,7 @@
 </template>
 
 <script setup lang="ts">
+import { escapeHtmlAttr } from '../../utils/htmlSecurity';
 import EditorBlock from '../../documents/editor/EditorBlock.vue'
 import { computed, watch } from 'vue'
 import { useKeyboardShortcuts } from '../../composables/useKeyboardShortcuts'
@@ -153,10 +154,12 @@ const previewHtml = computed(() => {
   html = html.replace(/\s*contenteditable="[^"]*"/gi, '');
   // Remove draggable attribute set by bridge
   html = html.replace(/\s*draggable="[^"]*"/gi, '');
-  // Substitute {variableName} with actual values
+  // Substitute {variableName} with actual values (escaped: values come from
+  // the parent / localStorage / a JSON file, and land inside raw HTML)
   const vars = inspectorDrawer.globalVariables || {};
   if (Object.keys(vars).length > 0) {
-    html = html.replace(/\{(\w+)\}/g, (match, key) => (vars as Record<string, string>)[key] ?? match);
+    html = html.replace(/\{(\w+)\}/g, (match, key) =>
+      Object.prototype.hasOwnProperty.call(vars, key) ? escapeHtmlAttr(String((vars as Record<string, string>)[key])) : match);
   }
   return html;
 });

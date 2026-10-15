@@ -46,6 +46,7 @@
 </template>
 
 <script setup lang="ts">
+import { sanitizeInlineHtml } from '../../../utils/htmlSecurity';
 import { ref, watch, nextTick, onMounted } from 'vue';
 
 type Props = {
@@ -78,7 +79,7 @@ const tooltipPosition = ref<{ top: string; left: string }>({ top: '0px', left: '
 const setEditorHTML = (html: string) => {
   if (!richTextEditor.value) return;
   if (richTextEditor.value.innerHTML !== html) {
-    richTextEditor.value.innerHTML = html || '';
+    richTextEditor.value.innerHTML = sanitizeInlineHtml(html || '');
   }
 };
 

@@ -94,6 +94,7 @@
 </template>
 
 <script setup lang="ts">
+import { sanitizeInlineHtml } from '../../../../utils/htmlSecurity';
 import { computed, nextTick, ref, onMounted, onUnmounted, watch } from "vue";
 import { useInspectorDrawer } from "../../../../documents/editor/editor.store";
 
@@ -221,7 +222,7 @@ onMounted(() => {
   const formats = blockData.props?.formats || [];
 
   const htmlContent = textWithFormatsToHtml(text, formats);
-  editableDiv.value.innerHTML = htmlContent;
+  editableDiv.value.innerHTML = sanitizeInlineHtml(htmlContent);
 
   document.addEventListener('selectionchange', updateFormatState);
 });
@@ -292,7 +293,7 @@ function getCurrentSelection(): string {
 
 function htmlToTextAndFormats(htmlContent: string): { text: string; formats: TextFormat[] } {
   const tempDiv = document.createElement('div');
-  tempDiv.innerHTML = htmlContent;
+  tempDiv.innerHTML = sanitizeInlineHtml(htmlContent);
 
   let text = "";
   const formats: TextFormat[] = [];
@@ -731,7 +732,7 @@ function insertVariable(variableKey: string) {
 
   } catch (error) {
     const currentHTML = editableDiv.value.innerHTML;
-    editableDiv.value.innerHTML = currentHTML + variableText;
+    editableDiv.value.innerHTML = sanitizeInlineHtml(currentHTML + variableText);
   }
 }
 
@@ -822,7 +823,7 @@ watch([() => props.modelValue, () => props.formats], ([newText, newFormats]) => 
     const wasFocused = document.activeElement === editableDiv.value;
 
     if (wasFocused) saveCursorPosition();
-    editableDiv.value.innerHTML = htmlContent;
+    editableDiv.value.innerHTML = sanitizeInlineHtml(htmlContent);
 
     if (wasFocused) {
       nextTick(() => restoreCursorPosition());
@@ -849,7 +850,7 @@ watch(blockProps, (newProps) => {
       const wasFocused = document.activeElement === editableDiv.value;
       if (wasFocused) saveCursorPosition();
 
-      editableDiv.value.innerHTML = htmlContent;
+      editableDiv.value.innerHTML = sanitizeInlineHtml(htmlContent);
 
       if (wasFocused) {
         nextTick(() => restoreCursorPosition());

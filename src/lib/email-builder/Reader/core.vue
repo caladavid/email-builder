@@ -8,7 +8,8 @@ import Avatar, { AvatarPropsSchema } from '@flyhub/email-block-avatar';
 import ButtonReader, { ButtonPropsSchema } from '../blocks/Button/ButtonReader.vue';
 import Divider, { DividerPropsSchema } from '@flyhub/email-block-divider';
 import HeadingReader, { HeadingPropsSchema } from '../blocks/Heading/HeadingReader.vue';
-import Html, { HtmlPropsSchema } from '@flyhub/email-block-html';
+import { HtmlPropsSchema } from '@flyhub/email-block-html';
+import Html from '../blocks/Html/SafeHtml';
 /* import Image, { ImagePropsSchema } from '@flyhub/email-block-image'; */
 import ImageReader, { ImagePropsSchema } from '../../../documents/blocks/Image/ImageReader.vue'; 
 

@@ -1,3 +1,5 @@
+import DOMPurify from 'dompurify';
+
 // Security filtering for untrusted template HTML (ZIP/backend response, parent
 // loadDocument/loadTemplate, HTML tab, GrapesJS projects, block→HTML render).
 //
@@ -69,6 +71,14 @@ export function escapeHtmlAttr(s: string): string {
     .replace(/'/g, '&#39;');
 }
 
+/**
+ * Sanitizer for small rich-text fragments (inline editors, readers that use
+ * v-html). DOMPurify default allowlist + target on links.
+ */
+export function sanitizeInlineHtml(html: string | null | undefined): string {
+  return DOMPurify.sanitize(html == null ? '' : String(html), { ADD_ATTR: ['target'] }) as string;
+}
+
 const REMOVE_TAGS = new Set([
   'script', 'iframe', 'frame', 'frameset', 'object', 'embed', 'applet',
   'base', 'template', 'portal',
@@ -98,9 +108,13 @@ function serializeDoctype(dt: DocumentType): string {
  */
 export function sanitizeTemplateHtml(html: string): string {
   if (!html) return html;
+  const isFullDocument = /<html[\s>]/i.test(html) || /<!doctype/i.test(html);
   let doc: Document;
   try {
-    doc = new DOMParser().parseFromString(html, 'text/html');
+    // Fragments are parsed already inside <body>: otherwise a leading comment
+    // (<!--[if mso]>) is attached to the Document node and lost, and a leading
+    // <style> is hoisted into <head>.
+    doc = new DOMParser().parseFromString(isFullDocument ? html : '<!DOCTYPE html><html><head></head><body>' + html + '</body></html>', 'text/html');
   } catch {
     return ''; // fail closed
   }
@@ -139,11 +153,7 @@ export function sanitizeTemplateHtml(html: string): string {
     }
   }
 
-  const isFullDocument = /<html[\s>]/i.test(html) || /<!doctype/i.test(html);
-  if (!isFullDocument) {
-    // DOMParser hoists leading <style>/<meta>/<link> of a fragment into <head>
-    return (doc.head ? doc.head.innerHTML : '') + (doc.body ? doc.body.innerHTML : '');
-  }
+  if (!isFullDocument) return doc.body ? doc.body.innerHTML : '';
 
   let out = '';
   doc.childNodes.forEach((node) => {

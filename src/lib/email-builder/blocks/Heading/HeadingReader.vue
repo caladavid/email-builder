@@ -62,6 +62,7 @@ export const HeadingPropsDefaults = {
 </script>
 
 <script setup lang="ts">
+import { sanitizeInlineHtml } from '../../../../utils/htmlSecurity';
 import { computed } from 'vue';
 
 const props = defineProps<HeadingProps>();
@@ -69,9 +70,9 @@ const props = defineProps<HeadingProps>();
 // 1. Determinar el tag (h1, h2...)
 const headingTag = computed(() => props.props?.level ?? HeadingPropsDefaults.level);
 
-// 2. Obtener el texto (HTML seguro)
+// 2. Obtener el texto (HTML saneado: viene del documento, que puede venir del padre o de un import)
 const textContent = computed(() => {
-  return props.props?.text ?? HeadingPropsDefaults.text;
+  return sanitizeInlineHtml(props.props?.text ?? HeadingPropsDefaults.text);
 });
 
 // 3. Estilos Computados

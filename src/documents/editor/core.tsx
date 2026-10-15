@@ -9,7 +9,8 @@ import Avatar, { AvatarPropsSchema } from '@flyhub/email-block-avatar';
 import Divider, { DividerPropsSchema } from '@flyhub/email-block-divider';
 import Spacer, { SpacerPropsSchema } from '../../lib/email-builder/blocks/Space/SpacerReader.vue';
 /* import Spacer, { SpacerPropsSchema } from '@flyhub/email-block-spacer'; */
-import Html, { HtmlPropsSchema } from '@flyhub/email-block-html';
+import { HtmlPropsSchema } from '@flyhub/email-block-html';
+import Html from '../../lib/email-builder/blocks/Html/SafeHtml';
 
 import { buildBlockConfigurationDictionary, buildBlockConfigurationSchema } from '@flyhub/email-document-core/builders';
 

@@ -62,6 +62,7 @@ export const createProcessedDocument = (document: TEditorConfiguration, globalVa
 
 export function processDocumentVariables(text: string, variables: Record<string, string>): string {
     return text.replace(/\{(\w+)\}/g, (match, varName) => {
-        return varName in variables ? variables[varName] : match;
+        // hasOwnProperty, not "in": {constructor} must not resolve to Object.prototype
+        return Object.prototype.hasOwnProperty.call(variables, varName) ? variables[varName] : match;
     });
 }

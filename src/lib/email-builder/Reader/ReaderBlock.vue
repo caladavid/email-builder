@@ -10,7 +10,8 @@ import Avatar, { AvatarPropsSchema } from '@flyhub/email-block-avatar';
 import ButtonReader, { ButtonPropsSchema } from '../blocks/Button/ButtonReader.vue';
 import Divider, { DividerPropsSchema } from '@flyhub/email-block-divider';
 import Heading, { HeadingPropsSchema } from '@flyhub/email-block-heading';
-import Html, { HtmlPropsSchema } from '@flyhub/email-block-html';
+import { HtmlPropsSchema } from '@flyhub/email-block-html';
+import Html from '../blocks/Html/SafeHtml';
 /* import Image, { ImagePropsSchema } from '@flyhub/email-block-image'; */
 import ImageReader, { ImagePropsSchema } from '../../../documents/blocks/Image/ImageReader.vue'; 
 import Spacer, { SpacerPropsSchema } from '@flyhub/email-block-spacer';
@@ -74,6 +75,16 @@ const READER_DICTIONARY = {
     Component: ButtonReader,
   },
   Divider: {
+    schema: DividerPropsSchema,
+    Component: Divider,
+  },
+  // HTMLToBlockParser.ts emits type: "Separator" (HTMLToBlockParser.ts:1043)
+  // for horizontal rules, not "Divider" — this key was simply never
+  // registered, so every imported <hr> silently failed to render in Preview
+  // (documented in CLAUDE.md as a known gap; found while updating those docs
+  // for Tanda 3). Separator's shape ({ style }, no custom props) matches
+  // Divider's schema exactly, so the same component/schema handles both.
+  Separator: {
     schema: DividerPropsSchema,
     Component: Divider,
   },

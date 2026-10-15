@@ -8,9 +8,15 @@ npm run build    # production build → dist/
 npm run preview  # preview production build
 ```
 
-`npm test` runs the vitest unit suite (`test/parser/*.spec.ts`, happy-dom — no real browser, can't drive the live iframe canvas).
+`npm test` runs the vitest unit suite (`test/parser/*.spec.ts`, happy-dom — no real browser, can't drive the live iframe canvas). `vitest.config.ts` registers `@vitejs/plugin-vue`/`@vitejs/plugin-vue-jsx` so `.vue`/`.tsx` files can be *parsed* when a pure module transitively imports one (e.g. `HTMLToBlockParser.ts` → `documents/editor/core.tsx` → block editor `.vue` components) — this is NOT `@vue/test-utils`; there is still no component-mounting API here, and no test in this repo renders/mounts a Vue component. That's an intentional decision: logic that causes bugs in the block/styles system is pure and lives in `src/utils/` (`css-color.ts`, `css-length.ts`, `canvasDomHelpers.ts`, `style-display.ts`) where it's tested directly; anything DOM/iframe-shaped is a Playwright e2e script below instead.
 
-`node test/e2e/text-sync-check.mjs` — manual Playwright smoke test for the Editor↔Preview↔HTML text-sync mechanism (see "Zona frágil" below). Requires `npm run dev` running and a system Chrome install; not part of `npm test` since it needs a real browser + the dev server.
+The following need `npm run dev` running and a system Chrome install — none are part of `npm test`:
+- `node test/e2e/text-sync-check.mjs` (`npm run test:e2e`) — Editor↔Preview↔HTML text-sync mechanism (see "Zona frágil" below).
+- `node test/e2e/block-lifecycle-check.mjs` (`npm run test:e2e:lifecycle`) — destructive-edit regressions (palette click, Contenedor/placeholder refill, duplicate/move, truncation).
+- `node test/e2e/panel-roundtrip-check.mjs` (`npm run test:e2e:panel`) — styles-panel round-trip (set → deselect → reselect → same value shown): Video, Columnas widths/gap/vAlign, Lista.
+- `node test/e2e/dragdrop-affordance-check.mjs` (`npm run test:e2e:dnd`) — "+" placeholder anchoring, proportional drop edge-bands, fast selection on a blocked image host.
+- `node test/e2e/html-security-check.mjs` (`npm run test:e2e:security`): imported template HTML can't run script in the builder origin (script/on*/javascript: stripped on import and export, Outlook conditional comments kept), and the canvas bridge rejects unsafe `set-attr`/`exec-command` and commands from any window other than its parent.
+- `node test/e2e/import-normalize-check.mjs <path-to-html>` — smoke test for the import-time normalizer + paste sanitizer against a real (uncommitted) client template; takes a file path since real templates aren't committed.
 
 ## Tech Stack
 
@@ -53,6 +59,12 @@ Record<blockId, { type: string, data: { props: {...}, style: {...} } }>
 | `src/utils/parsers/HTMLToBlockParser.ts` | ZIP/HTML → blocks (137KB); CSS inlining, matchers |
 | `src/utils/documentProcessor.ts` | `createProcessedDocument()` |
 | `src/utils/markdown-formatter.ts` | `textWithFormatsToMarkdownRobust()` |
+| `src/utils/canvas-bridge.ts` | Iframe-injected canvas script — selection, hover, drag-drop, postMessage command handler |
+| `src/utils/canvasDomHelpers.ts` | Pure DOM helpers shared by `canvas-bridge.ts` and vitest — source of truth for `getElementPath`, `isFillerNode`, `hasRealChildren`, `collapseSides`, `readColumnsChildData`. **Embedding contract**: each function must be fully self-contained (no references to module-scope constants/other helpers) — `canvas-bridge.ts` pulls them in verbatim via `` var name = ${fn.toString()} `` inside its own giant template literal, and `Function.prototype.toString()` only returns a function's own source text |
+| `src/utils/htmlSecurity.ts` | `sanitizeTemplateHtml` (targeted denylist, NOT DOMPurify: DOMPurify drops Outlook `<!--[if mso]>` comments) runs in `sanitizeImportedHtml` (every import vector) and `getHtmlFromDocument` (export). `isSafeAttribute` is embedded in `canvas-bridge.ts` via `toString()` (same self-contained contract as `canvasDomHelpers.ts`). `sanitizeInlineHtml` (DOMPurify) guards every `innerHTML`/`v-html` in inline editors and readers; the Html block goes through `src/lib/email-builder/blocks/Html/SafeHtml.ts`. DOMPurify does NOT work under happy-dom (returns handlers untouched), so DOMPurify-based checks live in `test/e2e/html-security-check.mjs`, not vitest |
+| `src/utils/css-color.ts` | Pure CSS color parsing — source of truth for what a "real" vs. unset color is (`parseCssColor`/`toHex6`/`formatColor`) |
+| `src/utils/css-length.ts` | `LENGTH_RULES` — per-property CSS length rules (unitless, keywords, multi-value) layered on the legacy `normalizeLength` |
+| `src/utils/style-display.ts` | `reconcileOptions`/`normalizeFontWeight` — keeps a `<select>` in `StylesPanel.vue` from silently showing a value the user never picked |
 
 ## Backend APIs
 
@@ -76,13 +88,21 @@ El texto que se edita con doble click en el canvas (`contentEditable`, dentro de
 
 **Antes de tocar cualquiera de estos 4 puntos**, correr `node test/e2e/text-sync-check.mjs` (con `npm run dev` corriendo) para confirmar que el flujo completo sigue funcionando.
 
+## `canvas-bridge.ts`'s template-literal trap
+
+`CANVAS_BRIDGE_CODE` (the whole injected iframe script) is ONE giant backtick template literal. Inside it:
+- A **single backslash** written directly between the backticks (not through `${}`) collapses at evaluation time — `\r\n` silently becomes a real CR+LF, `\s` silently becomes a bare `s`. Always double it: `\\s`.
+- **Any unescaped backtick** — even inside a `//` comment — prematurely closes the whole template literal and corrupts everything after it into invalid top-level JS. Never write a backtick in a comment or string inside this file; use plain quotes instead.
+
+`test/parser/canvasBridgeSource.spec.ts` guards both classes of bug automatically (scans the raw `.ts` source text, not the evaluated output — by the time a buggy single backslash has been evaluated, there's nothing left to detect).
+
 ## Known Issues / Gotchas
 
-- **`createFlexContainer()` bug** (`HTMLToBlockParser.ts:2414`): puts `childrenIds` in `data` instead of `data.props` → Container children invisible in Reader preview.
-- **Missing READER_DICTIONARY types**: `Separator`, `Espaciador`, `Video`, `List`, `Script` are generated by the HTML parser but not registered in `ReaderBlock.vue`'s dictionary → those blocks silently don't render.
 - **Origin validation disabled**: `allowedOrigins.ts` always returns `true` — do not ship to prod without fixing.
 - **Dark mode forced** on init (`document.body.classList.add('dark')` in `main.ts`).
-- `renderToStaticMarkup` (HTML export to parent) uses raw `document.value`, not `processedDocument` — text formats/variables are NOT applied in the exported HTML.
+- **Accordion state leak** (`StylesPanel.vue`'s `<StyleSection>` instances): fixed via `:key="store.selectedElementPath"` on all of them — if a future refactor removes that key, a section's open/closed state will silently carry over from whatever was previously selected.
+
+Already fixed (kept here as history, not current bugs): `createFlexContainer()` used to put `childrenIds` in `data` instead of `data.props`; `Video`/`List`/`ListItem`/`Separator` used to be generated by the HTML parser but missing from `ReaderBlock.vue`'s `READER_DICTIONARY` (Separator now maps to the same `Divider` component/schema — the sanitizer already renames `Separator`→`Divider` on ZIP/HTML import, but a document delivered directly via `loadDocument` bypasses that sanitizer, so the Reader needs its own entry too); `renderToStaticMarkup` used to render raw `document.value` instead of `processedDocument`, so text formats/variables were missing from the exported HTML.
 
 ## postMessage API
 
@@ -101,4 +121,4 @@ Iframe sends to parent:
 ## Sample Templates
 
 Accessible via URL hash: `#sample/welcome`, `#sample/reset-password`, etc.
-Code-based: `#code/<base64(JSON)>`
+Code-based: `#code/<base64(JSON)>` (DEV only: in production builds it is ignored, since a crafted link would be a one-click XSS)

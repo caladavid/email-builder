@@ -91,11 +91,15 @@ export const ButtonPropsSchema = z.object({
 </script>
 
 <script setup lang="ts">
+import { isSafeUrl } from '../../../../utils/htmlSecurity';
 
 const props = defineProps<ButtonProps>()
 
 const text = computed(() => props.props?.text ?? ButtonPropsDefaults.text)
-const url = computed(() => props.props?.url ?? ButtonPropsDefaults.url)
+const url = computed(() => {
+  const u = props.props?.url ?? ButtonPropsDefaults.url;
+  return isSafeUrl(u) ? u : '#';
+})
 const fullWidth = computed(() => props.props?.fullWidth ?? ButtonPropsDefaults.fullWidth)
 
 // 🔥 FIX 5: Prioridad de colores. Si no hay prop, usa el estilo CSS.

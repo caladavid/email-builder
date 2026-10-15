@@ -46,6 +46,12 @@ export function sanitizePastedHtml(html: string): string {
     return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
+  // For attribute values: also escape quotes, otherwise an href like
+  // https://x" onmouseover="... breaks out of href="..."
+  function escapeAttr(s: string): string {
+    return escapeText(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
   function isSafeHref(href: string): boolean {
     var h = String(href || '').trim().toLowerCase();
     return /^(https?:|mailto:|tel:|#|\/)/.test(h);
@@ -69,7 +75,7 @@ export function sanitizePastedHtml(html: string): string {
         var innerA: string[] = [];
         walk(el, innerA);
         if (isSafeHref(href)) {
-          out.push('<a href="' + escapeText(href) + '">' + innerA.join('') + '</a>');
+          out.push('<a href="' + escapeAttr(href) + '">' + innerA.join('') + '</a>');
         } else {
           out.push(innerA.join(''));
         }

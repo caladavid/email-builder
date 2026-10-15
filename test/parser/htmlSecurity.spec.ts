@@ -167,3 +167,35 @@ describe('escapeHtmlAttr', () => {
     expect(escapeHtmlAttr(`a"b'c<d>&`)).toBe('a&quot;b&#39;c&lt;d&gt;&amp;');
   });
 });
+
+describe('Fase 2: sinks secundarios', () => {
+  // sanitizeInlineHtml (DOMPurify) is checked in test/e2e/html-security-check.mjs:
+  // DOMPurify doesn't work under happy-dom (returns handlers untouched).
+
+  it('pasteSanitizer escapes quotes inside href', async () => {
+    const { sanitizePastedHtml } = await import('../../src/utils/pasteSanitizer');
+    const out = sanitizePastedHtml('<a href=\'https://x.cl" onmouseover="alert(1)\'>link</a>');
+    expect(out).not.toMatch(/"\s*onmouseover=/);
+    expect(out).toContain('&quot;');
+  });
+
+  it('grapesJsProjectToHtml drops script tags, on* attrs and escapes quotes', async () => {
+    const { grapesJsProjectToHtml } = await import('../../src/utils/grapesJsToHtml');
+    const project: any = {
+      pages: [{ frames: [{ component: { components: [
+        { tagName: 'script', components: [{ type: 'textnode', content: 'alert(1)' }] },
+        { tagName: 'div', attributes: { onclick: 'alert(1)', title: 'a" onmouseover="alert(1)', 'bad name': 'x' }, components: [{ type: 'textnode', content: 'ok' }] },
+        { tagName: 'img"><svg onload=alert(1)>', components: [] },
+      ] } }] }],
+      styles: [],
+    };
+    const out = grapesJsProjectToHtml(project);
+    expect(out).not.toMatch(/<script|onclick|onload|"\s*onmouseover=/i);
+    expect(out).toContain('>ok</div>');
+  });
+
+  it('processDocumentVariables ignores prototype keys', async () => {
+    const { processDocumentVariables } = await import('../../src/utils/documentProcessor');
+    expect(processDocumentVariables('Hola {nombre} {constructor}', { nombre: 'Ana' })).toBe('Hola Ana {constructor}');
+  });
+});

@@ -117,6 +117,37 @@ async function main() {
   await page.waitForTimeout(300);
   record('command from non-parent window ignored', (await frame.evaluate(() => document.getElementById('sec-p').getAttribute('title'))) === 'ok-title');
 
+  // 7. Fase 2: sinks secundarios (DOMPurify / readers), evaluated in real Chrome
+  const p2 = await page.evaluate(async () => {
+    const { sanitizeInlineHtml, sanitizeTemplateHtml } = await import('/src/utils/htmlSecurity.ts');
+    const inline = sanitizeInlineHtml('<b>Hola</b> <i>{nombre}</i> <a href="https://celcom.cl" target="_blank">x</a><img src=x onerror="window.__pwned=1"><a href="javascript:alert(1)">y</a>');
+    const htmlBlock = sanitizeTemplateHtml('<!--[if mso]><table><tr><td>MSO</td></tr></table><![endif]--><p onclick="x()">bloque</p>');
+    const { default: renderToStaticMarkup } = await import('/src/lib/email-builder/renderers/renderToStaticMarkup.ts');
+    const doc = {
+      root: { type: 'EmailLayout', data: { childrenIds: ['h', 't', 'b', 'x'], backdropColor: '#fff', canvasColor: '#fff', textColor: '#000', fontFamily: 'MODERN_SANS' } },
+      h: { type: 'Heading', data: { props: { text: 'Titulo<img src=x onerror="window.__pwned=2">', level: 'h1' }, style: {} } },
+      t: { type: 'Text', data: { props: { markdown: true, text: '[a](javascript:alert(1)) [b](https://x.cl" onmouseover="alert(1))' }, style: {} } },
+      b: { type: 'Button', data: { props: { text: 'Boton', url: 'javascript:alert(1)' }, style: {} } },
+      x: { type: 'Html', data: { props: { contents: '<p>html</p><img src=x onerror="window.__pwned=3">' }, style: {} } },
+    };
+    const rendered = await renderToStaticMarkup(doc, { rootBlockId: 'root' });
+    // Inspect the real DOM: escaped text like "onerror=&quot;" is inert, only attributes matter
+    const parsed = new DOMParser().parseFromString(rendered, 'text/html');
+    const bad = [];
+    parsed.querySelectorAll('*').forEach((el) => {
+      for (const a of Array.from(el.attributes)) {
+        if (/^on/i.test(a.name) || /^\s*(javascript|vbscript):/i.test(a.value)) bad.push(el.localName + '[' + a.name + '=' + a.value + ']');
+      }
+    });
+    return { inline, htmlBlock, rendered, bad };
+  });
+  record('sanitizeInlineHtml keeps <b>/{var}/target, drops onerror/javascript:',
+    p2.inline.includes('<b>Hola</b>') && p2.inline.includes('{nombre}') && p2.inline.includes('target="_blank"') && !/onerror|javascript:/i.test(p2.inline), p2.inline);
+  record('Html block sanitizer keeps MSO comment, drops onclick', p2.htmlBlock.includes('<!--[if mso]>') && !/onclick/i.test(p2.htmlBlock));
+  record('rendered blocks (Heading/Text md/Button/Html) have no handlers or javascript:',
+    p2.rendered.includes('Titulo') && p2.rendered.includes('html') && p2.bad.length === 0, p2.bad.join(' | '));
+  record('nothing executed during block rendering', (await page.evaluate(() => window.__pwned)) === undefined);
+
   await browser.close();
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} passed`);

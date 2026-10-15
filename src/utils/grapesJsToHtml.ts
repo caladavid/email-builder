@@ -40,8 +40,16 @@ export function isGrapesJsProject(doc: unknown): doc is GrapesProject {
 const VOID_TAGS = new Set(['br', 'hr', 'img', 'input', 'meta', 'area', 'base', 'col', 'embed', 'source', 'track', 'wbr']);
 
 function escapeHtml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
+
+// GrapesJS projects come from the parent page (possibly authored by other
+// users): tag and attribute names are used verbatim in the markup, so only
+// accept well-formed names and never event handlers. The output still goes
+// through sanitizeTemplateHtml on import; this keeps the markup well-formed.
+const VALID_TAG = /^[a-z][a-z0-9-]*$/i;
+const VALID_ATTR = /^[a-z_:][a-z0-9_:.\-]*$/i;
+const BLOCKED_TAGS = new Set(['script', 'iframe', 'object', 'embed', 'base', 'template', 'frame', 'frameset', 'applet']);
 
 function selectorName(sel: GrapesSelector): string {
   return typeof sel === 'string' ? sel.replace(/^#/, '') : sel?.name ?? '';
@@ -82,16 +90,19 @@ function renderNode(node: GrapesComponent, rules: GrapesStyleRule[]): string {
     return escapeHtml(node.content || '');
   }
 
-  const tag = defaultTagFor(node);
+  const rawTag = defaultTagFor(node);
+  if (BLOCKED_TAGS.has(String(rawTag).toLowerCase())) return '';
+  const tag = VALID_TAG.test(rawTag) ? rawTag : 'div';
   const classNames = (node.classes || []).map(selectorName).filter(Boolean);
   const style = stylesForNode(node, rules);
 
   const attrParts: string[] = [];
   for (const [key, value] of Object.entries(node.attributes || {})) {
     if (key === 'id' || value === undefined || value === null || value === '') continue;
+    if (!VALID_ATTR.test(key) || /^on/i.test(key)) continue;
     attrParts.push(`${key}="${escapeHtml(String(value))}"`);
   }
-  if (classNames.length) attrParts.push(`class="${classNames.join(' ')}"`);
+  if (classNames.length) attrParts.push(`class="${escapeHtml(classNames.join(' '))}"`);
   const styleStr = Object.entries(style).map(([k, v]) => `${k}:${v}`).join(';');
   if (styleStr) attrParts.push(`style="${escapeHtml(styleStr)}"`);
 

@@ -22,6 +22,7 @@
 </template>                    
                   
 <script setup lang="ts">  
+import { sanitizeInlineHtml } from '../../../utils/htmlSecurity';
 import { computed, inject, nextTick, onMounted, provide, ref, watch } from 'vue';  
 import { useInspectorDrawer } from '../../editor/editor.store';  
 import { currentBlockIdSymbol } from '../../editor/EditorBlock.vue';  
@@ -318,7 +319,7 @@ function processInlineContent(
   
 function htmlToTextAndFormats(htmlContent: string): { text: string; formats: TextFormat[] } {  
   const tempDiv = document.createElement('div');  
-  tempDiv.innerHTML = htmlContent;  
+  tempDiv.innerHTML = sanitizeInlineHtml(htmlContent);  
     
   let text = "";  
   const formats: TextFormat[] = [];  
@@ -666,7 +667,7 @@ function insertVariable(variableKey: string) {
     // ÚLTIMO RECURSO: innerHTML
     /* console.warn('🔄 Last resort: innerHTML append'); */
     const currentHTML = editableDiv.value.innerHTML;
-    editableDiv.value.innerHTML = currentHTML + variableText;
+    editableDiv.value.innerHTML = sanitizeInlineHtml(currentHTML + variableText);
     handleInput();
   }
   
@@ -794,7 +795,7 @@ watch(blockProps, (newProps, oldProps) => {
     const wasFocused = document.activeElement === editableDiv.value;
     if (wasFocused) saveCursorPosition();
     
-    editableDiv.value.innerHTML = htmlContent;
+    editableDiv.value.innerHTML = sanitizeInlineHtml(htmlContent);
     
     if (wasFocused) {
       nextTick(() => restoreCursorPosition());
@@ -829,7 +830,7 @@ onMounted(() => {
   
   /* console.log('🚀 InlineTextEditor - Montado con datos del store:', { text, formats }); */
   
-  editableDiv.value.innerHTML = htmlContent;  
+  editableDiv.value.innerHTML = sanitizeInlineHtml(htmlContent);  
 });
 
 provide('editorFunctions', {

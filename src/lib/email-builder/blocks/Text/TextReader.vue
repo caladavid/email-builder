@@ -7,6 +7,7 @@
 </template>
 
 <script setup lang="ts">
+import { sanitizeInlineHtml } from '../../../../utils/htmlSecurity';
 import { computed } from 'vue';
 import { getFontFamily, getPadding } from '@flyhub/email-core';
 import DOMPurify from 'dompurify';
@@ -66,8 +67,10 @@ const renderedContent = computed(() => {
     return DOMPurify.sanitize(rawText);
   }
 
-  // Si es Markdown, aplicamos un parser simple
-  return parseBasicMarkdown(rawText);
+  // Si es Markdown, aplicamos un parser simple. El resultado también pasa por
+  // DOMPurify: la regla de links inserta la URL tal cual ([x](javascript:...)
+  // o una comilla que rompe el atributo href)
+  return sanitizeInlineHtml(parseBasicMarkdown(rawText));
 });
 
 /**

@@ -58,12 +58,16 @@ export type ImageProps = {
 </script>
 
 <script setup lang="ts">
+import { isSafeUrl } from '../../../utils/htmlSecurity';
 const props = defineProps<ImageProps>()
 
 // --- LÓGICA DE PROPS ---
 const width = computed(() => props.props?.width ?? undefined)
 const height = computed(() => props.props?.height ?? undefined)
-const linkHref = computed(() => props.props?.linkHref ?? null)
+const linkHref = computed(() => {
+  const u = props.props?.linkHref ?? null;
+  return u && !isSafeUrl(u) ? '#' : u;
+})
 
 // --- LÓGICA DE ESTILOS (Aquí estaba el problema antes) ---
 const sectionStyle = computed(() => ({
