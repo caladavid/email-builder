@@ -10,9 +10,10 @@
 // http://localhost:<port> origin listed explicitly in VITE_ALLOWED_ORIGINS
 // (for testing the production image locally, e.g. a parent app on :3000).
 // The real production build never sets it.
+// flex.multinetlabs.com (old staging) is disabled; to re-enable it for a
+// deploy, add it to VITE_ALLOWED_ORIGINS and FRAME_ANCESTORS.
 const PARENT_ORIGINS = [
   'https://flex.celcomlatam.com',
-  'https://flex.multinetlabs.com',
 ] as const;
 
 const DEV_ORIGINS = [

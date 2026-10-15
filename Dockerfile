@@ -30,7 +30,7 @@ FROM nginx:alpine
 
 # Who may embed the builder in an iframe (clickjacking protection). Only the
 # parent apps; for a local test of this image add e.g. http://localhost:3000
-ARG FRAME_ANCESTORS="https://flex.celcomlatam.com https://flex.multinetlabs.com"
+ARG FRAME_ANCESTORS="https://flex.celcomlatam.com"
   
 # Copiar archivos construidos  
 COPY --from=builder /app/dist /usr/share/nginx/html  

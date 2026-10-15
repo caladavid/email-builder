@@ -4,7 +4,7 @@ import { isOriginAllowed, isFromParent, ALLOWED_ORIGINS } from '../../src/utils/
 describe('allowedOrigins', () => {
   it('allows only the parent apps (https) and, in dev, localhost', () => {
     expect(isOriginAllowed('https://flex.celcomlatam.com')).toBe(true);
-    expect(isOriginAllowed('https://flex.multinetlabs.com')).toBe(true);
+    expect(isOriginAllowed('https://flex.multinetlabs.com')).toBe(false); // old staging, disabled
     expect(isOriginAllowed('http://localhost:5173')).toBe(true); // vitest runs in dev mode
   });
 
@@ -45,7 +45,7 @@ describe('allowedOrigins in a production build', () => {
   it('rejects localhost unless listed in VITE_ALLOWED_ORIGINS', async () => {
     const m = await load({ PROD: true, DEV: false, VITE_ALLOWED_ORIGINS: '' });
     expect(m.isOriginAllowed('https://flex.celcomlatam.com')).toBe(true);
-    expect(m.isOriginAllowed('https://flex.multinetlabs.com')).toBe(true);
+    expect(m.isOriginAllowed('https://flex.multinetlabs.com')).toBe(false);
     expect(m.isOriginAllowed('http://localhost:3000')).toBe(false);
     expect(m.isOriginAllowed('http://localhost:5173')).toBe(false);
   });
