@@ -29,8 +29,21 @@ export default defineConfig(({ mode }) => {
       }
     : undefined;
 
+  // index.html's meta CSP carries the dev server's HMR websocket and
+  // 'unsafe-eval' (Vite dev needs them). Production builds don't, so strip
+  // both from the built index.html.
+  const prodCsp = {
+    name: 'prod-csp',
+    apply: 'build' as const,
+    transformIndexHtml(html: string) {
+      return html
+        .replace(/\s+wss?:\/\/localhost:5173/g, '')
+        .replace(/\s+'unsafe-eval'/g, '');
+    },
+  };
+
   return {
-    plugins: [vue(), tailwindcss(), ui(), vueJsx()],
+    plugins: [vue(), tailwindcss(), ui(), vueJsx(), prodCsp],
     preview: localTestProxy ? { proxy: localTestProxy } : undefined,
     build: {
       rollupOptions: {

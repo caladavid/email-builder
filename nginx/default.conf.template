@@ -1,0 +1,18 @@
+server {
+    listen 80;
+    server_tokens off;
+
+    # Clickjacking: only the parent apps may embed the builder in an iframe.
+    # frame-ancestors can't be set from the <meta> CSP in index.html, so it
+    # lives here. __FRAME_ANCESTORS__ is replaced at image build time
+    # (Dockerfile ARG FRAME_ANCESTORS).
+    add_header Content-Security-Policy "frame-ancestors __FRAME_ANCESTORS__" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    location / {
+        root /usr/share/nginx/html;
+        index index.html;
+        try_files $uri $uri/ /index.html;
+    }
+}

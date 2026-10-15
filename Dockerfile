@@ -1,5 +1,5 @@
 # Stage 1: Build  
-FROM node:18-alpine AS builder  
+FROM node:20-alpine AS builder  
   
 WORKDIR /app  
   
@@ -27,20 +27,18 @@ RUN npm run build
   
 # Stage 2: Production  
 FROM nginx:alpine  
+
+# Who may embed the builder in an iframe (clickjacking protection). Only the
+# parent apps; for a local test of this image add e.g. http://localhost:3000
+ARG FRAME_ANCESTORS="https://flex.celcomlatam.com https://flex.multinetlabs.com"
   
 # Copiar archivos construidos  
 COPY --from=builder /app/dist /usr/share/nginx/html  
   
-# Configuración de Nginx para SPA  
-RUN echo 'server { \  
-    listen 80; \  
-    location / { \  
-        root /usr/share/nginx/html; \  
-        index index.html; \  
-        try_files $uri $uri/ /index.html; \  
-    } \  
-}' > /etc/nginx/conf.d/default.conf  
-  
+# Configuración de Nginx para SPA + headers de seguridad (nginx/default.conf.template)
+COPY nginx/default.conf.template /etc/nginx/conf.d/default.conf
+RUN sed -i "s|__FRAME_ANCESTORS__|${FRAME_ANCESTORS}|" /etc/nginx/conf.d/default.conf
+
 EXPOSE 80  
   
 CMD ["nginx", "-g", "daemon off;"]

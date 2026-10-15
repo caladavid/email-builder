@@ -4,4 +4,9 @@ dist
 .gitignore  
 *.md  
 .env  
-.DS_Store  
+.DS_Store
+.env.*
+!.env.production
+test
+.claude
+coverage

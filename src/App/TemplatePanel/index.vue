@@ -79,7 +79,7 @@
         <iframe
           v-if="isIframeMode"
           :srcdoc="previewHtml"
-          sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
+          sandbox="allow-popups allow-popups-to-escape-sandbox"
           style="width:100%;height:100%;border:none;display:block;min-height:00px;"
         />
         <Reader v-else :document="processedDocument" root-block-id="root" />

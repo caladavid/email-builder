@@ -3,6 +3,7 @@ import { isFromParent } from "../../utils/allowedOrigins";
 import { isGrapesJsProject, grapesJsProjectToHtml } from "../../utils/grapesJsToHtml";
 import { bakeHostIndependentDefaults } from "../../utils/htmlImportNormalizer";
 import { sanitizeTemplateHtml } from "../../utils/htmlSecurity";
+import { isSvgFile, svgFileToPng, notifySvgConverted } from "../../utils/svgToPng";
 import type { TEditorConfiguration } from "./core";
 import { defineStore } from "pinia";
 import { computed, nextTick, onScopeDispose, ref, render } from "vue";
@@ -53,7 +54,9 @@ function saveVariablesToStorage(variables: Record<string, string>) {
   }
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? 'https://dos.multinetlabs.com/sms_services';
+// || (not ??): the Dockerfile sets VITE_API_BASE to "" when the build arg
+// is missing, which used to send uploads to a relative /rest/... path
+const API_BASE = import.meta.env.VITE_API_BASE || 'https://services.celcom.cl';
 /* const API_BASE = import.meta.env.VITE_API_BASE ?? 'https://services.celcom.cl'; */
 
 export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
@@ -418,6 +421,12 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
         return false;
       }
 
+      const MAX_ZIP_SIZE = 50 * 1024 * 1024; // 50MB
+      if (!/\.zip$/i.test(file.name) || file.size > MAX_ZIP_SIZE) {
+        console.error('❌ ZIP inválido o demasiado grande (máx 50MB)');
+        return false;
+      }
+
       const formData = new FormData()
       formData.append('TOKEN', token)
       formData.append('file', file);
@@ -487,7 +496,7 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
         console.log('✅ ZIP importado como HTML directo (modo iframe)');
         return true;
       } else {
-        console.error('❌ Error procesando ZIP:', result);
+        console.error('❌ Error procesando ZIP:', result?.response, result?.message);
         return false;
       }
 
@@ -499,7 +508,19 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
 
   async function uploadImage(file: File): Promise<string | null>{
     try {
-      const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml']);
+      // SVG never reaches the service: converted to PNG first (scripts inside
+      // an SVG run if the CDN URL is opened directly; email clients don't
+      // render SVG anyway)
+      if (isSvgFile(file)) {
+        try {
+          file = await svgFileToPng(file);
+          notifySvgConverted();
+        } catch (e) {
+          console.error('❌ No se pudo convertir el SVG a PNG:', e);
+          return null;
+        }
+      }
+      const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
       if (!ALLOWED_TYPES.has(file.type)) {
         console.error('❌ Tipo de archivo no permitido:', file.type);
         return null;
@@ -532,8 +553,6 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        const errBody = await response.text().catch(() => '');
-        console.error('❌ uploadImage error body:', errBody);
         throw new Error(`Error HTTP: ${response.status}`);
       }
 
@@ -545,7 +564,6 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
           console.error('❌ Respuesta inválida del servidor imagen: data vacío');
           return null;
         }
-        console.log('✅ Imagen subida:', imageUrl);
         return imageUrl;
       } else {
         console.error('❌ Error del backend:', result.message);

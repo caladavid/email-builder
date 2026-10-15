@@ -6,6 +6,7 @@
 npm run dev      # dev server → localhost:5173
 npm run build    # production build → dist/
 npm run preview  # preview production build
+npm run preview:local  # production build on :4173 that accepts a parent on localhost:3000 and proxies /rest (see below)
 ```
 
 `npm test` runs the vitest unit suite (`test/parser/*.spec.ts`, happy-dom — no real browser, can't drive the live iframe canvas). `vitest.config.ts` registers `@vitejs/plugin-vue`/`@vitejs/plugin-vue-jsx` so `.vue`/`.tsx` files can be *parsed* when a pure module transitively imports one (e.g. `HTMLToBlockParser.ts` → `documents/editor/core.tsx` → block editor `.vue` components) — this is NOT `@vue/test-utils`; there is still no component-mounting API here, and no test in this repo renders/mounts a Vue component. That's an intentional decision: logic that causes bugs in the block/styles system is pure and lives in `src/utils/` (`css-color.ts`, `css-length.ts`, `canvasDomHelpers.ts`, `style-display.ts`) where it's tested directly; anything DOM/iframe-shaped is a Playwright e2e script below instead.
@@ -73,9 +74,11 @@ Record<blockId, { type: string, data: { props: {...}, style: {...} } }>
 | ZIP template upload | `https://services.celcom.cl/rest/protected/flex_email/addFileZip` |
 | Image upload | `https://dos.multinetlabs.com/sms_services/rest/protected/flex_email/addFileImage` |
 
-**Dev vs production:** On `localhost`, ZIP parsing runs client-side via `parseZipToBlocks()` (JSZip). On production, the ZIP is sent to the backend and the returned HTML is parsed.
+**Dev vs production:** with `npm run dev` (`import.meta.env.DEV`), ZIP parsing runs client-side (JSZip) and images fall back to base64. Production builds send the ZIP/images to the backend. SVG uploads are always converted to PNG in the browser first (`src/utils/svgToPng.ts`): SVG can carry script and email clients don't render it.
 
-Dev proxy in `vite.config.ts`: `/api-zip` → `https://services.celcom.cl/...`
+The upload services reject the `localhost` origin (CORS 403). `npm run preview:local` (mode `localtest`, `.env.localtest`) points `VITE_API_BASE` at the preview server, whose `/rest` proxy forwards server-side and drops the Origin header. Only that mode has a proxy; `npm run dev` and production don't.
+
+**Deploy (Dockerfile):** nginx config lives in `nginx/default.conf.template` (`frame-ancestors` from build arg `FRAME_ANCESTORS`, plus `nosniff` and `Referrer-Policy`). The `<meta>` CSP in `index.html` keeps `'unsafe-eval'` and the HMR websocket for dev only; the `prod-csp` plugin in `vite.config.ts` strips both from the built `index.html`.
 
 ## Zona frágil: sync Editor ↔ Preview/HTML (texto editado en el canvas)
 

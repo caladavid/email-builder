@@ -38,6 +38,7 @@
     "playwright-core": "^1.62.1",
     "tailwindcss": "^4.1.4",
     "typescript": "^5.8.3",
+    "vite": "^6.4.4",
     "vitest": "^2.0.0",
     "vue-router": "^4.5.1"
   },
@@ -51,17 +52,16 @@
     "@types/dompurify": "^3.0.5",
     "@vitejs/plugin-vue": "^5.2.3",
     "@vitejs/plugin-vue-jsx": "^4.1.2",
-    "dompurify": "^3.4.11",
+    "dompurify": "^3.4.17",
     "highlight.js": "^11.11.1",
     "jszip": "^3.10.1",
     "juice": "^11.1.0",
     "pinia": "^3.0.2",
-    "postcss": "^8.5.6",
+    "postcss": "^8.5.30",
     "postcss-safe-parser": "^7.0.1",
     "prettier": "^3.5.3",
     "turndown": "^7.2.2",
     "turndown-plugin-gfm": "^1.0.2",
-    "uuid": "^13.0.0",
-    "vite": "latest"
+    "uuid": "^13.0.0"
   }
 }

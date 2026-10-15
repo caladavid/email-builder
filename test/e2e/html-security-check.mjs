@@ -164,14 +164,21 @@ async function main() {
         if (/^on/i.test(a.name) || /^\s*(javascript|vbscript):/i.test(a.value)) bad.push(el.localName + '[' + a.name + '=' + a.value + ']');
       }
     });
-    return { inline, htmlBlock, rendered, bad };
+    // SVG upload: converted to PNG through an <img> (its script must not run)
+    const { svgFileToPng, isSvgFile } = await import('/src/utils/svgToPng.ts');
+    const svg = new File(['<svg xmlns="http://www.w3.org/2000/svg" width="120" height="40" onload="window.parent.__pwned=4"><script>window.parent.__pwned=5</script><rect width="120" height="40" fill="#0045B0"/></svg>'], 'logo.svg', { type: 'image/svg+xml' });
+    const png = await svgFileToPng(svg);
+    const bmp = await createImageBitmap(png);
+    const svgResult = { isSvg: isSvgFile(svg), type: png.type, name: png.name, w: bmp.width, h: bmp.height };
+    return { inline, htmlBlock, rendered, bad, svgResult };
   });
   record('sanitizeInlineHtml keeps <b>/{var}/target, drops onerror/javascript:',
     p2.inline.includes('<b>Hola</b>') && p2.inline.includes('{nombre}') && p2.inline.includes('target="_blank"') && !/onerror|javascript:/i.test(p2.inline), p2.inline);
   record('Html block sanitizer keeps MSO comment, drops onclick', p2.htmlBlock.includes('<!--[if mso]>') && !/onclick/i.test(p2.htmlBlock));
   record('rendered blocks (Heading/Text md/Button/Html) have no handlers or javascript:',
     p2.rendered.includes('Titulo') && p2.rendered.includes('html') && p2.bad.length === 0, p2.bad.join(' | '));
-  record('nothing executed during block rendering', (await page.evaluate(() => window.__pwned)) === undefined);
+  record('SVG upload converted to a 2x PNG', p2.svgResult.isSvg && p2.svgResult.type === 'image/png' && p2.svgResult.name === 'logo.png' && p2.svgResult.w === 240 && p2.svgResult.h === 80, JSON.stringify(p2.svgResult));
+  record('nothing executed during block rendering / SVG conversion', (await page.evaluate(() => window.__pwned)) === undefined);
 
   await browser.close();
   const failed = results.filter((r) => !r.ok);
