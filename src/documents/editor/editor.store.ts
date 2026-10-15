@@ -3,7 +3,7 @@ import { isFromParent } from "../../utils/allowedOrigins";
 import { isGrapesJsProject, grapesJsProjectToHtml } from "../../utils/grapesJsToHtml";
 import { bakeHostIndependentDefaults } from "../../utils/htmlImportNormalizer";
 import { sanitizeTemplateHtml } from "../../utils/htmlSecurity";
-import { isSvgFile, svgFileToPng, notifySvgConverted } from "../../utils/svgToPng";
+import { isSvgFile, svgFileToPng, notifySvgConverted, convertZipSvgsToPng } from "../../utils/svgToPng";
 import type { TEditorConfiguration } from "./core";
 import { defineStore } from "pinia";
 import { computed, nextTick, onScopeDispose, ref, render } from "vue";
@@ -425,6 +425,14 @@ export const useInspectorDrawer = defineStore('inspectorDrawer', () => {
       if (!/\.zip$/i.test(file.name) || file.size > MAX_ZIP_SIZE) {
         console.error('❌ ZIP inválido o demasiado grande (máx 50MB)');
         return false;
+      }
+
+      // The backend doesn't handle SVG inside a ZIP (broken image, and any
+      // script in it would be hosted as-is): convert them to PNG first
+      const svgResult = await convertZipSvgsToPng(file);
+      if (svgResult.converted > 0) {
+        file = svgResult.file;
+        notifySvgConverted();
       }
 
       const formData = new FormData()

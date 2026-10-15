@@ -8,6 +8,7 @@
 // Usage: node test/e2e/html-security-check.mjs
 
 import { chromium } from 'playwright-core';
+import JSZip from 'jszip';
 
 const BASE_URL = process.env.DEV_URL || 'http://localhost:5173';
 const CHROME_PATH = process.env.CHROME_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
@@ -179,6 +180,32 @@ async function main() {
     p2.rendered.includes('Titulo') && p2.rendered.includes('html') && p2.bad.length === 0, p2.bad.join(' | '));
   record('SVG upload converted to a 2x PNG', p2.svgResult.isSvg && p2.svgResult.type === 'image/png' && p2.svgResult.name === 'logo.png' && p2.svgResult.w === 240 && p2.svgResult.h === 80, JSON.stringify(p2.svgResult));
   record('nothing executed during block rendering / SVG conversion', (await page.evaluate(() => window.__pwned)) === undefined);
+
+  // 8. SVG inside an imported ZIP / HTML: converted to PNG before the backend
+  //    (which doesn't handle SVG: they ended up as broken images)
+  const svgSrc = '<svg xmlns="http://www.w3.org/2000/svg" width="60" height="20" onload="window.parent.__pwned=6"><script>window.parent.__pwned=7</script><rect width="60" height="20" fill="#0045B0"/></svg>';
+  const srcZip = new JSZip();
+  srcZip.file('index.html', `<html><body><p>Ñandú</p><img src="images/logo.svg"><div style="background:url('images/logo.svg')"></div></body></html>`);
+  srcZip.file('images/logo.svg', svgSrc);
+  const zipB64 = (await srcZip.generateAsync({ type: 'nodebuffer' })).toString('base64');
+  const conv = await page.evaluate(async ([zb, svg]) => {
+    const { convertZipSvgsToPng, convertSvgDataUrisInHtml } = await import('/src/utils/svgToPng.ts');
+    const bytes = Uint8Array.from(atob(zb), (c) => c.charCodeAt(0));
+    const res = await convertZipSvgsToPng(new File([bytes], 't.zip', { type: 'application/zip' }));
+    const buf = new Uint8Array(await res.file.arrayBuffer());
+    let bin = ''; for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+    const htmlIn = '<img src="data:image/svg+xml;base64,' + btoa(svg) + '"><img src="data:image/svg+xml;utf8,' + encodeURIComponent(svg) + '">';
+    const h = await convertSvgDataUrisInHtml(htmlIn, async () => 'https://cdn.example/x.png');
+    return { converted: res.converted, zipB64: btoa(bin), html: h };
+  }, [zipB64, svgSrc]);
+  const outZip = await JSZip.loadAsync(Buffer.from(conv.zipB64, 'base64'));
+  const outIndex = await outZip.file('index.html').async('string');
+  record('ZIP import: SVG converted to PNG and references rewritten',
+    conv.converted === 1 && !!outZip.file('images/logo.png') && !outZip.file('images/logo.svg')
+      && (outIndex.match(/images\/logo\.png/g) || []).length === 2 && outIndex.includes('Ñandú'), outIndex);
+  record('HTML import: data:image/svg+xml (base64 and utf8) converted and uploaded',
+    conv.html.converted === 2 && !/data:image\/svg/i.test(conv.html.html) && (conv.html.html.match(/cdn\.example\/x\.png/g) || []).length === 2);
+  record('nothing executed during ZIP/HTML SVG conversion', (await page.evaluate(() => window.__pwned)) === undefined);
 
   await browser.close();
   const failed = results.filter((r) => !r.ok);

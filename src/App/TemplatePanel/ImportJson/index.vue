@@ -117,6 +117,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useInspectorDrawer } from '../../../documents/editor/editor.store';
+import { convertSvgDataUrisInHtml, notifySvgConverted } from '../../../utils/svgToPng';
 import validateJsonStringValue from './validateJsonStringValue';
 // Type-only — the runtime module is loaded dynamically below (bundle-splitting);
 // this just brings in the `JSZip.JSZipObject` type namespace, fully erased at build time.
@@ -152,7 +153,7 @@ function handleChange(v: string) {
   error.value = validateJsonStringValue(v).error ?? null
 }
 
-function handleSubmit() {
+async function handleSubmit() {
   if (activeTab.value === "json") {
     const { error: err, data } = validateJsonStringValue(value.value)
     error.value = err ?? null
@@ -166,7 +167,10 @@ function handleSubmit() {
       htmlError.value = 'El código HTML no puede estar vacío';
       return;
     }
-    inspectorDrawer.importRawHtml(htmlCode.value);
+    // SVG embedded as data URI: convert to PNG and upload, like a manual upload
+    const { html, converted } = await convertSvgDataUrisInHtml(htmlCode.value, (f) => inspectorDrawer.uploadImage(f));
+    if (converted > 0) notifySvgConverted();
+    inspectorDrawer.importRawHtml(html);
     handleCancel();
   }
 }

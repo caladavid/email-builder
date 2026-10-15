@@ -84,3 +84,93 @@ export function notifySvgConverted(): void {
     }))
     .catch(() => {});
 }
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * ZIP import: converts every .svg inside the ZIP to .png and rewrites the
+ * references in its .html/.css files, before the ZIP goes to the backend
+ * (which doesn't handle SVG: imported SVGs ended up as broken images, and
+ * any script inside them would be hosted as-is).
+ * Text files are rewritten byte-for-byte (binary string), so a Latin-1 or
+ * UTF-8 template keeps its encoding. On any error the original ZIP is used.
+ */
+export async function convertZipSvgsToPng(file: File): Promise<{ file: File; converted: number }> {
+  try {
+    const JSZip = (await import('jszip')).default;
+    const zip = await JSZip.loadAsync(file);
+    const isJunk = (n: string) => n.startsWith('__MACOSX/') || /(^|\/)\._/.test(n);
+    const entries = (re: RegExp) => Object.keys(zip.files).filter((n) => !zip.files[n].dir && !isJunk(n) && re.test(n));
+
+    const renames: Array<[string, string]> = [];
+    for (const name of entries(/\.svg$/i)) {
+      try {
+        const text = await zip.files[name].async('string');
+        const png = await svgFileToPng(new File([text], name.split('/').pop() || 'imagen.svg', { type: 'image/svg+xml' }));
+        let newName = name.replace(/\.svg$/i, '.png');
+        if (zip.files[newName]) newName = name + '.png';
+        zip.file(newName, await png.arrayBuffer());
+        zip.remove(name);
+        renames.push([name, newName]);
+      } catch { /* unrenderable SVG: leave it as is */ }
+    }
+    if (!renames.length) return { file, converted: 0 };
+
+    for (const tn of entries(/\.(html?|css)$/i)) {
+      const original = await zip.files[tn].async('binarystring');
+      let content = original;
+      for (const [oldName, newName] of renames) {
+        const oldBase = oldName.split('/').pop() as string;
+        const newBase = newName.split('/').pop() as string;
+        // basename at a path boundary, followed by a quote, ), ?, # or space
+        const re = new RegExp(`(?<=^|[/"'(\\s=])${escapeRegExp(oldBase)}(?=["')\\s?#]|$)`, 'g');
+        content = content.replace(re, newBase);
+      }
+      if (content !== original) zip.file(tn, content, { binary: true });
+    }
+
+    const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+    return { file: new File([blob], file.name, { type: file.type || 'application/zip' }), converted: renames.length };
+  } catch {
+    return { file, converted: 0 };
+  }
+}
+
+function blobToDataUri(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(blob);
+  });
+}
+
+/**
+ * HTML import: every data:image/svg+xml URI (img src, background, CSS url())
+ * becomes a PNG, uploaded through `upload` (same path as a manual upload);
+ * if the upload isn't possible it falls back to a PNG data URI.
+ */
+export async function convertSvgDataUrisInHtml(
+  html: string,
+  upload: (file: File) => Promise<string | null>,
+): Promise<{ html: string; converted: number }> {
+  const found = Array.from(new Set(html.match(/data:image\/svg\+xml[;,][^"')\s]+/gi) || []));
+  let converted = 0;
+  for (const uri of found) {
+    try {
+      const comma = uri.indexOf(',');
+      const meta = uri.slice(0, comma);
+      const payload = uri.slice(comma + 1);
+      const text = /;base64$/i.test(meta)
+        ? new TextDecoder().decode(Uint8Array.from(atob(payload), (c) => c.charCodeAt(0)))
+        : decodeURIComponent(payload);
+      const png = await svgFileToPng(new File([text], 'imagen.svg', { type: 'image/svg+xml' }));
+      const url = (await upload(png).catch(() => null)) || (await blobToDataUri(png));
+      html = html.split(uri).join(url);
+      converted++;
+    } catch { /* leave this one as is */ }
+  }
+  return { html, converted };
+}
