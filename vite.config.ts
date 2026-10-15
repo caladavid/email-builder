@@ -9,8 +9,29 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const API_BASE = env.VITE_API_BASE ?? 'https://services.celcom.cl';
 
+  // "npm run preview:local" only (mode localtest): the ZIP/image services
+  // reject the localhost origin (CORS 403), so the preview server forwards
+  // /rest/* server-side and drops the Origin header. Production (nginx) and
+  // "npm run dev" never use this.
+  const localTestProxy = mode === 'localtest'
+    ? {
+        '/rest': {
+          target: env.PROXY_TARGET || 'https://services.celcom.cl',
+          changeOrigin: true,
+          secure: true,
+          configure: (proxy: any) => {
+            proxy.on('proxyReq', (proxyReq: any) => {
+              proxyReq.removeHeader('origin');
+              proxyReq.removeHeader('referer');
+            });
+          },
+        },
+      }
+    : undefined;
+
   return {
     plugins: [vue(), tailwindcss(), ui(), vueJsx()],
+    preview: localTestProxy ? { proxy: localTestProxy } : undefined,
     build: {
       rollupOptions: {
         output: {

@@ -15,8 +15,12 @@ COPY . .
 # Build args para variables de entorno de Vite
 ARG VITE_API_BASE
 ARG VITE_PARENT_ORIGIN
+# Optional, comma-separated extra parent origins. Leave empty in production;
+# only for testing this image locally (e.g. http://localhost:3000)
+ARG VITE_ALLOWED_ORIGINS=""
 ENV VITE_API_BASE=$VITE_API_BASE
 ENV VITE_PARENT_ORIGIN=$VITE_PARENT_ORIGIN
+ENV VITE_ALLOWED_ORIGINS=$VITE_ALLOWED_ORIGINS
 
 # Build de producción
 RUN npm run build

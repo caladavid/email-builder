@@ -10,6 +10,7 @@
     "test:e2e:panel": "node test/e2e/panel-roundtrip-check.mjs",
     "test:e2e:dnd": "node test/e2e/dragdrop-affordance-check.mjs",
     "test:e2e:security": "node test/e2e/html-security-check.mjs",
+    "preview:local": "vite build --mode localtest && vite preview --mode localtest --port 4173 --strictPort",
     "dev": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",
